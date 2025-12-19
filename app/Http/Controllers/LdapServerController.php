@@ -36,7 +36,7 @@ class LdapServerController extends Controller
 
         LdapServer::create($validated);
 
-        return redirect()->route('settings.ldap.index')->with('success', 'LDAP Server added successfully.');
+        return redirect()->route('admin.ldap.index')->with('success', 'LDAP Server added successfully.');
     }
 
     public function edit(LdapServer $ldapServer)
@@ -61,13 +61,13 @@ class LdapServerController extends Controller
 
         $ldapServer->update($validated);
 
-        return redirect()->route('settings.ldap.index')->with('success', 'LDAP Server updated successfully.');
+        return redirect()->route('admin.ldap.index')->with('success', 'LDAP Server updated successfully.');
     }
 
     public function destroy(LdapServer $ldapServer)
     {
         $ldapServer->delete();
-        return redirect()->route('settings.ldap.index')->with('success', 'LDAP Server deleted successfully.');
+        return redirect()->route('admin.ldap.index')->with('success', 'LDAP Server deleted successfully.');
     }
 
     public function testConnection(LdapServer $ldapServer, LdapService $ldapService)
