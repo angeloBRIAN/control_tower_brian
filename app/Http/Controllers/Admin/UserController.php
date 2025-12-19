@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Services\LdapService;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+    /**
+     * Available roles for assignment
+     */
+    protected array $roles = [
+        'user' => 'User (No Access)',
+        'sa' => 'Service Advisor',
+        'foreman' => 'Foreman',
+        'sparepart' => 'Sparepart',
+        'control_tower' => 'Control Tower',
+        'audit' => 'Audit',
+        'manager' => 'Workshop Manager',
+        'admin' => 'Administrator',
+    ];
+
+    /**
+     * Display a listing of users with roles
+     */
+    public function index(Request $request)
+    {
+        $query = User::query();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        $users = $query->orderBy('name')->paginate(20)->withQueryString();
+        $roles = $this->roles;
+
+        return view('admin.users.index', compact('users', 'roles'));
+    }
+
+    /**
+     * Show form to edit user role
+     */
+    public function edit(User $user)
+    {
+        $roles = $this->roles;
+        return view('admin.users.edit', compact('user', 'roles'));
+    }
+
+    /**
+     * Update user role
+     */
+    public function update(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role' => 'required|in:' . implode(',', array_keys($this->roles)),
+        ]);
+
+        $user->update(['role' => $validated['role']]);
+
+        return redirect()->route('admin.users.index')
+            ->with('success', "Role updated for {$user->name} to {$this->roles[$validated['role']]}");
+    }
+
+    /**
+     * Search LDAP users
+     */
+    public function searchLdap(Request $request)
+    {
+        $request->validate(['search' => 'required|min:2']);
+
+        try {
+            $ldapService = app(LdapService::class);
+            $results = $ldapService->searchUsers($request->search);
+
+            return response()->json([
+                'success' => true,
+                'users' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'LDAP search failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Assign role to LDAP user (creates user if doesn't exist)
+     */
+    public function assignRole(Request $request)
+    {
+        $validated = $request->validate([
+            'username' => 'required|string',
+            'name' => 'required|string',
+            'email' => 'required|email',
+            'role' => 'required|in:' . implode(',', array_keys($this->roles)),
+        ]);
+
+        // Find or create user
+        $user = User::updateOrCreate(
+            ['email' => $validated['email']],
+            [
+                'name' => $validated['name'],
+                'role' => $validated['role'],
+                'password' => bcrypt(str()->random(32)), // Random password, user uses LDAP
+            ]
+        );
+
+        return redirect()->route('admin.users.index')
+            ->with('success', "Role '{$this->roles[$validated['role']]}' assigned to {$user->name}");
+    }
+}

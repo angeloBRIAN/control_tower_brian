@@ -1,0 +1,49 @@
+# Docker ignore file - exclude from build context
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (will be installed in container)
+/node_modules
+/vendor
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs and cache
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+!/storage/logs/.gitkeep
+!/storage/framework/cache/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/views/.gitkeep
+
+# Testing
+/tests
+phpunit.xml
+
+# Documentation
+/docs
+*.md
+!README.md
+
+# Development files
+.env
+.env.backup
+.env.local
+docker-compose.override.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package archives
+*.tar.gz
+*.zip

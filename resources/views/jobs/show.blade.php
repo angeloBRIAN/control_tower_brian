@@ -1,0 +1,671 @@
+@extends('layouts.app')
+
+@section('title', 'Job Details - ' . $job->job_number)
+
+@section('content')
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ route('jobs.index') }}">Jobs</a></li>
+                <li class="breadcrumb-item active">{{ $job->job_number }}</li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="bi bi-clipboard-check me-2"></i>{{ $job->job_number }}
+            <span class="badge {{ $job->franchise == 'CV' ? 'bg-info' : 'bg-secondary' }} fs-6">{{ $job->franchise }}</span>
+            @if($job->department)
+                @php
+                    $deptBadge = match(strtoupper($job->department ?? '')) {
+                        'W' => ['bg-primary', 'Workshop'],
+                        'B' => ['bg-warning text-dark', 'Body Paint'],
+                        default => ['bg-secondary', $job->department],
+                    };
+                @endphp
+                <span class="badge {{ $deptBadge[0] }} fs-6">{{ $deptBadge[1] }}</span>
+            @endif
+            @if($job->type_sale)
+                @php
+                    $typeSaleBadge = match(strtoupper($job->type_sale ?? '')) {
+                        'INT' => ['bg-info', 'Internal'],
+                        'WAR' => ['bg-warning text-dark', 'Warranty'],
+                        'CASH' => ['bg-success', 'Cash'],
+                        default => ['bg-secondary', $job->type_sale],
+                    };
+                @endphp
+                <span class="badge {{ $typeSaleBadge[0] }} fs-6">{{ $typeSaleBadge[1] }}</span>
+            @endif
+            @if($job->status == 'invoiced')
+                <span class="badge bg-success fs-6">Invoiced</span>
+            @else
+                <span class="badge bg-warning text-dark fs-6">Uninvoiced</span>
+            @endif
+        </h1>
+    </div>
+    <div>
+        @if(auth()->user()->canEdit())
+            @if($job->status == 'uninvoiced')
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#markInvoicedModal">
+                <i class="bi bi-check-circle me-1"></i>Mark Invoiced
+            </button>
+            @endif
+        @endif
+    </div>
+</div>
+
+@if(auth()->user()->canEdit())
+<form action="{{ route('jobs.update', $job) }}" method="POST" id="jobForm">
+    @csrf
+    @method('PUT')
+@php 
+    $readonly = false; 
+    $isControlTower = auth()->user()->hasRole('control_tower');
+@endphp
+@else
+<div>
+@php 
+    $readonly = true;
+    $isControlTower = false;
+@endphp
+@endif
+    
+    <div class="row g-4">
+        <div class="col-md-8">
+            <!-- Job Identification -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <span><i class="bi bi-tag me-2"></i>Job Identification</span>
+                    @if(auth()->user()->canEdit())
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-save me-1"></i>Save
+                    </button>
+                    @endif
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Department</label>
+                             <input type="text" name="department" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('department', $job->department) }}" placeholder="GR/BP">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">WIP</label>
+                            <input type="text" name="job_number" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('job_number', $job->job_number) }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Job Card</label>
+                            <input type="text" name="job_card" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('job_card', $job->job_card) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Franchise</label>
+                            <select name="franchise" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }} required>
+                                <option value="PC" {{ old('franchise', $job->franchise) == 'PC' ? 'selected' : '' }}>PC</option>
+                                <option value="CV" {{ old('franchise', $job->franchise) == 'CV' ? 'selected' : '' }}>CV</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Created</label>
+                            <input type="date" name="job_date" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('job_date', $job->job_date?->format('Y-m-d')) }}">
+                        </div>
+                        
+                        <!-- New Date Fields -->
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Date In / Check-In</label>
+                            <div class="input-group input-group-sm">
+                                <input type="date" name="date_in" class="form-control" {{ $readonly ? 'disabled' : '' }} value="{{ old('date_in', $job->date_in?->format('Y-m-d')) }}">
+                                <input type="time" name="check_in_time" class="form-control" {{ $readonly ? 'disabled' : '' }} value="{{ old('check_in_time', $job->check_in_time ? \Carbon\Carbon::parse($job->check_in_time)->format('H:i') : '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Date Out</label>
+                            <input type="date" name="date_out" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('date_out', $job->date_out?->format('Y-m-d')) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Promise Date</label>
+                            <input type="date" name="promise_date" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('promise_date', $job->promise_date?->format('Y-m-d')) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Deadline</label>
+                            <input type="date" name="deadline" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('deadline', $job->deadline?->format('Y-m-d')) }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicle & Customer -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <i class="bi bi-car-front me-2"></i>Vehicle & Customer
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Reg No</label>
+                            <input type="text" name="plate_number" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('plate_number', $job->plate_number) }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Chassis Number</label>
+                            <input type="text" name="chassis_number" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('chassis_number', $job->chassis_number) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Unit</label>
+                            <input type="text" name="unit" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('unit', $job->unit) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Type Unit</label>
+                            <input type="text" name="type_unit" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('type_unit', $job->type_unit) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Account No</label>
+                            <input type="text" name="account_no" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('account_no', $job->account_no) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Date First Reg</label>
+                            <input type="date" name="date_first_reg" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('date_first_reg', $job->date_first_reg?->format('Y-m-d')) }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-muted mb-0">Customer Name</label>
+                            <input type="text" name="customer_name" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('customer_name', $job->customer_name) }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small text-muted mb-0">Customer Address</label>
+                            <textarea name="customer_address" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} rows="3" style="resize: vertical;">{{ old('customer_address', $job->customer_address) }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personnel & Job Info -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <i class="bi bi-people me-2"></i>Personnel & Info
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Service Advisor</label>
+                            <select name="service_advisor" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }}>
+                                <option value="">-- Select SA --</option>
+                                @foreach($serviceAdvisors as $sa)
+                                    <option value="{{ $sa->name }}" {{ old('service_advisor', $job->service_advisor) == $sa->name ? 'selected' : '' }}>{{ $sa->name }}</option>
+                                @endforeach
+                                @if($job->service_advisor && !$serviceAdvisors->contains('name', $job->service_advisor))
+                                    <option value="{{ $job->service_advisor }}" selected>{{ $job->service_advisor }}</option>
+                                @endif
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Foreman</label>
+                            <select name="foreman" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }}>
+                                <option value="">-- Select Foreman --</option>
+                                @foreach($foremen as $fm)
+                                    <option value="{{ $fm->name }}" {{ old('foreman', $job->foreman) == $fm->name ? 'selected' : '' }}>{{ $fm->name }}</option>
+                                @endforeach
+                                @if($job->foreman && !$foremen->contains('name', $job->foreman))
+                                    <option value="{{ $job->foreman }}" selected>{{ $job->foreman }}</option>
+                                @endif
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Technician</label>
+                            <input type="text" name="technician" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('technician', $job->technician) }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Block</label>
+                            <input type="text" name="block" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('block', $job->block) }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Work Status</label>
+                            <select name="work_status" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }}>
+                                <option value="">-- Select Status --</option>
+                                <option value="pending" {{ old('work_status', $job->work_status) == 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="in_progress" {{ old('work_status', $job->work_status) == 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                                <option value="waiting_parts" {{ old('work_status', $job->work_status) == 'waiting_parts' ? 'selected' : '' }}>Waiting Parts</option>
+                                <option value="waiting_approval" {{ old('work_status', $job->work_status) == 'waiting_approval' ? 'selected' : '' }}>Waiting Approval</option>
+                                <option value="completed" {{ old('work_status', $job->work_status) == 'completed' ? 'selected' : '' }}>Completed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Payment Type</label>
+                            <input type="text" name="payment_type" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('payment_type', $job->payment_type) }}" placeholder="CASH, AR, etc">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small text-muted mb-0">Job Description (Operation)</label>
+                            <input type="text" name="job_description" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('job_description', $job->job_description) }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <i class="bi bi-currency-dollar me-2"></i>Sales
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Labour Sales (Rp)</label>
+                            <input type="number" name="labour_sales" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('labour_sales', $job->labour_sales) }}" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Part Sales (Rp)</label>
+                            <input type="number" name="part_sales" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('part_sales', $job->part_sales) }}" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Total Sales (Rp)</label>
+                            <input type="number" name="total_sales" class="form-control form-control-sm fw-bold" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('total_sales', $job->total_sales) }}" step="0.01">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice History -->
+            @if($job->invoices->count() > 0)
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-receipt me-2"></i>Invoice History</span>
+                    <span class="badge bg-success">Total: Rp {{ number_format($job->total_invoice_amount, 0, ',', '.') }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Invoice #</th>
+                                <th>Type</th>
+                                <th>Type Sale</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($job->invoices as $invoice)
+                            <tr>
+                                <td>{{ $invoice->invoice_date?->format('d/m/Y') ?? '-' }}</td>
+                                <td><code>{{ $invoice->invoice_number ?? '-' }}</code></td>
+                                <td>
+                                    @if($invoice->invoice_type == 'credit_note')
+                                        <span class="badge bg-danger"><i class="bi bi-dash-circle me-1"></i>Credit Note</span>
+                                    @else
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Invoice</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @php
+                                        $typeSaleBadge = match(strtoupper($invoice->type_sale ?? '')) {
+                                            'INT' => 'bg-info',
+                                            'WAR' => 'bg-warning text-dark',
+                                            'CASH' => 'bg-primary',
+                                            default => 'bg-secondary',
+                                        };
+                                    @endphp
+                                    <span class="badge {{ $typeSaleBadge }}">{{ $invoice->type_sale_label }}</span>
+                                </td>
+                                <td class="text-end {{ $invoice->invoice_type == 'credit_note' ? 'text-danger' : '' }}">
+                                    {{ $invoice->invoice_type == 'credit_note' ? '-' : '' }}Rp {{ number_format($invoice->inv_ppn_meterai, 0, ',', '.') }}
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
+            <!-- Order & Parts -->
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-gear me-2"></i>Order & Parts
+                        @if($job->need_part)
+                            <span class="badge bg-warning text-dark ms-2"><i class="bi bi-exclamation-triangle"></i> Needs Parts</span>
+                        @endif
+                    </span>
+                    @if(auth()->user()->hasRole('sparepart') && $job->need_part)
+                        <button type="submit" form="orderPartsForm" class="btn btn-primary btn-sm">
+                            <i class="bi bi-save me-1"></i>Save Parts Info
+                        </button>
+                    @endif
+                </div>
+                <div class="card-body py-3">
+                    @if(auth()->user()->canEdit())
+                    {{-- Full edit access for Control Tower (partial), Manager, Admin --}}
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">RQ</label>
+                            <input type="text" name="rq" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('rq', $job->rq) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
+                            <input type="text" name="no_order_part_mbina" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('no_order_part_mbina', $job->no_order_part_mbina) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Lain Lain</label>
+                            <input type="text" name="lain_lain" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('lain_lain', $job->lain_lain) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0 d-block">&nbsp;</label>
+                            <div class="form-check">
+                                <input type="hidden" name="need_part" value="0">
+                                <input class="form-check-input" type="checkbox" name="need_part" value="1" id="needPart" {{ old('need_part', $job->need_part) ? 'checked' : '' }}>
+                                <label class="form-check-label text-warning fw-bold" for="needPart">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Needs Parts
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    @elseif(auth()->user()->hasRole('sparepart') && $job->need_part)
+                    {{-- Sparepart role: can edit RQ, Order Part, Lain-lain on jobs that need parts --}}
+                    </form>{{-- Close main form --}}
+                    <form action="{{ route('jobs.update-order-parts', $job) }}" method="POST" id="orderPartsForm">
+                        @csrf
+                        @method('PATCH')
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">RQ</label>
+                                <input type="text" name="rq" class="form-control form-control-sm" value="{{ old('rq', $job->rq) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
+                                <input type="text" name="no_order_part_mbina" class="form-control form-control-sm" value="{{ old('no_order_part_mbina', $job->no_order_part_mbina) }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">Lain Lain</label>
+                                <input type="text" name="lain_lain" class="form-control form-control-sm" value="{{ old('lain_lain', $job->lain_lain) }}">
+                            </div>
+                        </div>
+                    </form>
+                    <form>{{-- Reopen dummy form to avoid HTML issues --}}
+                    @else
+                    {{-- Read-only view for SA, Foreman, Audit, etc --}}
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">RQ</label>
+                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->rq ?: '-' }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
+                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->no_order_part_mbina ?: '-' }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Lain Lain</label>
+                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->lain_lain ?: '-' }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted mb-0">Needs Parts</label>
+                            <div class="form-control-plaintext form-control-sm">
+                                @if($job->need_part)
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Yes</span>
+                                @else
+                                    <span class="text-muted">No</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Close main form before comments to avoid nested form issue --}}
+            @if(auth()->user()->canEdit())
+            </form>
+            @else
+            </div>
+            @endif
+
+            <!-- Comments Section -->
+            <div class="card">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-chat-dots me-2"></i>Comments <span class="badge bg-secondary ms-1">{{ $job->remarks->count() }}</span></span>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Comment List -->
+                    <div class="comment-container" id="commentContainer">
+                        @forelse($job->remarks as $remark)
+                        <div class="comment-item {{ auth()->id() == $remark->user_id ? 'comment-own' : '' }}">
+                            <div class="comment-avatar" style="background-color: {{ sprintf('#%06X', crc32($remark->commenter_name) & 0xFFFFFF) }}">
+                                {{ $remark->commenter_initials }}
+                            </div>
+                            <div class="comment-content">
+                                <div class="comment-meta">
+                                    <span class="comment-author">{{ $remark->commenter_name }}</span>
+                                    @if($remark->user)
+                                    <span class="badge bg-{{ $remark->user->role == 'admin' ? 'danger' : ($remark->user->role == 'manager' ? 'primary' : ($remark->user->role == 'control_tower' ? 'info' : ($remark->user->role == 'sparepart' ? 'warning' : 'secondary'))) }} badge-sm">{{ $remark->user->getRoleDisplayName() }}</span>
+                                    @endif
+                                    <span class="comment-time">{{ $remark->time_ago }}</span>
+                                </div>
+                                <div class="comment-text">{{ $remark->remark_text }}</div>
+                            </div>
+                        </div>
+                        @empty
+                        <div class="text-center text-muted py-4" id="noCommentsMessage">
+                            <i class="bi bi-chat-left-text fs-1 opacity-50"></i>
+                            <p class="mb-0 mt-2">No comments yet. Be the first to add one!</p>
+                        </div>
+                        @endforelse
+                    </div>
+
+                    <!-- Add Comment Form (Inline) -->
+                    @if(auth()->user()->canAddRemarks())
+                    <div class="comment-form-container">
+                        <form id="inlineCommentForm" class="d-flex gap-2 align-items-start">
+                            @csrf
+                            <div class="comment-avatar comment-avatar-sm" style="background-color: {{ sprintf('#%06X', crc32(auth()->user()->name) & 0xFFFFFF) }}">
+                                {{ auth()->user()->initials }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <textarea name="remark_text" class="form-control form-control-sm" rows="2" placeholder="Write a comment..." required id="remarkTextInput"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm" id="submitCommentBtn">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </form>
+                    </div>
+                    @endif
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+            <!-- Status Card -->
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <i class="bi bi-info-circle me-2"></i>Status
+                </div>
+                <div class="card-body py-3">
+                    @if($job->status == 'invoiced')
+                        <div class="alert alert-success mb-3 py-2">
+                            <strong><i class="bi bi-check-circle me-1"></i>Invoiced</strong><br>
+                            <small class="d-block">{{ $job->invoice_number }}</small>
+                            <small class="d-block text-muted">{{ $job->invoiced_at?->format('d/m/Y H:i') }}</small>
+                        </div>
+                        <ul class="list-group list-group-flush mb-0 small">
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Amount</span>
+                                <span class="fw-bold">{{ number_format($job->inv_amount, 2) }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">PPN</span>
+                                <span>{{ number_format($job->inv_ppn, 2) }}</span>
+                            </li>
+                            @if($job->inv_ppn_meterai > 0)
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span class="text-muted">Meterai</span>
+                                <span>{{ number_format($job->inv_ppn_meterai, 2) }}</span>
+                            </li>
+                            @endif
+                        </ul>
+                    @else
+                        <div class="alert alert-warning mb-3 py-2">
+                            <strong><i class="bi bi-clock me-1"></i>Uninvoiced</strong>
+                        </div>
+                        @if(auth()->user()->canMarkInvoiced())
+                        <button type="button" class="btn btn-success btn-sm w-100" data-bs-toggle="modal" data-bs-target="#markInvoicedModal">
+                            <i class="bi bi-check-circle me-1"></i>Mark as Invoiced
+                        </button>
+                        @endif
+                    @endif
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card">
+                <div class="card-header py-2">
+                    <i class="bi bi-gear me-2"></i>Actions
+                </div>
+                <div class="card-body py-3">
+                    @if(auth()->user()->canEdit())
+                    <button type="submit" form="jobForm" class="btn btn-primary btn-sm w-100 mb-2">
+                        <i class="bi bi-save me-1"></i>Save Changes
+                    </button>
+                    @endif
+                    <a href="{{ route('jobs.index') }}" class="btn btn-outline-secondary btn-sm w-100 mb-2">
+                        <i class="bi bi-arrow-left me-1"></i>Back to List
+                    </a>
+                    @if(auth()->user()->hasRole('admin'))
+                    <hr>
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                        <i class="bi bi-trash me-1"></i>Delete Job
+                    </button>
+                    @endif
+                </div>
+            </div>
+    </div>
+
+<!-- Mark Invoiced Modal -->
+<div class="modal fade" id="markInvoicedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('jobs.mark-invoiced', $job) }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Mark as Invoiced</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Invoice Number <span class="text-danger">*</span></label>
+                        <input type="text" name="invoice_number" class="form-control" required placeholder="Enter invoice number">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remark <span class="text-danger">*</span></label>
+                        <textarea name="remark" class="form-control" required placeholder="Enter reason or details for invoicing..." rows="3"></textarea>
+                        <div class="form-text">A remark is required when marking a job as invoiced.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Mark as Invoiced</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ route('jobs.destroy', $job) }}" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-trash me-2"></i>Delete Job</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete job <strong>{{ $job->job_number }}</strong>?</p>
+                    <p class="text-danger mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Comment AJAX Script -->
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('inlineCommentForm');
+    if (!form) return;
+
+    const submitBtn = document.getElementById('submitCommentBtn');
+    const textarea = document.getElementById('remarkTextInput');
+    const container = document.getElementById('commentContainer');
+    const noCommentsMsg = document.getElementById('noCommentsMessage');
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const remarkText = textarea.value.trim();
+        if (!remarkText) return;
+
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        try {
+            const response = await fetch('{{ route("jobs.add-remark", $job) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ remark_text: remarkText })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Remove "no comments" message if present
+                if (noCommentsMsg) noCommentsMsg.remove();
+
+                // Create new comment element
+                const commentHtml = `
+                    <div class="comment-item comment-own">
+                        <div class="comment-avatar" style="background-color: ${data.remark.avatar_color}">
+                            ${data.remark.initials}
+                        </div>
+                        <div class="comment-content">
+                            <div class="comment-meta">
+                                <span class="comment-author">${data.remark.commenter_name}</span>
+                                <span class="badge bg-${data.remark.role_color} badge-sm">${data.remark.role_display}</span>
+                                <span class="comment-time">just now</span>
+                            </div>
+                            <div class="comment-text">${data.remark.text}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Prepend to container (newest first)
+                container.insertAdjacentHTML('afterbegin', commentHtml);
+
+                // Update comment count badge
+                const badge = document.querySelector('.card-header .badge.bg-secondary');
+                if (badge) {
+                    badge.textContent = parseInt(badge.textContent) + 1;
+                }
+
+                // Clear textarea
+                textarea.value = '';
+            } else {
+                alert(data.message || 'Failed to add comment');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-send"></i>';
+        }
+    });
+});
+</script>
+@endpush
+@endsection
+

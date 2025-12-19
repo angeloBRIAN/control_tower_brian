@@ -1,0 +1,554 @@
+@extends('layouts.app')
+
+@section('title', 'All Jobs')
+
+@section('content')
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-clipboard-check me-2"></i>All Jobs</h1>
+        <p class="text-muted">Total: {{ $jobs->total() }} jobs</p>
+    </div>
+    <a href="{{ route('jobs.create') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-2"></i>Add Job
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-center" id="searchForm">
+            <div class="col-md-2">
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="Search WIP, Plate..." value="{{ request('search') }}">
+            </div>
+            <div class="col-md-2">
+                <select name="franchise" class="form-select form-select-sm">
+                    <option value="">All Franchise</option>
+                    <option value="PC" {{ request('franchise') == 'PC' ? 'selected' : '' }}>PC</option>
+                    <option value="CV" {{ request('franchise') == 'CV' ? 'selected' : '' }}>CV</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All Status</option>
+                    <option value="uninvoiced" {{ request('status') == 'uninvoiced' ? 'selected' : '' }}>Uninvoiced</option>
+                    <option value="invoiced" {{ request('status') == 'invoiced' ? 'selected' : '' }}>Invoiced</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
+                <a href="{{ route('jobs.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+                
+                @auth
+                <div class="dropdown">
+                    <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-layout-three-columns"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 240px; max-height: 500px; overflow-y: auto;">
+                        <h6 class="dropdown-header">Visible Columns</h6>
+                        <div id="columnToggles"></div>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" class="btn btn-primary btn-sm w-100" id="saveColumnsBtn">Save</button>
+                    </div>
+                </div>
+                @endauth
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 70vh; overflow: auto;">
+            <table class="table table-hover table-bordered table-sm mb-0" id="dataTable" style="white-space: nowrap;">
+                <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
+                    @php
+                        $storedPrefs = auth()->user()?->column_preferences ?? [];
+                        $userSort = $storedPrefs['sort'] ?? 'created_at';
+                        $userDir = $storedPrefs['dir'] ?? 'desc';
+                        $currentSort = request('sort', $userSort);
+                        $currentDir = request('dir', $userDir);
+                        $sortMap = [
+                            'wip' => 'job_number',
+                            'job_card' => 'job_card',
+                            'job_date' => 'job_date',
+                            'date_in' => 'date_in',
+                            'date_out' => 'date_out',
+                            'reg_no' => 'plate_number',
+                            'customer' => 'customer_name',
+                            'sa' => 'service_advisor',
+                            'foreman' => 'foreman',
+                            'labour' => 'labour_sales',
+                            'part' => 'part_sales',
+                            'total' => 'total_sales',
+                            'inv_date' => 'invoice_date',
+                            'inv_amt' => 'inv_amount',
+                            'dept' => 'department',
+                            'check_in' => 'check_in_time',
+                            'deadline' => 'deadline',
+                            'promise' => 'promise_date',
+                            'chassis' => 'chassis_number',
+                            'unit' => 'unit_type',
+                            'account' => 'account_no',
+                            'first_reg' => 'date_first_reg',
+                            'technician' => 'technician',
+                            'block' => 'block',
+                            'job_type' => 'job_type',
+                            'pay_type' => 'payment_type',
+                            'type_sale' => 'type_sale',
+                            'job_desc' => 'job_description',
+                            'work_status' => 'work_status',
+                            'estimated' => 'estimated_amount',
+                            'rq' => 'rq',
+                            'order_part' => 'no_order_part_mbina',
+                            'lain_lain' => 'lain_lain',
+                            'need_part' => 'need_part',
+                            'inv_no' => 'invoice_number',
+                            'inv_ppn' => 'inv_ppn',
+                            'inv_total' => 'inv_ppn_meterai',
+                            'last_updated' => 'latest_remark_at',
+                            'status' => 'status',
+                        ];
+                        // All columns - grouped logically
+                        $allColumns = [
+                            // Core identifiers
+                            'wip' => 'WIP',
+                            'job_card' => 'Job Card',
+                            'dept' => 'Dept',
+                            // Dates
+                            'job_date' => 'Job Date',
+                            'date_in' => 'Date In',
+                            'date_out' => 'Date Out',
+                            'check_in' => 'Check In',
+                            'deadline' => 'Deadline',
+                            'promise' => 'Promise Date',
+                            // Vehicle
+                            'reg_no' => 'Reg No',
+                            'chassis' => 'Chassis',
+                            'unit' => 'Unit Type',
+                            'account' => 'Account No',
+                            'first_reg' => 'First Reg',
+                            // Customer
+                            'customer' => 'Customer',
+                            'address' => 'Address',
+                            // Personnel
+                            'sa' => 'SA',
+                            'foreman' => 'Foreman',
+                            'technician' => 'Technician',
+                            'block' => 'Block',
+                            // Job info
+                            'job_type' => 'Job Type',
+                            'pay_type' => 'Payment Type',
+                            'type_sale' => 'Type Sale',
+                            'job_desc' => 'Job Desc',
+                            'work_status' => 'Work Status',
+                            // Sales
+                            'labour' => 'Labour',
+                            'part' => 'Part',
+                            'total' => 'Total',
+                            'estimated' => 'Estimated',
+                            // Parts/Orders
+                            'rq' => 'RQ',
+                            'order_part' => 'Order Part',
+                            'lain_lain' => 'Lain-lain',
+                            'need_part' => 'Needs Parts',
+                            // Invoice
+                            'inv_no' => 'Invoice #',
+                            'inv_date' => 'Inv Date',
+                            'inv_amt' => 'Inv Amt',
+                            'inv_ppn' => 'Inv+PPN',
+                            'inv_total' => 'Inv+Meterai',
+                            // Remarks & Status
+                            'first_remark' => 'First Remark',
+                            'update_remark' => 'Latest Remark',
+                            'last_updated' => 'Remark Updated',
+                            'status' => 'Status',
+                            'action' => 'Action',
+                        ];
+                        // Filterable columns map (col alias => filter param name)
+                        $filterMap = [
+                            'sa' => 'service_advisor',
+                            'foreman' => 'foreman',
+                            'dept' => 'department',
+                            'work_status' => 'work_status',
+                            'block' => 'block',
+                            'technician' => 'technician',
+                            'job_type' => 'job_type',
+                            'pay_type' => 'payment_type',
+                            'need_part' => 'need_part',
+                        ];
+                    @endphp
+                    <tr id="headerRow">
+                        <th data-col="no">#</th>
+                        @foreach($allColumns as $col => $label)
+                            @php
+                                $sortable = isset($sortMap[$col]);
+                                $sortField = $sortMap[$col] ?? null;
+                                $isActive = $sortable && $currentSort === $sortField;
+                                $nextDir = $isActive && $currentDir === 'asc' ? 'desc' : 'asc';
+                                $filterable = isset($filterMap[$col]);
+                                $filterParam = $filterMap[$col] ?? null;
+                                $activeFilter = $filterable ? request("filter_{$filterParam}") : null;
+                            @endphp
+                            <th data-col="{{ $col }}" @if($sortable) style="cursor: pointer;" @endif>
+                                <div class="d-flex align-items-center gap-1">
+                                    @if($sortable)
+                                        <a href="{{ request()->fullUrlWithQuery(['sort' => $sortField, 'dir' => $nextDir]) }}" class="text-white text-decoration-none flex-grow-1 d-flex align-items-center">
+                                            {{ $label }}
+                                            @if($isActive)
+                                                <i class="bi bi-arrow-{{ $currentDir === 'asc' ? 'up' : 'down' }} ms-1"></i>
+                                            @else
+                                                <i class="bi bi-arrow-down-up ms-1 opacity-25"></i>
+                                            @endif
+                                        </a>
+                                    @else
+                                        <span class="flex-grow-1">{{ $label }}</span>
+                                    @endif
+                                    @if($filterable && isset($filterOptions[$filterParam]))
+                                        <div class="dropdown">
+                                            <button class="btn btn-link btn-sm p-0 text-white {{ $activeFilter ? 'text-warning' : 'opacity-50' }}" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="event.stopPropagation()">
+                                                <i class="bi bi-funnel{{ $activeFilter ? '-fill' : '' }}"></i>
+                                            </button>
+                                            <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 150px; max-height: 250px; overflow-y: auto;">
+                                                <a href="{{ request()->fullUrlWithQuery(["filter_{$filterParam}" => null]) }}" class="dropdown-item small {{ !$activeFilter ? 'active' : '' }}">All</a>
+                                                <div class="dropdown-divider"></div>
+                                                @foreach($filterOptions[$filterParam] as $option)
+                                                    <a href="{{ request()->fullUrlWithQuery(["filter_{$filterParam}" => $option]) }}" class="dropdown-item small {{ $activeFilter == $option ? 'active' : '' }}">{{ $option ?: '(empty)' }}</a>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @elseif($col === 'need_part')
+                                        <div class="dropdown">
+                                            <button class="btn btn-link btn-sm p-0 text-white {{ request('filter_need_part') ? 'text-warning' : 'opacity-50' }}" type="button" data-bs-toggle="dropdown" onclick="event.stopPropagation()">
+                                                <i class="bi bi-funnel{{ request('filter_need_part') ? '-fill' : '' }}"></i>
+                                            </button>
+                                            <div class="dropdown-menu dropdown-menu-end p-2">
+                                                <a href="{{ request()->fullUrlWithQuery(['filter_need_part' => null]) }}" class="dropdown-item small {{ !request('filter_need_part') ? 'active' : '' }}">All</a>
+                                                <a href="{{ request()->fullUrlWithQuery(['filter_need_part' => '1']) }}" class="dropdown-item small {{ request('filter_need_part') === '1' ? 'active' : '' }}">Yes</a>
+                                                <a href="{{ request()->fullUrlWithQuery(['filter_need_part' => '0']) }}" class="dropdown-item small {{ request('filter_need_part') === '0' ? 'active' : '' }}">No</a>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    @forelse($jobs as $index => $job)
+                    <tr onclick="window.location='{{ route('jobs.show', $job) }}'" style="cursor: pointer;">
+                        <td data-col="no">{{ $jobs->firstItem() + $index }}</td>
+                        {{-- Core identifiers --}}
+                        <td data-col="wip">
+                            <span class="fw-bold text-primary">{{ $job->job_number }}</span>
+                            <span class="badge {{ $job->franchise == 'CV' ? 'bg-info' : 'bg-secondary' }} ms-1">{{ $job->franchise }}</span>
+                        </td>
+                        <td data-col="job_card">{{ $job->job_card }}</td>
+                        <td data-col="dept">{{ $job->department }}</td>
+                        {{-- Dates --}}
+                        <td data-col="job_date"><small>{{ $job->job_date?->format('d/m/y') }}</small></td>
+                        <td data-col="date_in"><small>{{ $job->date_in?->format('d/m/y') }}</small></td>
+                        <td data-col="date_out"><small>{{ $job->date_out?->format('d/m/y') }}</small></td>
+                        <td data-col="check_in"><small>{{ $job->check_in_time }}</small></td>
+                        <td data-col="deadline"><small>{{ $job->deadline?->format('d/m/y') }}</small></td>
+                        <td data-col="promise"><small>{{ $job->promise_date?->format('d/m/y') }}</small></td>
+                        {{-- Vehicle --}}
+                        <td data-col="reg_no">{{ $job->plate_number }}</td>
+                        <td data-col="chassis"><small>{{ $job->chassis_number }}</small></td>
+                        <td data-col="unit">{{ $job->unit_type }}</td>
+                        <td data-col="account">{{ $job->account_no }}</td>
+                        <td data-col="first_reg"><small>{{ $job->date_first_reg?->format('d/m/y') }}</small></td>
+                        {{-- Customer --}}
+                        <td data-col="customer" class="text-truncate" style="max-width: 120px;">{{ $job->customer_name }}</td>
+                        <td data-col="address" class="text-truncate" style="max-width: 150px;"><small>{{ Str::limit($job->customer_address, 30) }}</small></td>
+                        {{-- Personnel --}}
+                        <td data-col="sa">{{ $job->service_advisor }}</td>
+                        <td data-col="foreman">{{ $job->foreman }}</td>
+                        <td data-col="technician">{{ $job->technician }}</td>
+                        <td data-col="block">{{ $job->block }}</td>
+                        {{-- Job info --}}
+                        <td data-col="job_type">{{ $job->job_type }}</td>
+                        <td data-col="pay_type">{{ $job->payment_type }}</td>
+                        <td data-col="type_sale">{{ $job->type_sale }}</td>
+                        <td data-col="job_desc" class="text-truncate" style="max-width: 100px;"><small>{{ Str::limit($job->job_description, 20) }}</small></td>
+                        <td data-col="work_status">{{ $job->work_status }}</td>
+                        {{-- Sales --}}
+                        <td data-col="labour" class="text-end"><small>{{ $job->labour_sales ? number_format($job->labour_sales, 0, ',', '.') : '-' }}</small></td>
+                        <td data-col="part" class="text-end"><small>{{ $job->part_sales ? number_format($job->part_sales, 0, ',', '.') : '-' }}</small></td>
+                        <td data-col="total" class="text-end fw-bold">{{ $job->total_sales ? number_format($job->total_sales, 0, ',', '.') : '-' }}</td>
+                        <td data-col="estimated" class="text-end"><small>{{ $job->estimated_amount ? number_format($job->estimated_amount, 0, ',', '.') : '-' }}</small></td>
+                        {{-- Parts/Orders --}}
+                        <td data-col="rq">{{ $job->rq }}</td>
+                        <td data-col="order_part">{{ $job->no_order_part_mbina }}</td>
+                        <td data-col="lain_lain" class="text-truncate" style="max-width: 80px;"><small>{{ Str::limit($job->lain_lain, 15) }}</small></td>
+                        <td data-col="need_part" class="text-center">
+                            @if($job->need_part)
+                                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></span>
+                            @endif
+                        </td>
+                        {{-- Invoice --}}
+                        <td data-col="inv_no">{{ $job->invoice_number }}</td>
+                        <td data-col="inv_date"><small>{{ $job->invoice_date?->format('d/m/y') }}</small></td>
+                        <td data-col="inv_amt" class="text-end"><small>{{ $job->inv_amount ? number_format($job->inv_amount, 0, ',', '.') : '-' }}</small></td>
+                        <td data-col="inv_ppn" class="text-end"><small>{{ $job->inv_ppn ? number_format($job->inv_ppn, 0, ',', '.') : '-' }}</small></td>
+                        <td data-col="inv_total" class="text-end"><small>{{ $job->inv_ppn_meterai ? number_format($job->inv_ppn_meterai, 0, ',', '.') : '-' }}</small></td>
+                        {{-- Remarks & Status --}}
+                        <td data-col="first_remark" class="text-truncate" style="max-width: 120px;"><small>{{ Str::limit($job->first_remark_text, 25) }}</small></td>
+                        <td data-col="update_remark" class="text-truncate" style="max-width: 120px;"><small>{{ Str::limit($job->update_remark_text, 25) }}</small></td>
+                        <td data-col="last_updated"><small>{{ $job->last_remark_updated?->format('d/m/y H:i') }}</small></td>
+                        <td data-col="status" onclick="event.stopPropagation()">
+                            @if($job->status == 'uninvoiced')
+                                <span class="badge bg-warning text-dark">Open</span>
+                            @else
+                                <span class="badge bg-success">Inv</span>
+                            @endif
+                        </td>
+                        <td data-col="action" onclick="event.stopPropagation()" class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-add-remark" 
+                                    data-job-id="{{ $job->id }}" 
+                                    data-job-number="{{ $job->job_number }}"
+                                    title="Add Remark">
+                                <i class="bi bi-chat-text"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="40" class="text-center text-muted py-4">No jobs found</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="d-flex align-items-center me-3">
+        <label class="me-2 small text-muted">Show</label>
+        <select name="per_page" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()" form="searchForm">
+            <option value="10" {{ request('per_page') == '10' ? 'selected' : '' }}>10</option>
+            <option value="20" {{ (request('per_page') == '20' || !request('per_page')) ? 'selected' : '' }}>20</option>
+            <option value="50" {{ request('per_page') == '50' ? 'selected' : '' }}>50</option>
+            <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100</option>
+        </select>
+        <span class="ms-2 small text-muted">entries</span>
+    </div>
+    {{ $jobs->withQueryString()->links() }}
+</div>
+
+@push('scripts')
+@php
+    $defaultPrefs = [
+        'columns' => [
+            'no' => true, 'wip' => true, 'job_card' => false, 'dept' => false,
+            'job_date' => true, 'date_in' => false, 'date_out' => false, 'check_in' => false, 'deadline' => false, 'promise' => false,
+            'reg_no' => true, 'chassis' => false, 'unit' => false, 'account' => false, 'first_reg' => false,
+            'customer' => true, 'address' => false,
+            'sa' => true, 'foreman' => false, 'technician' => false, 'block' => false,
+            'job_type' => false, 'pay_type' => false, 'type_sale' => false, 'job_desc' => false, 'work_status' => false,
+            'labour' => false, 'part' => false, 'total' => true, 'estimated' => false,
+            'rq' => false, 'order_part' => false, 'lain_lain' => false, 'need_part' => true,
+            'inv_no' => false, 'inv_date' => false, 'inv_amt' => false, 'inv_ppn' => false, 'inv_total' => false,
+            'first_remark' => false, 'update_remark' => true, 'last_updated' => true, 'status' => true, 'action' => true
+        ],
+        'order' => ['no', 'wip', 'job_card', 'dept', 'job_date', 'date_in', 'date_out', 'check_in', 'deadline', 'promise', 'reg_no', 'chassis', 'unit', 'account', 'first_reg', 'customer', 'address', 'sa', 'foreman', 'technician', 'block', 'job_type', 'pay_type', 'type_sale', 'job_desc', 'work_status', 'labour', 'part', 'total', 'estimated', 'rq', 'order_part', 'lain_lain', 'need_part', 'inv_no', 'inv_date', 'inv_amt', 'inv_ppn', 'inv_total', 'first_remark', 'update_remark', 'last_updated', 'status', 'action'],
+        'widths' => [],
+        'sort' => 'created_at',
+        'dir' => 'desc'
+    ];
+    $storedPrefs = auth()->user()?->column_preferences ?? [];
+    $storedColumns = isset($storedPrefs['columns']) ? $storedPrefs['columns'] : [];
+    $userPrefs = array_merge($defaultPrefs['columns'], $storedColumns);
+    
+    // Merge order - keep stored order but append any new columns not in it
+    $storedOrder = $storedPrefs['order'] ?? [];
+    $allKeys = array_keys($defaultPrefs['columns']);
+    $missingKeys = array_diff($allKeys, $storedOrder);
+    $userOrder = !empty($storedOrder) ? array_merge($storedOrder, $missingKeys) : $defaultPrefs['order'];
+    
+    $userWidths = $storedPrefs['widths'] ?? [];
+    $userSort = $storedPrefs['sort'] ?? $defaultPrefs['sort'];
+    $userDir = $storedPrefs['dir'] ?? $defaultPrefs['dir'];
+@endphp
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userPrefs = @json($userPrefs);
+    let userOrder = @json($userOrder);
+    const userWidths = @json($userWidths);
+    const userSort = @json($userSort);
+    const userDir = @json($userDir);
+    const columnLabels = {
+        'no': '#', 'wip': 'WIP', 'job_card': 'Job Card', 'dept': 'Dept',
+        'job_date': 'Job Date', 'date_in': 'Date In', 'date_out': 'Date Out', 'check_in': 'Check In', 'deadline': 'Deadline', 'promise': 'Promise Date',
+        'reg_no': 'Reg No', 'chassis': 'Chassis', 'unit': 'Unit Type', 'account': 'Account No', 'first_reg': 'First Reg',
+        'customer': 'Customer', 'address': 'Address',
+        'sa': 'SA', 'foreman': 'Foreman', 'technician': 'Technician', 'block': 'Block',
+        'job_type': 'Job Type', 'pay_type': 'Payment Type', 'type_sale': 'Type Sale', 'job_desc': 'Job Desc', 'work_status': 'Work Status',
+        'labour': 'Labour', 'part': 'Part', 'total': 'Total', 'estimated': 'Estimated',
+        'rq': 'RQ', 'order_part': 'Order Part', 'lain_lain': 'Lain-lain', 'need_part': 'Needs Parts',
+        'inv_no': 'Invoice #', 'inv_date': 'Inv Date', 'inv_amt': 'Inv Amt', 'inv_ppn': 'Inv+PPN', 'inv_total': 'Inv+Meterai',
+        'first_remark': 'First Remark', 'update_remark': 'Latest Remark', 'last_updated': 'Remark Updated', 'status': 'Status', 'action': 'Action'
+    };
+    const container = document.getElementById('columnToggles');
+    const table = document.getElementById('dataTable');
+    const headerRow = document.getElementById('headerRow');
+
+    Object.keys(userWidths).forEach(col => {
+        const th = table.querySelector(`th[data-col="${col}"]`);
+        if(th) th.style.width = userWidths[col];
+    });
+
+    function applyColumnOrder(order) {
+        order.forEach((col) => {
+            const th = headerRow.querySelector(`th[data-col="${col}"]`);
+            if (th) headerRow.appendChild(th);
+        });
+        document.querySelectorAll('#tableBody tr').forEach(row => {
+            order.forEach(col => {
+                const td = row.querySelector(`td[data-col="${col}"]`);
+                if (td) row.appendChild(td);
+            });
+        });
+    }
+    applyColumnOrder(userOrder);
+
+    function buildToggles() {
+        container.innerHTML = '';
+        userOrder.forEach(key => {
+            if (!columnLabels[key]) return;
+            const div = document.createElement('div');
+            div.className = 'form-check d-flex align-items-center py-1';
+            div.draggable = true;
+            div.dataset.col = key;
+            div.innerHTML = `
+                <i class="bi bi-grip-vertical text-muted me-2" style="cursor: grab;"></i>
+                <input class="form-check-input col-toggle" type="checkbox" value="${key}" id="col_${key}" ${userPrefs[key] ? 'checked' : ''}>
+                <label class="form-check-label ms-1 small" for="col_${key}">${columnLabels[key]}</label>
+            `;
+            container.appendChild(div);
+        });
+        setupDragDrop();
+    }
+    buildToggles();
+
+    function setupDragDrop() {
+        let draggedEl = null;
+        container.querySelectorAll('[draggable]').forEach(el => {
+            el.addEventListener('dragstart', e => { draggedEl = el; el.classList.add('opacity-50'); e.dataTransfer.effectAllowed = 'move'; });
+            el.addEventListener('dragend', e => { el.classList.remove('opacity-50'); container.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over', 'border-top', 'border-primary')); draggedEl = null; });
+            el.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drag-over', 'border-top', 'border-primary'); });
+            el.addEventListener('dragleave', e => { el.classList.remove('drag-over', 'border-top', 'border-primary'); });
+            el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag-over', 'border-top', 'border-primary'); if (draggedEl && draggedEl !== el) { container.insertBefore(draggedEl, el); updateOrderFromDOM(); applyColumnOrderFromDOM(); } });
+        });
+    }
+
+    function updateOrderFromDOM() { userOrder = []; container.querySelectorAll('[data-col]').forEach(el => userOrder.push(el.dataset.col)); }
+    function applyColumnOrderFromDOM() { const order = []; container.querySelectorAll('[data-col]').forEach(el => order.push(el.dataset.col)); applyColumnOrder(order); }
+
+    function applyVisibility() {
+        document.querySelectorAll('.col-toggle').forEach(toggle => {
+            const colName = toggle.value;
+            const visible = toggle.checked;
+            const th = table.querySelector(`th[data-col="${colName}"]`);
+            if(th) th.style.display = visible ? '' : 'none';
+            table.querySelectorAll(`td[data-col="${colName}"]`).forEach(td => td.style.display = visible ? '' : 'none');
+        });
+    }
+    applyVisibility();
+    container.addEventListener('change', applyVisibility);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSort = urlParams.get('sort') || userSort;
+    const currentDir = urlParams.get('dir') || userDir;
+
+    document.getElementById('saveColumnsBtn').addEventListener('click', function() {
+        const prefs = {};
+        document.querySelectorAll('.col-toggle').forEach(t => prefs[t.value] = t.checked);
+        const widths = {};
+        table.querySelectorAll('th').forEach(th => { if(th.dataset.col && th.style.width) widths[th.dataset.col] = th.style.width; });
+        const order = [];
+        container.querySelectorAll('[data-col]').forEach(el => order.push(el.dataset.col));
+
+        fetch('{{ route("preferences.columns") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+            body: JSON.stringify({ columns: prefs, widths: widths, order: order, sort: currentSort, dir: currentDir, table: 'jobs' })
+        }).then(res => res.json()).then(data => {
+            if(data.success) {
+                const btn = document.getElementById('saveColumnsBtn');
+                btn.innerHTML = '<i class="bi bi-check"></i> Saved!';
+                btn.classList.replace('btn-primary', 'btn-success');
+                setTimeout(() => { btn.innerHTML = 'Save'; btn.classList.replace('btn-success', 'btn-primary'); }, 1500);
+            }
+        }).catch(err => alert('Error: ' + err.message));
+    });
+
+    table.querySelectorAll('th').forEach(th => {
+        const resizer = document.createElement('div');
+        resizer.style.cssText = 'width:5px;height:100%;position:absolute;right:0;top:0;cursor:col-resize;user-select:none;z-index:10;';
+        th.appendChild(resizer);
+        th.style.position = 'relative';
+        let startX, startWidth;
+        resizer.addEventListener('mousedown', e => { e.stopPropagation(); startX = e.pageX; startWidth = th.offsetWidth; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); });
+        function onMove(e) { th.style.width = (startWidth + e.pageX - startX) + 'px'; }
+        function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+    });
+
+    // Add Remark button handler
+    document.querySelectorAll('.btn-add-remark').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const jobId = this.dataset.jobId;
+            const jobNumber = this.dataset.jobNumber;
+            document.getElementById('remarkJobId').value = jobId;
+            document.getElementById('remarkJobNumber').textContent = jobNumber;
+            document.getElementById('remarkText').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('addRemarkModal'));
+            modal.show();
+        });
+    });
+});
+</script>
+@endpush
+
+<!-- Add Remark Modal -->
+<div class="modal fade" id="addRemarkModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="addRemarkForm" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-chat-plus me-2"></i>Add Remark for WIP <span id="remarkJobNumber" class="fw-bold"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="job_id" id="remarkJobId">
+                    <div class="mb-3">
+                        <label class="form-label">Remark <span class="text-danger">*</span></label>
+                        <textarea name="remark_text" id="remarkText" class="form-control" rows="3" required placeholder="Enter your remark..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus me-1"></i>Add Remark</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('addRemarkForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const jobId = document.getElementById('remarkJobId').value;
+    const form = this;
+    form.action = '/jobs/' + jobId + '/remark';
+    form.submit();
+});
+</script>
+
+@endsection

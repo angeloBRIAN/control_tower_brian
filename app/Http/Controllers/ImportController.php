@@ -1,0 +1,1130 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Import;
+use App\Models\Job;
+use App\Models\JobInvoice;
+use App\Models\Vehicle;
+use App\Models\Foreman;
+use App\Models\ServiceAdvisor;
+use Illuminate\Http\Request;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
+class ImportController extends Controller
+{
+    public function index()
+    {
+        $imports = Import::latest()->paginate(20);
+        return view('imports.index', compact('imports'));
+    }
+
+    public function show(Import $import)
+    {
+        return view('imports.show', compact('import'));
+    }
+
+    public function showUploadForm()
+    {
+        return view('imports.upload');
+    }
+
+    public function importProgress(Request $request)
+    {
+        // Increase limits for large files
+        set_time_limit(0); // No time limit
+        ini_set('memory_limit', '2G');
+        
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        
+        // Use a more memory-efficient reader
+        $reader = IOFactory::createReaderForFile($file->getPathname());
+        
+        // For XLSX files, try to calculate formulas
+        // For ODS files, skip formulas as LibreOffice structured references often fail
+        if ($extension === 'ods') {
+            $reader->setReadDataOnly(true); // Skip formatting, formulas for ODS
+        } else {
+            $reader->setReadDataOnly(false); // Allow formula calculation for XLSX
+        }
+        $reader->setReadEmptyCells(false); // Skip empty cells
+        
+        $spreadsheet = $reader->load($file->getPathname());
+        
+        // For XLSX, try to calculate formulas; for ODS, disable calculation cache
+        if ($extension === 'ods') {
+            \PhpOffice\PhpSpreadsheet\Calculation\Calculation::getInstance($spreadsheet)->disableCalculationCache();
+        }
+        
+        $sheetCount = $spreadsheet->getSheetCount();
+        
+        // Create import record first with pending status
+        $import = Import::create([
+            'file_name' => $file->getClientOriginalName(),
+            'import_type' => 'progress',
+            'records_imported' => 0,
+            'records_updated' => 0,
+            'records_failed' => 0,
+            'imported_by' => auth()->user()?->name,
+        ]);
+        $importId = $import->id;
+        
+        $imported = 0;
+        $updated = 0;
+        $failed = 0;
+        $failedRows = [];
+        $maxFailedRows = 100; // Limit stored failed rows to prevent huge JSON
+
+        for ($sheetIndex = 0; $sheetIndex < $sheetCount; $sheetIndex++) {
+            $worksheet = $spreadsheet->getSheet($sheetIndex);
+            $sheetName = strtoupper(trim($worksheet->getTitle()));
+            
+            // Skip only Sheet5 (unused) to save memory
+            if ($sheetName === 'SHEET5') {
+                continue;
+            }
+            
+            // Only load rows if we're going to process this sheet
+            // Try to get calculated values first, fallback to raw values if formula error occurs
+            try {
+                $rows = $worksheet->toArray();
+            } catch (\Exception $e) {
+                // Formula calculation failed (e.g., structured references), try without calculation
+                try {
+                    $highestRow = $worksheet->getHighestRow();
+                    $highestColumn = $worksheet->getHighestColumn();
+                    $rows = $worksheet->rangeToArray('A1:' . $highestColumn . $highestRow, null, false, false);
+                } catch (\Exception $e2) {
+                    // Skip this sheet entirely if still failing
+                    continue;
+                }
+            }
+
+            if (empty($rows)) {
+                continue;
+            }
+
+            // Route based on sheet name
+            \Log::info("Processing sheet: {$sheetName}, rows: " . count($rows));
+            
+            if (str_contains($sheetName, 'BOOKING')) {
+                \Log::info("Matched BOOKING sheet");
+                $result = $this->importBookingSheet($rows);
+                \Log::info("Booking import result: ", $result);
+                $imported += $result['imported'];
+                $updated += $result['updated'];
+                $failed += $result['failed'];
+                if (!empty($result['failedRows'])) {
+                    $failedRows = array_merge($failedRows, array_slice($result['failedRows'], 0, $maxFailedRows - count($failedRows)));
+                }
+                continue;
+            }
+
+            if (str_contains($sheetName, 'PRE DELIVERY') || str_contains($sheetName, 'PDI')) {
+                \Log::info("Matched PDI sheet");
+                $result = $this->importPdiSheet($rows);
+                \Log::info("PDI import result: ", $result);
+                $imported += $result['imported'];
+                $updated += $result['updated'];
+                $failed += $result['failed'];
+                if (!empty($result['failedRows'])) {
+                    $failedRows = array_merge($failedRows, array_slice($result['failedRows'], 0, $maxFailedRows - count($failedRows)));
+                }
+                continue;
+            }
+
+            if (str_contains($sheetName, 'TOWING') || str_contains($sheetName, 'STOORING')) {
+                $result = $this->importTowingSheet($rows);
+                $imported += $result['imported'];
+                $updated += $result['updated'];
+                $failed += $result['failed'];
+                if (!empty($result['failedRows'])) {
+                    $failedRows = array_merge($failedRows, array_slice($result['failedRows'], 0, $maxFailedRows - count($failedRows)));
+                }
+                continue;
+            }
+
+            // Default: Job Progress sheet
+            // Find Header Row
+            $headerMap = [];
+            $dataStartIndex = 0;
+            $foundHeader = false;
+
+            // Scan first 10 rows for header
+            for ($i = 0; $i < min(10, count($rows)); $i++) {
+                $row = $rows[$i];
+                // Check if this row looks like a header (contains specific keywords)
+                $rowString = strtolower(implode(' ', array_map('trim', $row)));
+                
+                // We look for 'wip' AND 'reg' to be sure
+                if (str_contains($rowString, 'wip') && (str_contains($rowString, 'reg') || str_contains($rowString, 'plate') || str_contains($rowString, 'polisi'))) {
+                    $header = $row;
+                    $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
+                    $dataStartIndex = $i + 1;
+                    $foundHeader = true;
+                    break;
+                }
+            }
+
+            if (!$foundHeader) {
+                \Log::warning("PROGRESS sheet {$sheetName}: No header row found");
+                continue;
+            }
+            
+            \Log::info("PROGRESS sheet {$sheetName}: Found header at row " . ($dataStartIndex - 1) . ", columns: " . implode(', ', array_keys($headerMap)));
+            
+            // Iterate Data
+            // Use for loop with index to easily manage start
+            for ($i = $dataStartIndex; $i < count($rows); $i++) {
+                $row = $rows[$i];
+                try {
+                $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number', 'nomer job']);
+                
+                // Skip empty job numbers or "Summary" rows (where WIP might be '0' or 'TOTAL' or 'GRAND')
+                if (empty($jobNumber) || $jobNumber === '0' || str_contains(strtoupper($jobNumber), 'TOTAL') || str_contains(strtoupper($jobNumber), 'GRAND')) {
+                    continue;
+                }
+                
+                // Skip invalid job numbers (single digits 1-9, or just serial numbers)
+                // Valid WIP should be at least 4 characters for real job numbers
+                if (strlen(trim($jobNumber)) < 4 && is_numeric($jobNumber)) {
+                    continue;
+                }
+
+                $plateNumber = $this->getColumnValue($row, $headerMap, ['reg no', 'reg. no', 'no polisi', 'plate_number', 'plate number', 'nopol']);
+                
+                // Skip rows without a valid plate number (critical field)
+                if (empty($plateNumber) || strlen(trim($plateNumber)) < 3) {
+                    continue;
+                }
+                
+                
+                $saName = $this->getColumnValue($row, $headerMap, ['sa', 'service_advisor', 'service advisor']);
+                $foremanName = $this->getColumnValue($row, $headerMap, ['foreman', 'kepala regu', 'mandor']); 
+                
+                // Auto-detect Franchise based on columns specific to PC Report
+                $isPCFormat = isset($headerMap['address 01']) || isset($headerMap['d']);
+                $defaultFranchise = $isPCFormat ? 'PC' : null;
+
+                // Attempt to determine franchise
+                $franchise = null;
+                if ($saName) {
+                    $sa = ServiceAdvisor::where('name', $saName)->first();
+                    if ($sa && $sa->franchise) {
+                        $franchise = $sa->franchise;
+                    }
+                }
+                
+                // Fallback to detected franchise
+                if (!$franchise && $defaultFranchise) {
+                    $franchise = $defaultFranchise;
+                }
+                
+                // Concatenate Address 01-05
+                $addressParts = [];
+                for ($k = 1; $k <= 5; $k++) {
+                    $key = 'address ' . str_pad($k, 2, '0', STR_PAD_LEFT); // address 01, address 02...
+                    $addrVal = $this->getColumnValue($row, $headerMap, [$key]);
+                    if ($addrVal) {
+                        $addressParts[] = $addrVal;
+                    }
+                }
+                $customerAddress = implode("\n", $addressParts);
+
+                $jobData = [
+                    'customer_name' => $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama customer']),
+                    'customer_address' => $customerAddress,
+                    'department' => $this->getColumnValue($row, $headerMap, ['d', 'dept', 'department']),
+                    'work_order_number' => $this->getColumnValue($row, $headerMap, ['no job', 'work order', 'wo']), 
+                    'foreman' => $this->helpersFindOrCreate(Foreman::class, $foremanName, $franchise),
+                    'block' => $this->getColumnValue($row, $headerMap, ['block', 'blok']),
+                    'franchise' => $franchise, 
+                    'plate_number' => $plateNumber,
+                    'service_advisor' => $this->helpersFindOrCreate(ServiceAdvisor::class, $saName, $franchise),
+                    'technician' => $this->getColumnValue($row, $headerMap, ['teknisi', 'technician', 'mekanik']),
+                    'job_type' => $this->getColumnValue($row, $headerMap, ['jenis', 'job_type', 'type']),
+                    'job_date' => $this->parseDate($this->getColumnValue($row, $headerMap, ['date', 'created', 'tanggal', 'tgl', 'job_date'])),
+                    'description' => $this->getColumnValue($row, $headerMap, ['keluhan', 'description', 'keterangan']),
+                    'check_in_time' => $this->parseTime($this->getColumnValue($row, $headerMap, [
+                        'jam', 'time', 'check in time', 'waktu'
+                    ])),
+                    'payment_type' => $this->getColumnValue($row, $headerMap, [
+                        'code', 'kode', 'payment type', 'tipe bayar'
+                    ]),
+                    'job_description' => $this->getColumnValue($row, $headerMap, [
+                        'operation', 'job description', 'pekerjaan', 'deskripsi'
+                    ]),
+                    'deadline' => $this->parseDate($this->getColumnValue($row, $headerMap, [
+                        'deadline', 'estimasi selesai', 'due date'
+                    ])),
+                    'unit_type' => $this->getColumnValue($row, $headerMap, [
+                        'tipe', 'type unit', 'unit', 'model', 'type', 'kendaraan'
+                    ]),
+                ];
+
+                // Match by Job Number AND Franchise if possible? 
+                // Problem: If franchise is null (new SA), we might match wrong job if duplicates exist.
+                // Constraint: User said duplicate WIPs exist across PC/CV.
+                // If we don't know franchise, we can't safely distinguish.
+                // However, 'updateOrCreate' maps attributes.
+                // If we assume Job Number is unique PER Franchise.
+                
+                $searchCriteria = ['job_number' => $jobNumber];
+                if ($franchise) {
+                    $searchCriteria['franchise'] = $franchise;
+                }
+                
+                $job = Job::updateOrCreate(
+                    $searchCriteria,
+                    array_filter(array_merge($jobData, ['import_id' => $importId]), fn($value) => !is_null($value))
+                );
+
+                if ($job->wasRecentlyCreated) {
+                    $imported++;
+                    \Log::info("PROGRESS: Created job {$jobNumber}", ['data' => array_filter($jobData, fn($v) => !is_null($v))]);
+                } else {
+                    $updated++;
+                }
+
+                // Create or update vehicle with model from unit_type
+                if (!empty($plateNumber)) {
+                    $unitType = $jobData['unit_type'] ?? null;
+                    Vehicle::updateOrCreate(
+                        ['plate_number' => $plateNumber],
+                        array_filter([
+                            'is_in_workshop' => true,
+                            'model' => $unitType,
+                            'customer_name' => $jobData['customer_name'] ?? null,
+                            'import_id' => $importId,
+                        ], fn($v) => !is_null($v))
+                    );
+                }
+                } catch (\Exception $e) {
+                    $failed++;
+                    if (count($failedRows) < $maxFailedRows) {
+                        $failedRows[] = [
+                            'row' => $i + 1, // +1 for 1-indexed row number in Excel
+                            'sheet' => $sheetName,
+                            'job_number' => $jobNumber ?? 'N/A',
+                            'plate_number' => $plateNumber ?? 'N/A',
+                            'error' => $e->getMessage(),
+                        ];
+                    }
+                }
+            } // end rows loop
+        } // end sheets loop
+
+        // Update import record with final counts
+        $import->update([
+            'records_imported' => $imported,
+            'records_updated' => $updated,
+            'records_failed' => $failed,
+            'failed_rows' => $failedRows,
+        ]);
+
+        $message = "Import completed: {$imported} new, {$updated} updated, {$failed} failed.";
+        if ($failed > 0) {
+            $message .= " <a href='" . route('imports.show', $import) . "'>View details</a>";
+        }
+
+        return redirect()->route('imports.index')
+            ->with('success', $message);
+    }
+
+    public function importUninvoiced(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+            'franchise' => 'nullable|in:PC,CV',
+        ]);
+
+        $franchise = $request->input('franchise');
+        $file = $request->file('file');
+        $spreadsheet = IOFactory::load($file->getPathname());
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray();
+
+        $header = array_shift($rows);
+        $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
+
+        // Validate this is an uninvoiced file, not an invoice file
+        // Uninvoiced files should have columns like 'reg. no.' or 'customer name' but NOT 'invoice date' or 'inv+ppn'
+        $hasInvoiceColumns = isset($headerMap['invoice']) || isset($headerMap['inv+ppn']) || isset($headerMap['inv+ppn+meterai']);
+        $hasUninvoicedColumns = isset($headerMap['wip']) || isset($headerMap['no job']) || isset($headerMap['reg. no.']) || isset($headerMap['customer name']);
+        
+        if ($hasInvoiceColumns) {
+            return redirect()->back()
+                ->with('error', 'This appears to be an INVOICED file (contains Invoice/Inv+PPN columns). Please use the "Import Invoiced" menu instead.');
+        }
+
+        $imported = 0;
+        $updated = 0;
+        $failed = 0;
+        $importedJobIds = [];
+
+        foreach ($rows as $row) {
+            try {
+                // Support multiple column name formats including uiws.xls format
+                $jobNumber = $this->getColumnValue($row, $headerMap, [
+                    'wip', 'no job', 'job_number', 'job number', 'nomer job', 'no. job'
+                ]);
+                
+                if (empty($jobNumber)) {
+                    continue;
+                }
+
+                $plateNumber = $this->getColumnValue($row, $headerMap, [
+                    'reg. no.', 'reg no', 'no polisi', 'plate_number', 'plate number', 'nopol'
+                ]);
+
+                $customerName = $this->getColumnValue($row, $headerMap, [
+                    'customer name', 'customer', 'nama customer', 'nama pelanggan'
+                ]);
+
+                // Concatenate Address 01-05 fields if present
+                $addressParts = [];
+                for ($k = 1; $k <= 5; $k++) {
+                    $key = 'address ' . str_pad($k, 2, '0', STR_PAD_LEFT); // address 01, address 02...
+                    $addrVal = $this->getColumnValue($row, $headerMap, [$key]);
+                    if ($addrVal) {
+                        $addressParts[] = $addrVal;
+                    }
+                }
+                $customerAddress = !empty($addressParts) 
+                    ? implode("\n", $addressParts) 
+                    : $this->getColumnValue($row, $headerMap, ['customer address', 'alamat', 'address', 'alamat customer']);
+                
+                $jobData = [
+                    'franchise' => $franchise,
+                    'job_card' => $this->getColumnValue($row, $headerMap, [
+                        'job card', 'jobcard', 'no job card'
+                    ]),
+                    'plate_number' => $plateNumber,
+                    'customer_name' => $customerName,
+                    'customer_address' => $customerAddress,
+                    'unit_type' => $this->getColumnValue($row, $headerMap, [
+                        'type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit'
+                    ]),
+                    // 'type_unit' mostly redundant if maps to same, using unit_type field for now based on rename
+                    
+                    'account_no' => $this->getColumnValue($row, $headerMap, [
+                        'account no', 'account', 'no akun', 'akun'
+                    ]),
+                    'date_first_reg' => $this->parseDate($this->getColumnValue($row, $headerMap, [
+                        'date first reg', 'first reg', 'tgl registrasi pertama'
+                    ])),
+                    'service_advisor' => $this->helpersFindOrCreate(
+                        ServiceAdvisor::class, 
+                        $this->getColumnValue($row, $headerMap, ['service advisor', 'sa', 'service_advisor'])
+                    ),
+                    'technician' => $this->getColumnValue($row, $headerMap, [
+                        'teknisi', 'technician', 'mekanik'
+                    ]),
+                    'foreman' => $this->helpersFindOrCreate(
+                        Foreman::class,
+                        $this->getColumnValue($row, $headerMap, ['foreman', 'kepala regu', 'mandor'])
+                    ),
+                    'job_date' => $this->parseDate($this->getColumnValue($row, $headerMap, [
+                        'created', 'date reg', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'tgl job', 'check in date'
+                    ])),
+                    'check_in_time' => $this->parseTime($this->getColumnValue($row, $headerMap, [
+                        'jam', 'time', 'check in time', 'waktu'
+                    ])),
+                     'payment_type' => $this->getColumnValue($row, $headerMap, [
+                        'code', 'kode', 'payment type', 'tipe bayar'
+                    ]),
+                    'job_description' => $this->getColumnValue($row, $headerMap, [
+                        'operation', 'job description', 'pekerjaan', 'deskripsi'
+                    ]),
+                    'deadline' => $this->parseDate($this->getColumnValue($row, $headerMap, [
+                        'deadline', 'estimasi selesai', 'due date'
+                    ])),
+                    'labour_sales' => $this->parseAmount($this->getColumnValue($row, $headerMap, [
+                        'labour sale', 'labour sales', 'labor sale', 'labor sales', 'jasa', 'biaya jasa'
+                    ])),
+                    'part_sales' => $this->parseAmount($this->getColumnValue($row, $headerMap, [
+                        'part sales', 'parts sales', 'part sale', 'sparepart', 'biaya part'
+                    ])),
+                    'total_sales' => $this->parseAmount($this->getColumnValue($row, $headerMap, [
+                        'total sales', 'total  sales', 'total', 'grand total', 'estimasi', 'amount', 'nilai'
+                    ])),
+                    'estimated_amount' => $this->parseAmount($this->getColumnValue($row, $headerMap, [
+                        'total sales', 'total', 'estimasi', 'amount', 'nilai'
+                    ])),
+                    'rq' => $this->getColumnValue($row, $headerMap, [
+                        'rq', 'requisition', 'req'
+                    ]),
+                    'no_order_part_mbina' => $this->getColumnValue($row, $headerMap, [
+                        'no order part mbina', 'order part', 'no order'
+                    ]),
+                    'lain_lain' => $this->getColumnValue($row, $headerMap, [
+                        'lain lain', 'lain-lain', 'other', 'lainnya'
+                    ]),
+                    'latest_remark' => $this->getColumnValue($row, $headerMap, [
+                        'remarks', 'remark', 'keterangan', 'catatan'
+                    ]),
+                    'update_remarks' => $this->getColumnValue($row, $headerMap, [
+                        'update remarks', 'update remark', 'update keterangan'
+                    ]),
+                    'status' => 'uninvoiced',
+                ];
+
+                $job = Job::updateOrCreate(
+                    ['job_number' => $jobNumber],
+                    array_filter($jobData)
+                );
+
+                $importedJobIds[] = $job->id;
+
+                if ($job->wasRecentlyCreated) {
+                    $imported++;
+                } else {
+                    $updated++;
+                }
+
+                // Create or update vehicle with model and customer info
+                if (!empty($plateNumber)) {
+                    $unitType = $jobData['unit_type'] ?? null;
+                    Vehicle::updateOrCreate(
+                        ['plate_number' => $plateNumber],
+                        array_filter([
+                            'is_in_workshop' => true,
+                            'model' => $unitType,
+                            'customer_name' => $customerName ?? null,
+                        ], fn($v) => !is_null($v))
+                    );
+                }
+            } catch (\Exception $e) {
+                $failed++;
+            }
+        }
+
+        $import = Import::create([
+            'file_name' => $file->getClientOriginalName(),
+            'import_type' => 'uninvoiced',
+            'records_imported' => $imported,
+            'records_updated' => $updated,
+            'records_failed' => $failed,
+            'imported_by' => auth()->user()?->name,
+        ]);
+
+        // Get the imported jobs to display in results
+        $jobs = Job::whereIn('id', $importedJobIds)->get();
+
+        return view('imports.results', [
+            'import' => $import,
+            'jobs' => $jobs,
+            'imported' => $imported,
+            'updated' => $updated,
+            'failed' => $failed,
+        ]);
+    }
+
+    public function importInvoiced(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+            'franchise' => 'required|in:PC,CV',
+        ]);
+
+        $franchise = $request->input('franchise');
+        $file = $request->file('file');
+        $spreadsheet = IOFactory::load($file->getPathname());
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray();
+
+        $header = array_shift($rows);
+        $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
+
+        // Validate this is an invoiced file, not an uninvoiced file
+        // Invoiced files should have columns like 'invoice', 'inv+ppn', 'inv+ppn+meterai'
+        $hasInvoiceColumns = isset($headerMap['invoice']) || isset($headerMap['inv+ppn']) || isset($headerMap['inv+ppn+meterai']);
+        
+        if (!$hasInvoiceColumns) {
+            return redirect()->back()
+                ->with('error', 'This does not appear to be an INVOICED file (missing Invoice/Inv+PPN columns). Please use the correct import menu for this file type.');
+        }
+
+        $imported = 0;
+        $updated = 0;
+        $failed = 0;
+
+        // Create import record first to get import_id
+        $import = Import::create([
+            'file_name' => $file->getClientOriginalName(),
+            'import_type' => 'invoiced',
+            'records_imported' => 0,
+            'records_updated' => 0,
+            'records_failed' => 0,
+            'imported_by' => auth()->user()?->name,
+        ]);
+        $importId = $import->id;
+
+        foreach ($rows as $row) {
+            try {
+                // Get WIP (job number) - required
+                $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
+                
+                if (empty($jobNumber)) {
+                    continue;
+                }
+                
+                // Skip invalid job numbers (single digits, summary rows, etc.)
+                if (strlen(trim($jobNumber)) < 4 && is_numeric($jobNumber)) {
+                    continue;
+                }
+                if (str_contains(strtoupper($jobNumber), 'TOTAL') || str_contains(strtoupper($jobNumber), 'GRAND')) {
+                    continue;
+                }
+
+                // Get invoice number - from "Invoice" column (NOT "Inv" - that's the amount)
+                $invoiceNumber = $this->getColumnValue($row, $headerMap, [
+                    'invoice', 'no invoice', 'invoice_number', 'no faktur'
+                ]);
+
+                // Parse invoice date - from "date" column
+                $invoiceDate = $this->parseDate($this->getColumnValue($row, $headerMap, [
+                    'date', 'invoice date', 'tgl invoice', 'tanggal invoice'
+                ]));
+
+                // Get other fields from the invoice report
+                $plateNumber = $this->getColumnValue($row, $headerMap, ['reg no', 'vehicle no', 'no polisi', 'nopol']);
+                $customerName = $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama customer']);
+                $chassisNumber = $this->getColumnValue($row, $headerMap, ['chassis number', 'chassis', 'no rangka']);
+                $accountNo = $this->getColumnValue($row, $headerMap, ['account', 'account no', 'akun']);
+                $typeSale = $this->getColumnValue($row, $headerMap, ['type sale', 'tipe sale', 'jenis']);
+                $department = $this->getColumnValue($row, $headerMap, ['dept', 'd', 'department']);
+                $dateIn = $this->parseDate($this->getColumnValue($row, $headerMap, ['date in', 'tgl masuk', 'tanggal masuk']));
+                $dateOut = $this->parseDate($this->getColumnValue($row, $headerMap, ['wldate out', 'date out', 'tgl keluar', 'tanggal keluar']));
+                
+                // Parse amounts
+                $invAmount = $this->parseAmount($this->getColumnValue($row, $headerMap, ['inv', 'amount']));
+                $invPpn = $this->parseAmount($this->getColumnValue($row, $headerMap, ['inv+ppn', 'inv ppn']));
+                $invPpnMeterai = $this->parseAmount($this->getColumnValue($row, $headerMap, ['inv+ppn+meterai', 'inv ppn meterai', 'total']));
+
+                // Prepare invoice-specific data (fields that come from invoice report)
+                $invoiceData = array_filter([
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_date' => $invoiceDate,
+                    'inv_amount' => $invAmount,
+                    'inv_ppn' => $invPpn,
+                    'inv_ppn_meterai' => $invPpnMeterai,
+                    'type_sale' => $typeSale,
+                    'date_in' => $dateIn,
+                    'date_out' => $dateOut,
+                    'chassis_number' => $chassisNumber,
+                    'status' => 'invoiced',
+                    'invoiced_at' => $invoiceDate ?? now(),
+                ], fn($v) => !is_null($v));
+
+                // Normalize job number for matching (trim whitespace, handle numeric comparisons)
+                $normalizedJobNumber = trim((string)$jobNumber);
+                
+                // Find existing job - try with franchise first, then without
+                $job = Job::where('job_number', $normalizedJobNumber)
+                    ->where('franchise', $franchise)
+                    ->first();
+                
+                // Fallback: if no match with franchise, try matching by job_number only
+                if (!$job) {
+                    $job = Job::where('job_number', $normalizedJobNumber)->first();
+                }
+                
+                // Also try matching with raw job number in case of format differences
+                if (!$job) {
+                    $job = Job::whereRaw('CAST(job_number AS CHAR) = ?', [$normalizedJobNumber])->first();
+                }
+
+                if ($job) {
+                    // Update existing job with ONLY invoice-specific data
+                    // Don't overwrite existing SA, Foreman, Address, sales figures, etc.
+                    $job->update(array_merge($invoiceData, ['import_id' => $importId]));
+                    $updated++;
+                    \Log::info("INVOICE import: Updated existing job {$normalizedJobNumber} (ID: {$job->id}, Franchise: {$job->franchise})");
+                } else {
+                    // For new job, include all available data
+                    $newJobData = array_merge($invoiceData, array_filter([
+                        'job_number' => $jobNumber,
+                        'franchise' => $franchise,
+                        'plate_number' => $plateNumber,
+                        'customer_name' => $customerName,
+                        'account_no' => $accountNo,
+                        'department' => $department,
+                        'import_id' => $importId,
+                    ], fn($v) => !is_null($v)));
+                    $job = Job::create($newJobData);
+                    $imported++;
+                    \Log::info("INVOICE import: Created NEW job {$normalizedJobNumber} (no existing match found)");
+                }
+
+                // Detect credit note by negative amount
+                $isCreditNote = ($invPpnMeterai ?? 0) < 0 || ($invAmount ?? 0) < 0;
+
+                // Create invoice history record
+                JobInvoice::create([
+                    'job_id' => $job->id,
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_date' => $invoiceDate,
+                    'invoice_type' => $isCreditNote ? 'credit_note' : 'invoice',
+                    'inv_amount' => abs($invAmount ?? 0),
+                    'inv_ppn' => abs($invPpn ?? 0),
+                    'inv_ppn_meterai' => abs($invPpnMeterai ?? 0),
+                    'type_sale' => $typeSale,
+                    'import_id' => $importId,
+                ]);
+
+                // Add remark about invoice
+                $remarkDate = ($invoiceDate instanceof \Carbon\Carbon) ? $invoiceDate->format('d/m/Y') : ($invoiceDate ?: date('d/m/Y'));
+                $remarkType = $isCreditNote ? 'Credit Note' : 'Invoice';
+                $remarkText = "{$remarkType} on {$remarkDate}" . ($invoiceNumber ? " - #{$invoiceNumber}" : '');
+                $job->addRemark($remarkText, 'System Import');
+
+                // Update vehicle - don't change workshop status, just link/update info
+                if (!empty($plateNumber)) {
+                    Vehicle::updateOrCreate(
+                        ['plate_number' => $plateNumber],
+                        array_filter([
+                            'customer_name' => $customerName,
+                            'import_id' => $importId,
+                            // Don't set is_in_workshop - user should update manually after invoice
+                        ], fn($v) => !is_null($v))
+                    );
+                }
+
+            } catch (\Exception $e) {
+                \Log::error("Invoiced import error for row: " . json_encode($row) . " - " . $e->getMessage());
+                $failed++;
+            }
+        }
+
+        // Update import record with final counts
+        $import->update([
+            'records_imported' => $imported,
+            'records_updated' => $updated,
+            'records_failed' => $failed,
+        ]);
+
+        return redirect()->route('imports.index')
+            ->with('success', "Import completed: {$imported} new, {$updated} updated as invoiced, {$failed} failed.");
+    }
+
+    private function getColumnValue(array $row, array $headerMap, array $possibleNames): ?string
+    {
+        foreach ($possibleNames as $name) {
+            if (isset($headerMap[$name]) && isset($row[$headerMap[$name]])) {
+                $value = trim($row[$headerMap[$name]]);
+                // Skip formula values that weren't calculated
+                if (str_starts_with($value, '=')) {
+                    return null;
+                }
+                // Skip Excel error values
+                if (in_array($value, ['#N/A', '#REF!', '#VALUE!', '#NAME?', '#DIV/0!', '#NULL!', '#NUM!'])) {
+                    return null;
+                }
+                if ($value !== '') {
+                    // Sanitize: remove special chars from start/end, normalize whitespace
+                    $value = $this->sanitizeText($value);
+                    return $value !== '' ? $value : null;
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Sanitize text value - remove special chars from start/end, normalize whitespace
+     */
+    private function sanitizeText(?string $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+        
+        // Trim whitespace
+        $cleaned = trim($value);
+        
+        // Remove backticks, quotes, and other special chars from start/end
+        $cleaned = preg_replace('/^[\`\'\"\s\*\#\@\!\~]+/', '', $cleaned);
+        $cleaned = preg_replace('/[\`\'\"\s\*\#\@\!\~]+$/', '', $cleaned);
+        
+        // Normalize multiple spaces and newlines to single space
+        $cleaned = preg_replace('/[\s\r\n]+/', ' ', $cleaned);
+        
+        return trim($cleaned);
+    }
+
+    /**
+     * Check if a value is an Excel error or formula
+     */
+    private function isInvalidValue(?string $value): bool
+    {
+        if ($value === null) return false;
+        if (str_starts_with($value, '=')) return true;
+        if (in_array($value, ['#N/A', '#REF!', '#VALUE!', '#NAME?', '#DIV/0!', '#NULL!', '#NUM!'])) return true;
+        return false;
+    }
+
+    private function parseDate(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+        
+        // Skip Excel error values
+        if (in_array($value, ['#N/A', '#REF!', '#VALUE!', '#NAME?', '#DIV/0!', '#NULL!', '#NUM!'])) {
+            return null;
+        }
+
+        try {
+            $parsedDate = null;
+            
+            // Try Excel serial date
+            if (is_numeric($value)) {
+                $parsedDate = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('Y-m-d');
+            } else {
+                // Try common date formats
+                $formats = ['d/m/Y', 'd-m-Y', 'Y-m-d', 'd M Y', 'd F Y', 'd-M-y', 'd-M-Y'];
+                foreach ($formats as $format) {
+                    $date = \DateTime::createFromFormat($format, $value);
+                    if ($date && $date->format($format) === $value) {
+                        $parsedDate = $date->format('Y-m-d');
+                        break;
+                    }
+                }
+                
+                // Last resort - strtotime, but validate result
+                if (!$parsedDate) {
+                    $timestamp = strtotime($value);
+                    if ($timestamp !== false && $timestamp > 0) {
+                        $parsedDate = date('Y-m-d', $timestamp);
+                    }
+                }
+            }
+            
+            // Validate year is reasonable (2000-2100), reject 1970 epoch dates
+            if ($parsedDate) {
+                $year = (int)substr($parsedDate, 0, 4);
+                if ($year < 2000 || $year > 2100) {
+                    return null;
+                }
+            }
+            
+            return $parsedDate;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function parseAmount(?string $value): ?float
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        // Remove currency symbols and formatting
+        $value = preg_replace('/[^\d.,]/', '', $value);
+        $value = str_replace(',', '', $value);
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function parseTime(?string $value): ?string
+    {
+        if (empty($value)) return null;
+        
+        try {
+            // Decimal time from Excel (e.g., 0.5 = 12:00)
+            if (is_numeric($value) && $value < 1) {
+                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('H:i:s');
+            }
+             return date('H:i:s', strtotime($value));
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function helpersFindOrCreate($modelClass, $name, $franchise = null)
+    {
+        if (empty($name)) {
+            return null;
+        }
+
+        $instance = $modelClass::firstOrCreate(
+            ['name' => $name],
+            ['active' => true, 'franchise' => $franchise]
+        );
+
+        return $instance->name;
+    }
+
+    /**
+     * Import Booking sheet
+     * Actual headers: tgl masuk, tgl booking, customer name, wip, tipe, foreman, sa, type of work, remarks
+     */
+    private function importBookingSheet(array $rows): array
+    {
+        $imported = 0; $updated = 0; $failed = 0;
+        $failedRows = [];
+        
+        // Debug: log first 5 rows
+        \Log::info("BOOKING SHEET - First 5 rows:", array_slice($rows, 0, 5));
+        
+        // Find header row - look for 'wip' or 'tgl booking' or 'customer name'
+        $headerMap = [];
+        $dataStartIndex = 0;
+        
+        // Indonesian months to skip as data rows
+        $months = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 
+                   'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+        
+        for ($i = 0; $i < min(10, count($rows)); $i++) {
+            $rowString = strtolower(implode(' ', array_map(fn($v) => trim((string)$v), $rows[$i])));
+            \Log::info("BOOKING row {$i}: {$rowString}");
+            
+            // Look for header row - must contain 'wip' and 'tgl' or 'customer'
+            if (str_contains($rowString, 'wip') && (str_contains($rowString, 'tgl') || str_contains($rowString, 'customer') || str_contains($rowString, 'booking'))) {
+                $headerMap = array_flip(array_map(fn($v) => strtolower(trim((string)$v)), $rows[$i]));
+                $dataStartIndex = $i + 1;
+                \Log::info("BOOKING - Found header at row {$i}, headerMap:", $headerMap);
+                break;
+            }
+        }
+        
+        if (empty($headerMap)) {
+            \Log::warning("BOOKING - No header found in first 10 rows");
+            return compact('imported', 'updated', 'failed');
+        }
+
+        $loggedRows = 0;
+        for ($i = $dataStartIndex; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            try {
+                // Skip month header rows (JANUARI, FEBRUARI, etc.)
+                $firstCell = strtolower(trim($row[0] ?? ''));
+                if (in_array($firstCell, $months)) {
+                    continue;
+                }
+                
+                // Get WIP as the primary identifier
+                $wip = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job number']);
+                
+                // Skip empty WIP or formula errors
+                if (empty($wip) || str_contains($wip, '=INDEX') || str_contains($wip, '#REF')) {
+                    continue;
+                }
+                
+                // Log first 5 data rows for debugging
+                if ($loggedRows < 5) {
+                    \Log::info("BOOKING data row {$i}: wip={$wip}, raw row:", $row);
+                    $loggedRows++;
+                }
+
+                $bookingData = [
+                    'wip' => $wip,
+                    'customer_name' => $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama']),
+                    'booking_date' => $this->parseDate($this->getColumnValue($row, $headerMap, ['tgl booking', 'tgl masuk', 'tanggal', 'date', 'booking date'])),
+                    'service_type' => $this->getColumnValue($row, $headerMap, ['type of work', 'tipe', 'type', 'service type', 'jenis']),
+                    'foreman' => $this->getColumnValue($row, $headerMap, ['foreman', 'kepala regu']),
+                    'service_advisor' => $this->getColumnValue($row, $headerMap, ['sa', 'service advisor']),
+                    'notes' => $this->getColumnValue($row, $headerMap, ['remarks', 'notes', 'catatan', 'keterangan']),
+                    'status' => 'pending',
+                ];
+
+                // Use WIP + booking_date as unique key
+                $booking = \App\Models\Booking::updateOrCreate(
+                    ['wip' => $wip, 'booking_date' => $bookingData['booking_date']],
+                    array_filter($bookingData, fn($v) => !is_null($v))
+                );
+
+                $booking->wasRecentlyCreated ? $imported++ : $updated++;
+            } catch (\Exception $e) {
+                \Log::error("BOOKING import error at row {$i}: " . $e->getMessage());
+                $failed++;
+                if (count($failedRows) < 100) {
+                    $failedRows[] = [
+                        'row' => $i + 1,
+                        'sheet' => 'BOOKING',
+                        'job_number' => $wip ?? 'N/A',
+                        'plate_number' => 'N/A',
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+        }
+        
+        \Log::info("BOOKING import complete: imported={$imported}, updated={$updated}, failed={$failed}");
+        return compact('imported', 'updated', 'failed', 'failedRows');
+    }
+
+    /**
+     * Import PDI sheet
+     * Actual headers: date, customer name, chassis no, engine no, type, colour, foreman, wip, status, remarks
+     */
+    private function importPdiSheet(array $rows): array
+    {
+        $imported = 0; $updated = 0; $failed = 0;
+        $failedRows = [];
+        
+        // Debug: log first 5 rows
+        \Log::info("PDI SHEET - First 5 rows:", array_slice($rows, 0, 5));
+        
+        // Find header row - look for 'chassis' or 'engine' or 'foreman' + 'wip'
+        $headerMap = [];
+        $dataStartIndex = 0;
+        
+        for ($i = 0; $i < min(10, count($rows)); $i++) {
+            $rowString = strtolower(implode(' ', array_map(fn($v) => trim((string)$v), $rows[$i])));
+            \Log::info("PDI row {$i}: {$rowString}");
+            
+            // Look for header row with 'chassis' or ('date' and 'customer' and 'type')
+            if (str_contains($rowString, 'chassis') || str_contains($rowString, 'engine no') || 
+                (str_contains($rowString, 'date') && str_contains($rowString, 'customer') && str_contains($rowString, 'type'))) {
+                $headerMap = array_flip(array_map(fn($v) => strtolower(trim((string)$v)), $rows[$i]));
+                $dataStartIndex = $i + 1;
+                \Log::info("PDI - Found header at row {$i}, headerMap:", $headerMap);
+                break;
+            }
+        }
+        
+        if (empty($headerMap)) {
+            \Log::warning("PDI - No header found in first 10 rows");
+            return compact('imported', 'updated', 'failed');
+        }
+
+        $loggedRows = 0;
+        for ($i = $dataStartIndex; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            try {
+                // Get VIN/chassis no as the primary identifier
+                $vin = $this->getColumnValue($row, $headerMap, ['chassis no', 'chassis', 'vin', 'no rangka', 'frame']);
+                
+                // Skip empty VIN
+                if (empty($vin)) continue;
+                
+                // Log first 5 data rows for debugging
+                if ($loggedRows < 5) {
+                    \Log::info("PDI data row {$i}: vin={$vin}, raw row:", $row);
+                    $loggedRows++;
+                }
+
+                $pdiData = [
+                    'vin' => $vin,
+                    'engine_no' => $this->getColumnValue($row, $headerMap, ['engine no', 'engine', 'no mesin']),
+                    'wip' => $this->getColumnValue($row, $headerMap, ['wip', 'no job']),
+                    'model' => $this->getColumnValue($row, $headerMap, ['type', 'model', 'tipe', 'unit']),
+                    'colour' => $this->getColumnValue($row, $headerMap, ['colour', 'color', 'warna']),
+                    'pdi_date' => $this->parseDate($this->getColumnValue($row, $headerMap, ['date', 'tanggal', 'tgl'])),
+                    'technician' => $this->getColumnValue($row, $headerMap, ['foreman', 'technician', 'mekanik', 'teknisi']),
+                    'notes' => $this->getColumnValue($row, $headerMap, ['remarks', 'notes', 'catatan', 'keterangan', 'status']),
+                    'status' => 'pending',
+                ];
+
+                // Use VIN + pdi_date as unique key
+                $pdi = \App\Models\PdiRecord::updateOrCreate(
+                    ['vin' => $vin, 'pdi_date' => $pdiData['pdi_date']],
+                    array_filter($pdiData, fn($v) => !is_null($v))
+                );
+
+                $pdi->wasRecentlyCreated ? $imported++ : $updated++;
+            } catch (\Exception $e) {
+                \Log::error("PDI import error at row {$i}: " . $e->getMessage());
+                $failed++;
+                if (count($failedRows) < 100) {
+                    $failedRows[] = [
+                        'row' => $i + 1,
+                        'sheet' => 'PDI',
+                        'job_number' => $vin ?? 'N/A',
+                        'plate_number' => 'N/A',
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+        }
+        
+        \Log::info("PDI import complete: imported={$imported}, updated={$updated}, failed={$failed}");
+        return compact('imported', 'updated', 'failed', 'failedRows');
+    }
+
+    /**
+     * Import Towing sheet (special format with month headers)
+     */
+    private function importTowingSheet(array $rows): array
+    {
+        $imported = 0; $updated = 0; $failed = 0;
+        $failedRows = [];
+        $headerMap = [];
+        
+        // Indonesian months to skip
+        $months = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 
+                   'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+
+        for ($i = 0; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            $firstCell = strtolower(trim($row[0] ?? ''));
+            
+            // Skip title row or month headers
+            if (empty($firstCell) || in_array($firstCell, $months) || str_contains($firstCell, 'jadwal')) {
+                continue;
+            }
+            
+            // Detect header row (contains TANGGAL and WIP)
+            $rowString = strtolower(implode(' ', array_map('trim', $row)));
+            if (str_contains($rowString, 'tanggal') && str_contains($rowString, 'wip')) {
+                $headerMap = array_flip(array_map('strtolower', array_map('trim', $row)));
+                continue;
+            }
+            
+            // Skip if no header found yet
+            if (empty($headerMap)) continue;
+            
+            // Skip if this is a repeat header (NURHALIM, TUTUT etc. in col A & B)
+            if (str_contains($rowString, 'foreman') || str_contains($rowString, 'mechanic')) {
+                continue;
+            }
+
+            try {
+                $plateNumber = $this->getColumnValue($row, $headerMap, ['nopol', 'plate', 'reg no']);
+                $scheduledDate = $this->parseDate($this->getColumnValue($row, $headerMap, ['tanggal', 'date']));
+                
+                if (empty($plateNumber) || empty($scheduledDate)) continue;
+
+                $towingorStoring = strtolower(trim($this->getColumnValue($row, $headerMap, ['stooring / towing', 'stooring/towing', 'towing']) ?? 'towing'));
+                $jobType = str_contains($towingorStoring, 'stooring') ? 'storing' : 'towing';
+
+                $towingData = [
+                    'plate_number' => $plateNumber,
+                    'scheduled_date' => $scheduledDate,
+                    'job_type' => $jobType,
+                    'status' => 'scheduled',
+                    'notes' => $this->getColumnValue($row, $headerMap, ['wip']), // Store WIP as reference
+                ];
+
+                $towing = \App\Models\TowingRecord::updateOrCreate(
+                    ['plate_number' => $plateNumber, 'scheduled_date' => $scheduledDate],
+                    array_filter($towingData, fn($v) => !is_null($v))
+                );
+
+                $towing->wasRecentlyCreated ? $imported++ : $updated++;
+            } catch (\Exception $e) {
+                $failed++;
+                if (count($failedRows) < 100) {
+                    $failedRows[] = [
+                        'row' => $i + 1,
+                        'sheet' => 'TOWING',
+                        'job_number' => 'N/A',
+                        'plate_number' => $plateNumber ?? 'N/A',
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+        }
+        
+        return compact('imported', 'updated', 'failed', 'failedRows');
+    }
+}
