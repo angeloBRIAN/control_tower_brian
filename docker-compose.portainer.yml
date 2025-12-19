@@ -16,8 +16,9 @@ services:
     environment:
       - APP_NAME=Control Tower
       - APP_ENV=production
-      - APP_DEBUG=false
+      - APP_DEBUG=true
       - APP_URL=http://192.168.99.123:8080
+      - APP_KEY=base64:skgy8qUtTy+bih795lEc3f1H5V4DEtc5NbR3W2BHMNU=
       - DB_CONNECTION=mysql
       - DB_HOST=db
       - DB_PORT=3306
