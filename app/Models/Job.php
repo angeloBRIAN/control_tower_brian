@@ -64,6 +64,7 @@ class Job extends Model
         'inv_ppn_meterai',
         'invoiced_at',
         'import_id',
+        'is_dummy_wip',
     ];
 
     protected $casts = [
@@ -85,6 +86,7 @@ class Job extends Model
         'update_at' => 'datetime',
         'invoiced_at' => 'datetime',
         'need_part' => 'boolean',
+        'is_dummy_wip' => 'boolean',
     ];
 
     public function vehicle(): BelongsTo

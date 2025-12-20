@@ -16,6 +16,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $filter = $request->input('filter');
         $sortField = $request->input('sort', 'name');
         $sortDir = $request->input('dir', 'asc');
 
@@ -57,15 +58,27 @@ class CustomerController extends Controller
         foreach ($customers as $customer) {
             $vehicleCount = Vehicle::where('customer_name', $customer->name)->count();
             $jobCount = Job::where('customer_name', $customer->name)->count();
+            $uninvoicedCount = Job::where('customer_name', $customer->name)->where('status', 'uninvoiced')->count();
             $salesAmount = Job::where('customer_name', $customer->name)
                 ->where('status', 'invoiced')
                 ->sum('inv_ppn_meterai') ?? 0;
+            
+            // Apply filters
+            if ($filter === 'with_uninvoiced' && $uninvoicedCount == 0) {
+                continue;
+            }
+            if ($filter === 'with_sales' && $salesAmount == 0) {
+                continue;
+            }
+            if ($filter === 'multi_vehicle' && $vehicleCount < 2) {
+                continue;
+            }
             
             $customerData[] = (object)[
                 'name' => $customer->name,
                 'vehicle_count' => $vehicleCount,
                 'job_count' => $jobCount,
-                'uninvoiced_count' => Job::where('customer_name', $customer->name)->where('status', 'uninvoiced')->count(),
+                'uninvoiced_count' => $uninvoicedCount,
                 'sales_amount' => $salesAmount,
                 'estimated_sales' => Job::where('customer_name', $customer->name)
                     ->where('status', 'uninvoiced')
@@ -74,7 +87,7 @@ class CustomerController extends Controller
         }
 
         // Sort by non-name fields if needed
-        if ($sortField !== 'name' && in_array($sortField, ['vehicle_count', 'job_count', 'sales_amount'])) {
+        if ($sortField !== 'name' && in_array($sortField, ['vehicle_count', 'job_count', 'sales_amount', 'uninvoiced_count'])) {
             usort($customerData, function($a, $b) use ($sortField, $sortDir) {
                 $aVal = $a->$sortField;
                 $bVal = $b->$sortField;
@@ -164,6 +177,8 @@ class CustomerController extends Controller
 
     /**
      * Find and show duplicate/similar customer names
+    /**
+     * Find and show duplicate/similar customer names
      */
     public function duplicates()
     {
@@ -198,7 +213,7 @@ class CustomerController extends Controller
 
                 $normalized2 = $this->normalizeForComparison($name2);
                 
-                // Check similarity
+                // Check similarity using Levenshtein distance
                 $levenshtein = levenshtein($normalized1, $normalized2);
                 $maxLen = max(strlen($normalized1), strlen($normalized2));
                 $similarity = $maxLen > 0 ? (1 - $levenshtein / $maxLen) * 100 : 0;
@@ -206,8 +221,9 @@ class CustomerController extends Controller
                 // Also check similar_text percentage
                 similar_text($normalized1, $normalized2, $percentSimilar);
 
-                // If either method shows high similarity (>80%), group them
-                if ($similarity > 80 || $percentSimilar > 80) {
+                // Require BOTH methods show high similarity (>90%) for more accuracy
+                // OR both >85% to reduce false positives like "Adi" vs "Andi"
+                if (($similarity > 90 && $percentSimilar > 85) || ($similarity > 85 && $percentSimilar > 90)) {
                     $similar[] = $name2;
                     $processed[] = $name2;
                 }
@@ -217,6 +233,11 @@ class CustomerController extends Controller
 
             // Only include groups with 2+ names
             if (count($similar) >= 2) {
+                // Skip if this group was previously dismissed
+                if (\App\Models\DismissedDuplicateGroup::isDismissed($similar)) {
+                    continue;
+                }
+
                 // Get counts and SOURCE for each name
                 $groupWithCounts = [];
                 $dmsSourceCount = 0;
@@ -247,6 +268,7 @@ class CustomerController extends Controller
                 $groupClassification = $dmsSourceCount >= 2 ? 'DMS_ISSUE' : 'USER_MISTAKE';
 
                 $duplicateGroups[] = [
+                    'names' => $similar, // Keep names array for dismiss functionality
                     'entries' => $groupWithCounts,
                     'classification' => $groupClassification,
                     'dms_count' => $dmsSourceCount,
@@ -261,6 +283,27 @@ class CustomerController extends Controller
             'dmsIssueCount' => collect($duplicateGroups)->where('classification', 'DMS_ISSUE')->count(),
             'userMistakeCount' => collect($duplicateGroups)->where('classification', 'USER_MISTAKE')->count(),
         ]);
+    }
+
+    /**
+     * Dismiss a duplicate group (mark as reviewed/not duplicate)
+     */
+    public function dismissGroup(Request $request)
+    {
+        $request->validate([
+            'names' => 'required|array|min:2',
+        ]);
+
+        $names = $request->input('names');
+        
+        \App\Models\DismissedDuplicateGroup::dismiss(
+            $names, 
+            'not_duplicate',
+            auth()->user()?->name
+        );
+
+        return redirect()->route('customers.duplicates')
+            ->with('success', 'Group dismissed. It will not appear in future reviews.');
     }
 
     /**
@@ -287,17 +330,19 @@ class CustomerController extends Controller
             // Detect source type by checking linked imports
             $sourceType = $this->detectDuplicateSource($oldName);
 
-            // Count before update
-            $jobsCount = Job::where('customer_name', $oldName)->count();
-            $vehiclesCount = Vehicle::where('customer_name', $oldName)->count();
+            // Update jobs individually for proper audit logging
+            $jobs = Job::where('customer_name', $oldName)->get();
+            $jobsCount = $jobs->count();
+            foreach ($jobs as $job) {
+                $job->update(['customer_name' => $canonicalName]);
+            }
 
-            // Update jobs
-            Job::where('customer_name', $oldName)
-                ->update(['customer_name' => $canonicalName]);
-
-            // Update vehicles
-            Vehicle::where('customer_name', $oldName)
-                ->update(['customer_name' => $canonicalName]);
+            // Update vehicles individually for proper audit logging
+            $vehicles = Vehicle::where('customer_name', $oldName)->get();
+            $vehiclesCount = $vehicles->count();
+            foreach ($vehicles as $vehicle) {
+                $vehicle->update(['customer_name' => $canonicalName]);
+            }
 
             // Log the merge operation
             CustomerMergeLog::create([
@@ -348,15 +393,19 @@ class CustomerController extends Controller
                 // Detect source type
                 $sourceType = $this->detectDuplicateSource($oldName);
 
-                // Count before update
-                $jobsCount = Job::where('customer_name', $oldName)->count();
-                $vehiclesCount = Vehicle::where('customer_name', $oldName)->count();
+                // Update jobs individually for proper audit logging
+                $jobs = Job::where('customer_name', $oldName)->get();
+                $jobsCount = $jobs->count();
+                foreach ($jobs as $job) {
+                    $job->update(['customer_name' => $canonicalName]);
+                }
 
-                // Update records
-                Job::where('customer_name', $oldName)
-                    ->update(['customer_name' => $canonicalName]);
-                Vehicle::where('customer_name', $oldName)
-                    ->update(['customer_name' => $canonicalName]);
+                // Update vehicles individually for proper audit logging
+                $vehicles = Vehicle::where('customer_name', $oldName)->get();
+                $vehiclesCount = $vehicles->count();
+                foreach ($vehicles as $vehicle) {
+                    $vehicle->update(['customer_name' => $canonicalName]);
+                }
 
                 // Log the merge
                 CustomerMergeLog::create([
@@ -406,6 +455,27 @@ class CustomerController extends Controller
             return 'job_progress_import'; // User mistake during progress import
         }
 
+        // Check vehicle imports
+        $hasVehicleImport = Vehicle::where('customer_name', $customerName)
+            ->whereNotNull('import_id')
+            ->exists();
+
+        if ($hasVehicleImport) {
+            return 'vehicle_import';
+        }
+
+        // Check if records exist but no import links (legacy or early data)
+        $hasJobsWithoutImport = Job::where('customer_name', $customerName)
+            ->whereNull('import_id')
+            ->exists();
+        $hasVehiclesWithoutImport = Vehicle::where('customer_name', $customerName)
+            ->whereNull('import_id')
+            ->exists();
+
+        if ($hasJobsWithoutImport || $hasVehiclesWithoutImport) {
+            return 'legacy_data'; // Records without import links (early system data)
+        }
+
         // Manual entry or unknown
         return 'user_entry';
     }
@@ -418,7 +488,9 @@ class CustomerController extends Controller
         return match($source) {
             'dms_import' => 'DMS (Invoice/Uninvoiced)',
             'job_progress_import' => 'Job Progress Import',
-            'user_entry' => 'Manual Entry',
+            'vehicle_import' => 'Vehicle Import',
+            'legacy_data' => 'Untracked (Conflict Fix/Early Import)',
+            'user_entry' => 'Unknown Source',
             default => $source,
         };
     }

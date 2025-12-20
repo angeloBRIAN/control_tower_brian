@@ -142,6 +142,11 @@
                         <i class="bi bi-trash3"></i> Data Cleanup
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('admin.dropdowns.*') ? 'active' : '' }}" href="{{ route('admin.dropdowns.index') }}">
+                        <i class="bi bi-list-ul"></i> Dropdown Options
+                    </a>
+                </li>
                 @endif
 
                 @if(Auth::user()->hasAnyRole(['admin', 'audit']))

@@ -38,6 +38,7 @@
                     <div class="row g-3 mb-4">
                         @foreach([
                             'jobs' => ['Jobs', 'bi-briefcase', 'danger'],
+                            'job_invoices' => ['Job Invoices', 'bi-receipt', 'danger'],
                             'bookings' => ['Bookings', 'bi-calendar-check', 'primary'],
                             'pdi_records' => ['PDI Records', 'bi-clipboard-check', 'success'],
                             'towing_records' => ['Towing Records', 'bi-truck', 'info'],

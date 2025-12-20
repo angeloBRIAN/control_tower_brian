@@ -81,7 +81,18 @@
                 <i class="bi bi-exclamation-triangle text-warning me-1"></i>Group #{{ $index + 1 }}
                 <span class="badge {{ $badgeClass }} ms-2">{{ $classLabel }}</span>
             </span>
-            <span class="badge bg-secondary">{{ count($group['entries']) }} variations</span>
+            <span class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">{{ count($group['entries']) }} variations</span>
+                <form action="{{ route('customers.dismiss-group') }}" method="POST" class="d-inline" onsubmit="return confirm('Dismiss this group? These names will not appear as duplicates again.')">
+                    @csrf
+                    @foreach($group['names'] as $name)
+                        <input type="hidden" name="names[]" value="{{ $name }}">
+                    @endforeach
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Not duplicates - dismiss this group">
+                        <i class="bi bi-x-lg"></i> Dismiss
+                    </button>
+                </form>
+            </span>
         </div>
         <div class="card-body">
             <table class="table table-sm table-hover mb-0">

@@ -25,6 +25,7 @@
     $vehiclesInWorkshop = \App\Models\Vehicle::where('is_in_workshop', true)->count();
     
     // Count duplicate customer name groups for alert
+    // Uses same logic as CustomerController@duplicates for consistency
     $duplicateCustomerCount = 0;
     try {
         $allNames = \Illuminate\Support\Facades\DB::table(
@@ -35,21 +36,39 @@
             ) as customers")
         )->pluck('name')->toArray();
         
-        // Simple check for similar names (first 10 chars match with different endings)
-        $checked = [];
+        // Use stricter algorithm (requires BOTH methods >90% AND >85%)
+        $processed = [];
         foreach ($allNames as $name1) {
-            if (in_array($name1, $checked)) continue;
-            $prefix = strtoupper(substr(preg_replace('/[^A-Z0-9]/', '', $name1), 0, 15));
-            if (strlen($prefix) < 10) continue;
+            if (in_array($name1, $processed)) continue;
+            $similar = [$name1];
+            $normalized1 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name1))));
+            
             foreach ($allNames as $name2) {
-                if ($name1 === $name2 || in_array($name2, $checked)) continue;
-                $prefix2 = strtoupper(substr(preg_replace('/[^A-Z0-9]/', '', $name2), 0, 15));
-                if ($prefix === $prefix2) {
-                    $duplicateCustomerCount++;
-                    $checked[] = $name2;
+                if ($name1 === $name2 || in_array($name2, $processed)) continue;
+                $normalized2 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name2))));
+                
+                // Levenshtein distance check
+                $levenshtein = levenshtein($normalized1, $normalized2);
+                $maxLen = max(strlen($normalized1), strlen($normalized2));
+                $similarity = $maxLen > 0 ? (1 - $levenshtein / $maxLen) * 100 : 0;
+                
+                // Similar text check
+                similar_text($normalized1, $normalized2, $percentSimilar);
+                
+                // Require BOTH methods show high similarity for more accuracy
+                if (($similarity > 90 && $percentSimilar > 85) || ($similarity > 85 && $percentSimilar > 90)) {
+                    $similar[] = $name2;
+                    $processed[] = $name2;
                 }
             }
-            $checked[] = $name1;
+            $processed[] = $name1;
+            
+            // Only count groups with 2+ names, excluding dismissed groups
+            if (count($similar) >= 2) {
+                if (!\App\Models\DismissedDuplicateGroup::isDismissed($similar)) {
+                    $duplicateCustomerCount++;
+                }
+            }
         }
     } catch (\Exception $e) {
         $duplicateCustomerCount = 0;
@@ -94,6 +113,58 @@
         <div class="stat-card-modern info">
             <p class="stat-value">{{ $vehiclesInWorkshop }}</p>
             <p class="stat-label mb-0"><i class="bi bi-car-front me-1"></i>In Workshop</p>
+        </div>
+    </div>
+</div>
+
+@php
+    // Work Status breakdown for uninvoiced jobs - using dynamic options from database
+    $workStatusCounts = \App\Models\Job::uninvoiced()
+        ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+        ->groupBy('work_status')
+        ->get()
+        ->keyBy('work_status');
+    
+    // Get configured work statuses from database
+    $workStatusOptions = \App\Models\DropdownOption::getOptions('work_status');
+@endphp
+
+<!-- Work Status Breakdown -->
+<div class="card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bar-chart me-2"></i>Work Status (Uninvoiced Jobs)</span>
+        <a href="{{ route('jobs.index', ['status' => 'uninvoiced']) }}" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            @forelse($workStatusOptions as $option)
+            @php
+                $count = $workStatusCounts->get($option->value)?->count ?? 0;
+            @endphp
+            <div class="col-md col-6">
+                <a href="{{ route('jobs.index', ['status' => 'uninvoiced', 'work_status' => $option->value]) }}" class="text-decoration-none">
+                    <div class="card border-0 bg-{{ $option->color }} bg-opacity-10 h-100">
+                        <div class="card-body py-3 text-center">
+                            @if($option->icon)
+                            <i class="bi bi-{{ $option->icon }} fs-3 text-{{ $option->color }} d-block mb-2"></i>
+                            @endif
+                            <h4 class="mb-0 text-{{ $option->color }}">{{ $count }}</h4>
+                            <small class="text-muted">{{ $option->label }}</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            @empty
+            <div class="col-12 text-center text-muted py-3">
+                <i class="bi bi-gear display-4 opacity-25"></i>
+                <p class="mb-0 mt-2">No work statuses configured</p>
+                @if(auth()->user()->hasRole('admin'))
+                <a href="{{ route('admin.dropdowns.index', ['type' => 'work_status']) }}" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-plus-lg me-1"></i>Configure Work Statuses
+                </a>
+                @endif
+            </div>
+            @endforelse
         </div>
     </div>
 </div>

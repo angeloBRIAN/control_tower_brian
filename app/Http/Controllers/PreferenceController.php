@@ -47,6 +47,9 @@ class PreferenceController extends Controller
             case 'vehicle':
                 $user->vehicle_preferences = $prefs;
                 break;
+            case 'customer':
+                $user->customer_preferences = $prefs;
+                break;
             default:
                 $user->column_preferences = $prefs;
         }

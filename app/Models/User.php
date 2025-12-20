@@ -26,6 +26,8 @@ class User extends Authenticatable
         'booking_preferences',
         'pdi_preferences',
         'towing_preferences',
+        'vehicle_preferences',
+        'customer_preferences',
         'role',
     ];
 
@@ -47,6 +49,8 @@ class User extends Authenticatable
         'booking_preferences' => 'array',
         'pdi_preferences' => 'array',
         'towing_preferences' => 'array',
+        'vehicle_preferences' => 'array',
+        'customer_preferences' => 'array',
     ];
 
     /**

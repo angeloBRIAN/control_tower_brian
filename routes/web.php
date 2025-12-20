@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
     Route::get('customers/duplicates', [\App\Http\Controllers\CustomerController::class, 'duplicates'])->name('customers.duplicates');
     Route::post('customers/merge', [\App\Http\Controllers\CustomerController::class, 'merge'])->name('customers.merge');
     Route::post('customers/merge-batch', [\App\Http\Controllers\CustomerController::class, 'mergeBatch'])->name('customers.merge-batch');
+    Route::post('customers/dismiss-group', [\App\Http\Controllers\CustomerController::class, 'dismissGroup'])->name('customers.dismiss-group');
     Route::get('customers/show', [\App\Http\Controllers\CustomerController::class, 'show'])->name('customers.show');
     Route::get('customers/search', [\App\Http\Controllers\CustomerController::class, 'search'])->name('customers.search');
 
@@ -57,6 +58,11 @@ Route::middleware('auth')->group(function () {
         Route::get('needs-parts', [ReportController::class, 'needsParts'])->name('needs-parts');
         Route::get('customer-merges', [ReportController::class, 'customerMerges'])->name('customer-merges');
         Route::get('customer-merges/export', [ReportController::class, 'exportCustomerMerges'])->name('customer-merges.export');
+        Route::get('wip-conflicts', [\App\Http\Controllers\WipConflictReportController::class, 'index'])->name('wip-conflicts');
+        Route::post('wip-conflicts/{job}/resolve', [\App\Http\Controllers\WipConflictReportController::class, 'resolve'])->name('wip-conflicts.resolve');
+        Route::get('orphan-vehicles', [\App\Http\Controllers\OrphanVehicleReportController::class, 'index'])->name('orphan-vehicles');
+        Route::delete('orphan-vehicles/{vehicle}', [\App\Http\Controllers\OrphanVehicleReportController::class, 'destroy'])->name('orphan-vehicles.destroy');
+        Route::delete('orphan-vehicles', [\App\Http\Controllers\OrphanVehicleReportController::class, 'bulkDestroy'])->name('orphan-vehicles.bulk-destroy');
     });
 
     // Add Remarks - SA, Foreman, Sparepart, Control Tower, Manager, Admin
@@ -108,6 +114,7 @@ Route::middleware('auth')->group(function () {
         // Report Exports
         Route::get('reports/export/uninvoiced', [ReportController::class, 'exportUninvoiced'])->name('reports.export-uninvoiced');
         Route::get('reports/export/needs-parts', [ReportController::class, 'exportNeedsParts'])->name('reports.export-needs-parts');
+        Route::get('reports/export/invoiced', [ReportController::class, 'exportInvoiced'])->name('reports.export-invoiced');
         
         // Report Builder
         Route::get('reports/builder', [ReportController::class, 'builder'])->name('reports.builder');
@@ -144,6 +151,15 @@ Route::middleware('auth')->group(function () {
         // Data Cleanup
         Route::get('data-cleanup', [\App\Http\Controllers\Admin\DataCleanupController::class, 'index'])->name('data-cleanup.index');
         Route::post('data-cleanup', [\App\Http\Controllers\Admin\DataCleanupController::class, 'cleanup'])->name('data-cleanup.execute');
+
+        // Dropdown Options Management
+        Route::get('dropdowns', [\App\Http\Controllers\DropdownController::class, 'index'])->name('dropdowns.index');
+        Route::get('dropdowns/create', [\App\Http\Controllers\DropdownController::class, 'create'])->name('dropdowns.create');
+        Route::post('dropdowns', [\App\Http\Controllers\DropdownController::class, 'store'])->name('dropdowns.store');
+        Route::get('dropdowns/{dropdown}/edit', [\App\Http\Controllers\DropdownController::class, 'edit'])->name('dropdowns.edit');
+        Route::put('dropdowns/{dropdown}', [\App\Http\Controllers\DropdownController::class, 'update'])->name('dropdowns.update');
+        Route::delete('dropdowns/{dropdown}', [\App\Http\Controllers\DropdownController::class, 'destroy'])->name('dropdowns.destroy');
+        Route::post('dropdowns/order', [\App\Http\Controllers\DropdownController::class, 'updateOrder'])->name('dropdowns.order');
     });
 
     // Delete operations - Admin only (outside prefix to keep normal route names)

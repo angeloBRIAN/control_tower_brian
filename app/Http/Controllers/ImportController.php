@@ -21,7 +21,12 @@ class ImportController extends Controller
 
     public function show(Import $import)
     {
-        return view('imports.show', compact('import'));
+        // Get dummy WIP jobs created during this import
+        $dummyJobs = Job::where('import_id', $import->id)
+            ->where('is_dummy_wip', true)
+            ->get();
+            
+        return view('imports.show', compact('import', 'dummyJobs'));
     }
 
     public function showUploadForm()
@@ -279,16 +284,54 @@ class ImportController extends Controller
                     $searchCriteria['franchise'] = $franchise;
                 }
                 
-                $job = Job::updateOrCreate(
-                    $searchCriteria,
-                    array_filter(array_merge($jobData, ['import_id' => $importId]), fn($value) => !is_null($value))
-                );
+                // Manual check for existing job + conflict handling
+                $existingJob = Job::where($searchCriteria)->first();
+                $job = null;
+                $isDummy = false;
 
-                if ($job->wasRecentlyCreated) {
+                if ($existingJob) {
+                    // Normalize plates for comparison
+                    $dbPlate = $this->sanitizeText($existingJob->plate_number);
+                    $newPlate = $this->sanitizeText($plateNumber);
+                    
+                    // If plate mismatch AND job is already established (Invoiced or Uninvoiced - not just "work_in_progress")
+                    // Actually user said: "if it is same plate number ... allow update data".
+                    // Implies if different, we do dummy.
+                    // We only want to enable this safety if the job is somewhat authoritative OR to prevent overwriting correct data with typo.
+                    // Simpler rule: If plates differ significantly, assume conflict.
+                    
+                    if ($dbPlate && $newPlate && $dbPlate !== $newPlate) {
+                         // CONFLICT Detected
+                         // Create Dummy Job
+                         $dummyWip = $jobNumber . '-DUP-' . ($i + 1); // Use row index for uniqueness
+                         $isDummy = true;
+                         
+                         $job = Job::create(array_filter(array_merge($jobData, [
+                             'job_number' => $dummyWip,
+                             'import_id' => $importId,
+                             'is_dummy_wip' => true,
+                             'description' => ($jobData['description'] ?? '') . " [CONFLICT: Orig WIP {$jobNumber} has plate {$existingJob->plate_number}]"
+                         ]), fn($value) => !is_null($value)));
+                         
+                         // Log the conflict
+                         \Log::warning("Import Conflict: WIP {$jobNumber} (Plate {$existingJob->plate_number}) vs Input (Plate {$plateNumber}). Created Dummy {$dummyWip}");
+                         // Treat as 'imported' (new record)
+                         $imported++;
+                         
+                         // Add to failedRows as info so user sees it? Or just let it be successfully imported as dummy?
+                         // User said "flagged and can be reported in detail info".
+                         // We'll mark it as successful import (it is saved), but maybe user can filter by is_dummy_wip later.
+                    } else {
+                        // Match or update allowed
+                        $existingJob->update(array_filter(array_merge($jobData, ['import_id' => $importId]), fn($value) => !is_null($value)));
+                        $job = $existingJob;
+                        $updated++;
+                    }
+                } else {
+                    // New Job - filter null values to allow DB defaults (especially franchise)
+                    $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId]), fn($value) => !is_null($value)));
                     $imported++;
                     \Log::info("PROGRESS: Created job {$jobNumber}", ['data' => array_filter($jobData, fn($v) => !is_null($v))]);
-                } else {
-                    $updated++;
                 }
 
                 // Create or update vehicle with model from unit_type
@@ -327,13 +370,8 @@ class ImportController extends Controller
             'failed_rows' => $failedRows,
         ]);
 
-        $message = "Import completed: {$imported} new, {$updated} updated, {$failed} failed.";
-        if ($failed > 0) {
-            $message .= " <a href='" . route('imports.show', $import) . "'>View details</a>";
-        }
-
-        return redirect()->route('imports.index')
-            ->with('success', $message);
+        return redirect()->route('imports.show', $import)
+            ->with('success', "Import completed: {$imported} new, {$updated} updated, {$failed} failed.");
     }
 
     public function importUninvoiced(Request $request)
@@ -366,8 +404,26 @@ class ImportController extends Controller
         $updated = 0;
         $failed = 0;
         $importedJobIds = [];
+        $failedRows = [];
+        $conflictRows = [];
+        $maxFailedRows = 100;
+        $rowIndex = 0;
+
+        // Create import record first so we have import_id for conflict resolution
+        $import = Import::create([
+            'file_name' => $file->getClientOriginalName(),
+            'import_type' => 'uninvoiced',
+            'records_imported' => 0,
+            'records_updated' => 0,
+            'records_failed' => 0,
+            'imported_by' => auth()->user()?->name,
+        ]);
+        $importId = $import->id;
 
         foreach ($rows as $row) {
+            $rowIndex++;
+            $jobNumber = null;
+            $plateNumber = null;
             try {
                 // Support multiple column name formats including uiws.xls format
                 $jobNumber = $this->getColumnValue($row, $headerMap, [
@@ -474,6 +530,88 @@ class ImportController extends Controller
                     'status' => 'uninvoiced',
                 ];
 
+                // RECONCILIATION Check
+                // 1. Check if job exists by real WIP
+                $existingJob = Job::where('job_number', $jobNumber)->first();
+                
+                // 2. If not found, check if a Dummy exists for this Plate
+                if (!$existingJob && !empty($plateNumber)) {
+                   $dummyCandidate = Job::where('is_dummy_wip', true)
+                        ->where(function($q) use ($plateNumber) {
+                            $q->where('plate_number', $plateNumber)
+                              ->orWhere('plate_number', 'LIKE', str_replace(' ', '%', $plateNumber));
+                        })
+                        ->where('franchise', $franchise)
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                        
+                    if ($dummyCandidate) {
+                         // Fix the WIP and remove dummy flag
+                        $dummyCandidate->update([
+                            'job_number' => $jobNumber,
+                            'is_dummy_wip' => false,
+                            'description' => ($dummyCandidate->description ?? '') . " [RECONCILED: Original Typo WIP was {$dummyCandidate->job_number}]"
+                        ]);
+                        \Log::info("UNINVOICED import: RECONCILED Dummy Job {$dummyCandidate->id} (Plate {$plateNumber}) to Real WIP {$jobNumber}");
+                    }
+                }
+
+                // WIP SWAP LOGIC: Check if existing job holder has wrong plate
+                $existingJobForSwap = Job::where('job_number', $jobNumber)->first();
+                if ($existingJobForSwap && !empty($plateNumber)) {
+                    $dbPlate = $this->sanitizeText($existingJobForSwap->plate_number);
+                    $uninvoicedPlate = $this->sanitizeText($plateNumber);
+                    
+                    if ($dbPlate && $uninvoicedPlate && $dbPlate !== $uninvoicedPlate) {
+                        // Current job has DIFFERENT plate - might be wrong holder
+                        $dummyWithCorrectPlate = Job::where('is_dummy_wip', true)
+                            ->where(function($q) use ($uninvoicedPlate, $plateNumber) {
+                                $q->where('plate_number', $plateNumber)
+                                  ->orWhere('plate_number', $uninvoicedPlate);
+                            })
+                            ->where('franchise', $franchise)
+                            ->first();
+                        
+                        if ($dummyWithCorrectPlate) {
+                            // SWAP: Demote current holder, Promote Dummy
+                            $oldWip = $existingJobForSwap->job_number;
+                            $wrongWip = $oldWip . '-WRONG-' . $existingJobForSwap->id;
+                            
+                            // Track conflict for report
+                            $conflictRows[] = [
+                                'row' => $rowIndex,
+                                'type' => 'SWAP',
+                                'original_wip' => $oldWip,
+                                'new_wip' => $wrongWip,
+                                'demoted_plate' => $existingJobForSwap->plate_number,
+                                'promoted_plate' => $plateNumber,
+                                'action' => "Demoted {$existingJobForSwap->plate_number} to {$wrongWip}, Promoted {$plateNumber} to {$oldWip}",
+                            ];
+                            
+                            // 1. Demote wrongful holder
+                            $existingJobForSwap->update([
+                                'job_number' => $wrongWip,
+                                'is_dummy_wip' => true,
+                                'import_id' => $importId,
+                                'description' => ($existingJobForSwap->description ?? '') . " [DEMOTED: WIP {$oldWip} now belongs to {$plateNumber}]"
+                            ]);
+                            \Log::warning("UNINVOICED import: SWAPPED - Demoted Job {$oldWip} (Plate {$dbPlate}) to {$wrongWip}");
+                            
+                            // 2. Promote Dummy to real WIP
+                            $dummyWithCorrectPlate->update([
+                                'job_number' => $jobNumber,
+                                'is_dummy_wip' => false,
+                                'import_id' => $importId,
+                                'description' => ($dummyWithCorrectPlate->description ?? '') . " [PROMOTED: Was {$dummyWithCorrectPlate->job_number}, now correct WIP {$jobNumber}]"
+                            ]);
+                            \Log::info("UNINVOICED import: SWAPPED - Promoted Dummy to Real WIP {$jobNumber} (Plate {$plateNumber})");
+                        }
+                    }
+                }
+
+                // Track old plate before update for orphan cleanup
+                $oldPlate = Job::where('job_number', $jobNumber)->value('plate_number');
+
                 $job = Job::updateOrCreate(
                     ['job_number' => $jobNumber],
                     array_filter($jobData)
@@ -485,6 +623,21 @@ class ImportController extends Controller
                     $imported++;
                 } else {
                     $updated++;
+                    // Track and cleanup if plate changed
+                    if ($oldPlate && $plateNumber && $this->sanitizeText($oldPlate) !== $this->sanitizeText($plateNumber)) {
+                        // Track plate correction for report
+                        $conflictRows[] = [
+                            'row' => $rowIndex,
+                            'type' => 'PLATE_CORRECTION',
+                            'original_wip' => $jobNumber,
+                            'new_wip' => $jobNumber,
+                            'demoted_plate' => $oldPlate,
+                            'promoted_plate' => $plateNumber,
+                            'action' => "Plate corrected from {$oldPlate} to {$plateNumber}",
+                        ];
+                        // Cleanup orphan vehicle
+                        $this->cleanupOrphanVehicle($oldPlate, $plateNumber, $importId);
+                    }
                 }
 
                 // Create or update vehicle with model and customer info
@@ -501,28 +654,29 @@ class ImportController extends Controller
                 }
             } catch (\Exception $e) {
                 $failed++;
+                if (count($failedRows) < $maxFailedRows) {
+                    $failedRows[] = [
+                        'row' => $rowIndex + 1,
+                        'sheet' => 'UNINVOICED',
+                        'job_number' => $jobNumber ?? 'N/A',
+                        'plate_number' => $plateNumber ?? 'N/A',
+                        'error' => $e->getMessage(),
+                    ];
+                }
             }
         }
 
-        $import = Import::create([
-            'file_name' => $file->getClientOriginalName(),
-            'import_type' => 'uninvoiced',
+        // Update import record with final counts
+        $import->update([
             'records_imported' => $imported,
             'records_updated' => $updated,
             'records_failed' => $failed,
-            'imported_by' => auth()->user()?->name,
+            'failed_rows' => $failedRows,
+            'conflict_rows' => $conflictRows,
         ]);
 
-        // Get the imported jobs to display in results
-        $jobs = Job::whereIn('id', $importedJobIds)->get();
-
-        return view('imports.results', [
-            'import' => $import,
-            'jobs' => $jobs,
-            'imported' => $imported,
-            'updated' => $updated,
-            'failed' => $failed,
-        ]);
+        return redirect()->route('imports.show', $import)
+            ->with('success', "Import completed: {$imported} new, {$updated} updated, {$failed} failed.");
     }
 
     public function importInvoiced(Request $request)
@@ -553,6 +707,10 @@ class ImportController extends Controller
         $imported = 0;
         $updated = 0;
         $failed = 0;
+        $failedRows = [];
+        $conflictRows = [];
+        $maxFailedRows = 100;
+        $rowIndex = 0;
 
         // Create import record first to get import_id
         $import = Import::create([
@@ -566,6 +724,9 @@ class ImportController extends Controller
         $importId = $import->id;
 
         foreach ($rows as $row) {
+            $rowIndex++;
+            $jobNumber = null;
+            $plateNumber = null;
             try {
                 // Get WIP (job number) - required
                 $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
@@ -640,12 +801,118 @@ class ImportController extends Controller
                     $job = Job::whereRaw('CAST(job_number AS CHAR) = ?', [$normalizedJobNumber])->first();
                 }
 
+                // RECONCILIATION: Check for Dummys logic
+                // If job not found by WIP, look for a Dummy Job created from conflict (Same Plate, roughly same date)
+                if (!$job && !empty($plateNumber)) {
+                    // Try to find a dummy job with matching plate number
+                    // We can also try to match by SA or partial WIP match if needed, but plate is safest anchor
+                    $dummyCandidate = Job::where('is_dummy_wip', true)
+                        ->where(function($q) use ($plateNumber) {
+                            $q->where('plate_number', $plateNumber)
+                              ->orWhere('plate_number', 'LIKE', str_replace(' ', '%', $plateNumber)); // Fuzzy plate
+                        })
+                        ->where('franchise', $franchise) // Should match franchise ideally
+                        // Optional: Check if date is close? Invoice date vs Job Date?
+                        // Job Date might be earlier. Let's just trust Plate + Dummy Flag for now.
+                        // Order by latest to pick most recent typo if multiple?
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                        
+                    if ($dummyCandidate) {
+                        $job = $dummyCandidate;
+                        // Fix the WIP and remove dummy flag
+                        $job->update([
+                            'job_number' => $normalizedJobNumber,
+                            'is_dummy_wip' => false,
+                            'description' => $job->description . " [RECONCILED: Original Typo WIP was {$job->job_number}]"
+                        ]);
+                        \Log::info("INVOICE import: RECONCILED Dummy Job {$job->id} (Plate {$plateNumber}) to Real WIP {$normalizedJobNumber}");
+                    }
+                }
+
                 if ($job) {
+                    // WIP SWAP LOGIC: Check if current job holder has wrong plate
+                    $dbPlate = $this->sanitizeText($job->plate_number);
+                    $invoicePlate = $this->sanitizeText($plateNumber);
+                    
+                    if ($dbPlate && $invoicePlate && $dbPlate !== $invoicePlate) {
+                        // Current job has DIFFERENT plate than Invoice - might be wrong holder
+                        // Search for Dummy with the correct (Invoice) plate
+                        $dummyWithCorrectPlate = Job::where('is_dummy_wip', true)
+                            ->where(function($q) use ($invoicePlate, $plateNumber) {
+                                $q->where('plate_number', $plateNumber)
+                                  ->orWhere('plate_number', $invoicePlate);
+                            })
+                            ->where('franchise', $franchise)
+                            ->first();
+                        
+                        if ($dummyWithCorrectPlate) {
+                            // SWAP: Demote current holder, Promote Dummy
+                            $oldWip = $job->job_number;
+                            $wrongWip = $oldWip . '-WRONG-' . $job->id;
+                            
+                            // Track conflict for report
+                            $conflictRows[] = [
+                                'row' => $rowIndex,
+                                'type' => 'SWAP',
+                                'original_wip' => $oldWip,
+                                'new_wip' => $wrongWip,
+                                'demoted_plate' => $job->plate_number,
+                                'promoted_plate' => $plateNumber,
+                                'action' => "Demoted {$job->plate_number} to {$wrongWip}, Promoted {$plateNumber} to {$oldWip}",
+                            ];
+                            
+                            // 1. Demote wrongful holder to Dummy
+                            $job->update([
+                                'job_number' => $wrongWip,
+                                'is_dummy_wip' => true,
+                                'import_id' => $importId,
+                                'description' => ($job->description ?? '') . " [DEMOTED: WIP {$oldWip} now belongs to {$plateNumber}]"
+                            ]);
+                            \Log::warning("INVOICE import: SWAPPED - Demoted Job {$oldWip} (Plate {$dbPlate}) to {$wrongWip}");
+                            
+                            // 2. Promote Dummy to real WIP
+                            $dummyWithCorrectPlate->update([
+                                'job_number' => $normalizedJobNumber,
+                                'is_dummy_wip' => false,
+                                'import_id' => $importId,
+                                'description' => ($dummyWithCorrectPlate->description ?? '') . " [PROMOTED: Was {$dummyWithCorrectPlate->job_number}, now correct WIP {$normalizedJobNumber}]"
+                            ]);
+                            \Log::info("INVOICE import: SWAPPED - Promoted Dummy to Real WIP {$normalizedJobNumber} (Plate {$plateNumber})");
+                            
+                            // 3. Continue updating the promoted job
+                            $job = $dummyWithCorrectPlate;
+                        }
+                    }
+                    
+                    // Track old plate before update for orphan cleanup
+                    $oldPlateBeforeUpdate = $job->plate_number;
+                    
                     // Update existing job with ONLY invoice-specific data
                     // Don't overwrite existing SA, Foreman, Address, sales figures, etc.
-                    $job->update(array_merge($invoiceData, ['import_id' => $importId]));
+                    $job->update(array_merge($invoiceData, [
+                        'import_id' => $importId,
+                        'plate_number' => $plateNumber,
+                        'customer_name' => $customerName,
+                    ]));
                     $updated++;
                     \Log::info("INVOICE import: Updated existing job {$normalizedJobNumber} (ID: {$job->id}, Franchise: {$job->franchise})");
+                    
+                    // Track and cleanup if plate changed
+                    if ($oldPlateBeforeUpdate && $plateNumber && $this->sanitizeText($oldPlateBeforeUpdate) !== $this->sanitizeText($plateNumber)) {
+                        // Track plate correction for report
+                        $conflictRows[] = [
+                            'row' => $rowIndex,
+                            'type' => 'PLATE_CORRECTION',
+                            'original_wip' => $normalizedJobNumber,
+                            'new_wip' => $normalizedJobNumber,
+                            'demoted_plate' => $oldPlateBeforeUpdate,
+                            'promoted_plate' => $plateNumber,
+                            'action' => "Plate corrected from {$oldPlateBeforeUpdate} to {$plateNumber}",
+                        ];
+                        // Cleanup orphan vehicle
+                        $this->cleanupOrphanVehicle($oldPlateBeforeUpdate, $plateNumber, $importId);
+                    }
                 } else {
                     // For new job, include all available data
                     $newJobData = array_merge($invoiceData, array_filter([
@@ -665,18 +932,22 @@ class ImportController extends Controller
                 // Detect credit note by negative amount
                 $isCreditNote = ($invPpnMeterai ?? 0) < 0 || ($invAmount ?? 0) < 0;
 
-                // Create invoice history record
-                JobInvoice::create([
-                    'job_id' => $job->id,
-                    'invoice_number' => $invoiceNumber,
-                    'invoice_date' => $invoiceDate,
-                    'invoice_type' => $isCreditNote ? 'credit_note' : 'invoice',
-                    'inv_amount' => abs($invAmount ?? 0),
-                    'inv_ppn' => abs($invPpn ?? 0),
-                    'inv_ppn_meterai' => abs($invPpnMeterai ?? 0),
-                    'type_sale' => $typeSale,
-                    'import_id' => $importId,
-                ]);
+                // Create or update invoice history record (prevent duplicates)
+                JobInvoice::updateOrCreate(
+                    [
+                        'job_id' => $job->id,
+                        'invoice_number' => $invoiceNumber,
+                        'invoice_date' => $invoiceDate,
+                    ],
+                    [
+                        'invoice_type' => $isCreditNote ? 'credit_note' : 'invoice',
+                        'inv_amount' => abs($invAmount ?? 0),
+                        'inv_ppn' => abs($invPpn ?? 0),
+                        'inv_ppn_meterai' => abs($invPpnMeterai ?? 0),
+                        'type_sale' => $typeSale,
+                        'import_id' => $importId,
+                    ]
+                );
 
                 // Add remark about invoice
                 $remarkDate = ($invoiceDate instanceof \Carbon\Carbon) ? $invoiceDate->format('d/m/Y') : ($invoiceDate ?: date('d/m/Y'));
@@ -699,6 +970,15 @@ class ImportController extends Controller
             } catch (\Exception $e) {
                 \Log::error("Invoiced import error for row: " . json_encode($row) . " - " . $e->getMessage());
                 $failed++;
+                if (count($failedRows) < $maxFailedRows) {
+                    $failedRows[] = [
+                        'row' => $rowIndex + 1,
+                        'sheet' => 'INVOICED',
+                        'job_number' => $jobNumber ?? 'N/A',
+                        'plate_number' => $plateNumber ?? 'N/A',
+                        'error' => $e->getMessage(),
+                    ];
+                }
             }
         }
 
@@ -707,9 +987,11 @@ class ImportController extends Controller
             'records_imported' => $imported,
             'records_updated' => $updated,
             'records_failed' => $failed,
+            'failed_rows' => $failedRows,
+            'conflict_rows' => $conflictRows,
         ]);
 
-        return redirect()->route('imports.index')
+        return redirect()->route('imports.show', $import)
             ->with('success', "Import completed: {$imported} new, {$updated} updated as invoiced, {$failed} failed.");
     }
 
@@ -768,6 +1050,63 @@ class ImportController extends Controller
         if (str_starts_with($value, '=')) return true;
         if (in_array($value, ['#N/A', '#REF!', '#VALUE!', '#NAME?', '#DIV/0!', '#NULL!', '#NUM!'])) return true;
         return false;
+    }
+
+    /**
+     * Cleanup orphan vehicle when job's plate number is updated
+     * Called during authoritative import (Uninvoiced/Invoice) when job plate changes
+     * 
+     * @param string|null $oldPlate The old plate number
+     * @param string|null $newPlate The new (correct) plate number
+     * @param int $importId Current import ID for logging
+     * @return array|null Info about merge/deletion if performed
+     */
+    private function cleanupOrphanVehicle(?string $oldPlate, ?string $newPlate, int $importId): ?array
+    {
+        if (empty($oldPlate) || empty($newPlate) || $oldPlate === $newPlate) {
+            return null;
+        }
+        
+        // Check if old plate vehicle exists
+        $oldVehicle = Vehicle::where('plate_number', $oldPlate)->first();
+        if (!$oldVehicle) {
+            return null; // No orphan to cleanup
+        }
+        
+        // Check if old plate has any remaining jobs
+        $remainingJobs = Job::where('plate_number', $oldPlate)->count();
+        if ($remainingJobs > 0) {
+            return null; // Not an orphan yet
+        }
+        
+        // Old plate vehicle has no jobs - it's an orphan
+        // Get or create the new plate vehicle
+        $newVehicle = Vehicle::firstOrCreate(
+            ['plate_number' => $newPlate],
+            ['import_id' => $importId]
+        );
+        
+        // Merge customer data from orphan to correct vehicle (if missing)
+        if (empty($newVehicle->customer_name) && !empty($oldVehicle->customer_name)) {
+            $newVehicle->customer_name = $oldVehicle->customer_name;
+        }
+        if (empty($newVehicle->model) && !empty($oldVehicle->model)) {
+            $newVehicle->model = $oldVehicle->model;
+        }
+        $newVehicle->save();
+        
+        // Log and delete the orphan
+        \Log::info("ORPHAN CLEANUP: Deleted vehicle {$oldPlate} (orphan after plate correction to {$newPlate})");
+        $orphanInfo = [
+            'old_plate' => $oldPlate,
+            'new_plate' => $newPlate,
+            'customer_name' => $oldVehicle->customer_name,
+            'action' => 'merged_and_deleted',
+        ];
+        
+        $oldVehicle->delete();
+        
+        return $orphanInfo;
     }
 
     private function parseDate(?string $value): ?string

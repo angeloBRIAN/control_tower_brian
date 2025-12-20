@@ -43,7 +43,8 @@ class ReportController extends Controller
 
     public function invoiced(Request $request)
     {
-        $query = Job::with('vehicle')
+        $query = Job::with(['vehicle', 'invoices'])
+            ->withCount('invoices')
             ->invoiced()
             ->latest('invoiced_at');
 
@@ -52,21 +53,234 @@ class ReportController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('job_number', 'like', "%{$search}%")
                   ->orWhere('plate_number', 'like', "%{$search}%")
-                  ->orWhere('invoice_number', 'like', "%{$search}%");
+                  ->orWhere('invoice_number', 'like', "%{$search}%")
+                  ->orWhere('customer_name', 'like', "%{$search}%");
             });
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('invoiced_at', '>=', $request->date_from);
+            $query->whereDate('invoice_date', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('invoiced_at', '<=', $request->date_to);
+            $query->whereDate('invoice_date', '<=', $request->date_to);
         }
 
-        $jobs = $query->paginate(20);
+        // Additional filters
+        if ($request->filled('franchise')) {
+            $query->where('franchise', $request->franchise);
+        }
+        if ($request->filled('department')) {
+            $query->where('department', $request->department);
+        }
+        if ($request->filled('type_sale')) {
+            $query->where('type_sale', $request->type_sale);
+        }
+        if ($request->filled('service_advisor')) {
+            $query->where('service_advisor', $request->service_advisor);
+        }
 
-        return view('reports.invoiced', compact('jobs'));
+        $jobs = $query->paginate(50)->withQueryString();
+
+        // Filter options
+        $filterOptions = [
+            'franchise' => ['PC', 'CV'],
+            'department' => Job::invoiced()->whereNotNull('department')->distinct()->pluck('department')->sort()->values()->toArray(),
+            'type_sale' => Job::invoiced()->whereNotNull('type_sale')->distinct()->pluck('type_sale')->sort()->values()->toArray(),
+            'service_advisor' => Job::invoiced()->whereNotNull('service_advisor')->distinct()->pluck('service_advisor')->sort()->values()->toArray(),
+        ];
+
+        return view('reports.invoiced', compact('jobs', 'filterOptions'));
+    }
+
+    public function exportInvoiced(Request $request)
+    {
+        $query = Job::invoiced()->latest('invoice_date');
+
+        // Apply same filters
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('job_number', 'like', "%{$search}%")
+                  ->orWhere('plate_number', 'like', "%{$search}%")
+                  ->orWhere('invoice_number', 'like', "%{$search}%")
+                  ->orWhere('customer_name', 'like', "%{$search}%");
+            });
+        }
+        if ($request->filled('date_from')) {
+            $query->whereDate('invoice_date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('invoice_date', '<=', $request->date_to);
+        }
+        if ($request->filled('franchise')) {
+            $query->where('franchise', $request->franchise);
+        }
+        if ($request->filled('department')) {
+            $query->where('department', $request->department);
+        }
+        if ($request->filled('type_sale')) {
+            $query->where('type_sale', $request->type_sale);
+        }
+        if ($request->filled('service_advisor')) {
+            $query->where('service_advisor', $request->service_advisor);
+        }
+
+        $jobs = $query->get();
+        $format = $request->input('format', 'xlsx');
+        $columns = $request->input('columns', ['job_number', 'plate_number', 'service_advisor', 'job_date', 'invoice_number', 'invoice_date', 'inv_ppn_meterai']);
+
+        // Column definitions
+        $allColumns = [
+            'job_number' => 'WIP',
+            'franchise' => 'Franchise',
+            'department' => 'Dept',
+            'plate_number' => 'Plate No',
+            'customer_name' => 'Customer',
+            'service_advisor' => 'SA',
+            'foreman' => 'Foreman',
+            'job_date' => 'Job Date',
+            'date_in' => 'Date In',
+            'date_out' => 'Date Out',
+            'invoice_number' => 'Invoice #',
+            'invoice_date' => 'Inv Date',
+            'type_sale' => 'Type Sale',
+            'inv_amount' => 'Amount',
+            'inv_ppn' => 'PPN',
+            'inv_ppn_meterai' => 'Total',
+        ];
+
+        $selectedColumns = array_intersect_key($allColumns, array_flip($columns));
+
+        // Calculate summary stats for PDF
+        $totalAll = $jobs->sum('inv_ppn_meterai');
+        $totalPC = $jobs->where('franchise', 'PC')->sum('inv_ppn_meterai');
+        $totalCV = $jobs->where('franchise', 'CV')->sum('inv_ppn_meterai');
+        $deptTotals = $jobs->where('franchise', 'PC')->groupBy('department')->map(fn($g) => $g->sum('inv_ppn_meterai'))->sortDesc();
+        $typeSaleTotalsPC = $jobs->where('franchise', 'PC')->groupBy('type_sale')->map(fn($g) => $g->sum('inv_ppn_meterai'))->sortDesc();
+        $typeSaleTotalsCV = $jobs->where('franchise', 'CV')->groupBy('type_sale')->map(fn($g) => $g->sum('inv_ppn_meterai'))->sortDesc();
+
+        if ($format === 'pdf') {
+            $typeSaleLabels = ['INT' => 'Internal', 'WAR' => 'Warranty', 'CASH' => 'Cash', 'CREDIT' => 'Credit'];
+            
+            $html = '<html><head><style>
+                body { font-family: Arial, sans-serif; font-size: 9px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ddd; padding: 4px; text-align: left; }
+                th { background: #333; color: white; }
+                .summary-card { display: inline-block; width: 30%; margin: 5px 1%; padding: 10px; text-align: center; border-radius: 8px; }
+                .card-total { background: #d1fae5; border: 1px solid #10b981; }
+                .card-pc { background: #dbeafe; border: 1px solid #3b82f6; }
+                .card-cv { background: #fef3c7; border: 1px solid #f59e0b; }
+                .card-value { font-size: 14px; font-weight: bold; margin: 5px 0; }
+                .breakdown { margin: 15px 0; padding: 10px; background: #f9fafb; border-radius: 5px; }
+                .breakdown-title { font-weight: bold; margin-bottom: 8px; }
+                .breakdown-item { display: inline-block; padding: 5px 10px; margin: 3px; background: #e5e7eb; border-radius: 4px; }
+                h1 { font-size: 16px; margin-bottom: 5px; }
+                .subtitle { color: #666; margin-bottom: 15px; }
+            </style></head><body>';
+            
+            $html .= '<h1>Invoiced Jobs Report</h1>';
+            $html .= '<div class="subtitle">Generated: ' . now()->format('d/m/Y H:i') . ' | Jobs: ' . $jobs->count() . '</div>';
+            
+            // Summary cards
+            $html .= '<div style="margin-bottom: 15px;">';
+            $html .= '<div class="summary-card card-total"><div>Total Invoiced</div><div class="card-value">Rp ' . number_format($totalAll, 0, ',', '.') . '</div><div>' . $jobs->count() . ' jobs</div></div>';
+            $html .= '<div class="summary-card card-pc"><div>PC (Passenger Car)</div><div class="card-value">Rp ' . number_format($totalPC, 0, ',', '.') . '</div><div>' . $jobs->where('franchise', 'PC')->count() . ' jobs</div></div>';
+            $html .= '<div class="summary-card card-cv"><div>CV (Commercial)</div><div class="card-value">Rp ' . number_format($totalCV, 0, ',', '.') . '</div><div>' . $jobs->where('franchise', 'CV')->count() . ' jobs</div></div>';
+            $html .= '</div>';
+            
+            // Type Sale Breakdown
+            if ($typeSaleTotalsPC->isNotEmpty()) {
+                $html .= '<div class="breakdown"><div class="breakdown-title">PC Type Sale</div>';
+                foreach ($typeSaleTotalsPC as $type => $total) {
+                    $label = $typeSaleLabels[$type] ?? ($type ?: 'Unknown');
+                    $html .= '<span class="breakdown-item">' . $label . ': Rp ' . number_format($total, 0, ',', '.') . '</span>';
+                }
+                $html .= '</div>';
+            }
+            
+            // Department Breakdown
+            if ($deptTotals->isNotEmpty()) {
+                $html .= '<div class="breakdown"><div class="breakdown-title">PC Department</div>';
+                foreach ($deptTotals as $dept => $total) {
+                    $html .= '<span class="breakdown-item">' . ($dept ?: 'No Dept') . ': Rp ' . number_format($total, 0, ',', '.') . '</span>';
+                }
+                $html .= '</div>';
+            }
+
+            // Data table
+            $html .= '<table><tr>';
+            foreach ($selectedColumns as $label) {
+                $html .= '<th>' . $label . '</th>';
+            }
+            $html .= '</tr>';
+            
+            foreach ($jobs as $job) {
+                $html .= '<tr>';
+                foreach ($selectedColumns as $key => $label) {
+                    $value = $job->{$key};
+                    if (in_array($key, ['job_date', 'date_in', 'date_out', 'invoice_date']) && $value) {
+                        $value = $value->format('d/m/Y');
+                    } elseif (in_array($key, ['inv_amount', 'inv_ppn', 'inv_ppn_meterai']) && $value) {
+                        $value = number_format($value, 0, ',', '.');
+                    }
+                    $html .= '<td>' . e($value ?? '-') . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            $html .= '</table></body></html>';
+
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="invoiced_jobs_' . date('Y-m-d') . '.pdf"',
+            ]);
+        }
+
+        // Excel/CSV Export
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Headers
+        $sheet->fromArray(array_values($selectedColumns), null, 'A1');
+        $sheet->getStyle('A1:' . chr(64 + count($selectedColumns)) . '1')->getFont()->setBold(true);
+
+        $row = 2;
+        foreach ($jobs as $job) {
+            $rowData = [];
+            foreach (array_keys($selectedColumns) as $key) {
+                $value = $job->{$key};
+                if (in_array($key, ['job_date', 'date_in', 'date_out', 'invoice_date']) && $value) {
+                    $value = $value->format('Y-m-d');
+                }
+                $rowData[] = $value ?? '';
+            }
+            $sheet->fromArray($rowData, null, 'A' . $row);
+            $row++;
+        }
+
+        foreach (range('A', chr(64 + count($selectedColumns))) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        if ($format === 'csv') {
+            $filename = 'invoiced_jobs_' . date('Y-m-d_His') . '.csv';
+            $writer = new Csv($spreadsheet);
+            $contentType = 'text/csv';
+        } else {
+            $filename = 'invoiced_jobs_' . date('Y-m-d_His') . '.xlsx';
+            $writer = new Xlsx($spreadsheet);
+            $contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        }
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => $contentType]);
     }
 
     public function needsParts(Request $request)

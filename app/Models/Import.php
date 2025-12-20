@@ -19,11 +19,13 @@ class Import extends Model
         'records_updated',
         'records_failed',
         'failed_rows',
+        'conflict_rows',
         'notes',
         'imported_by',
     ];
 
     protected $casts = [
         'failed_rows' => 'array',
+        'conflict_rows' => 'array',
     ];
 }

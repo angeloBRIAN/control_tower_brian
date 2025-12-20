@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Job;
+use App\Models\JobInvoice;
 use App\Models\Booking;
 use App\Models\PdiRecord;
 use App\Models\TowingRecord;
@@ -25,6 +26,7 @@ class DataCleanupController extends Controller
         // Get counts for display
         $counts = [
             'jobs' => Job::count(),
+            'job_invoices' => JobInvoice::count(),
             'bookings' => Booking::count(),
             'pdi_records' => PdiRecord::count(),
             'towing_records' => TowingRecord::count(),
@@ -61,6 +63,11 @@ class DataCleanupController extends Controller
             if (in_array('remarks', $tablesToClean)) {
                 $results['remarks'] = Remark::count();
                 DB::table('remarks')->truncate();
+            }
+
+            if (in_array('job_invoices', $tablesToClean)) {
+                $results['job_invoices'] = JobInvoice::count();
+                DB::table('job_invoices')->truncate();
             }
 
             if (in_array('jobs', $tablesToClean)) {
