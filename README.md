@@ -4,13 +4,39 @@ Workshop management system for tracking vehicle service jobs, from entry through
 
 ## Features
 
-- **Job Management** - Track jobs from creation to invoice
-- **Vehicle & Customer Tracking** - Manage vehicles and customer data
-- **Data Import** - Import from DMS (Progress, Invoiced, Booking, PDI, Towing)
-- **Invoice History** - Track invoices and credit notes per job
-- **Duplicate Detection** - Find and merge similar customer names
-- **Reports** - Uninvoiced, Invoiced, Needs Parts, Customer Merges
-- **Audit Logging** - Track all data changes
+### 🛠️ Job Operations
+- **Job Management** - End-to-end tracking from vehicle entry to invoicing
+- **Booking System** - Schedule appointments with capacity planning
+- **PDI & Towing** - Specialized modules for Pre-Delivery Inspection and Towing services
+- **Invoicing** - Generate standard invoices and track payment status
+- **Workflows** - Automated status transitions based on parts/work progress
+
+### 📱 Customer Experience
+- **Customer Portal** - Dedicated login for customers to view service history
+- **Vehicle Tracking** - Real-time status updates for customers
+- **Invoice Access** - Customers can download their own invoices
+- **PWA Support** - Installable as a native app on mobile/desktop
+- **Mobile Optimized** - Fully responsive design for on-the-go access
+
+### 🛡️ Security & Access
+- **Two-Factor Authentication** - TOTP support (Google Authenticator) for staff
+- **Session Management** - View and terminate active sessions
+- **LDAP Integration** - Corporate directory authentication support
+- **Role-Based Access** - Granular permissions (Admin, Manager, SA, Foreman, Sparepart)
+- **Audit Logging** - Comprehensive tracking of all data changes
+
+### 📊 Reports & Data
+- **Report Builder** - Create custom reports with filters and column selection
+- **Saved Reports** - Save frequently used report configurations
+- **Dashboards** - SA Performance, Aging Reports, and Financial overviews
+- **Data Import/Export** - Seamless integration with Excel/CSV data
+- **Data Cleanup** - Tools to manage database growth and archive old records
+
+### 🤖 Automation & Tools
+- **Global Search** - Command palette (Ctrl+K) to find anything quickly
+- **Notifications** - In-app alerts for job assignments and updates
+- **Stale Job Alerts** - Automated flagging of jobs needing attention
+- **Customer Merging** - Smart detection and merging of duplicate customer records
 
 ---
 
