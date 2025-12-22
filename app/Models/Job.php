@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Events\JobStatusUpdated;
+use App\Events\RemarkAdded;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -217,6 +219,9 @@ class Job extends Model
         // Notify assigned SA/Foreman about new remark (if different from creator)
         $this->notifyAssignedUsers($remarkText, $createdBy, $userId);
 
+        // Broadcast real-time update
+        event(new RemarkAdded($this, $remark));
+
         return $remark;
     }
 
@@ -269,5 +274,8 @@ class Job extends Model
             'invoice_number' => $invoiceNumber,
             'invoiced_at' => now(),
         ]);
+
+        // Broadcast real-time update
+        event(new JobStatusUpdated($this, 'invoiced', auth()->user()?->name));
     }
 }
