@@ -19,60 +19,11 @@
 </div>
 
 @php
-    $uninvoicedCount = \App\Models\Job::uninvoiced()->count();
-    $invoicedCount = \App\Models\Job::invoiced()->count();
-    $needsPartsCount = \App\Models\Job::uninvoiced()->needsParts()->count();
-    $vehiclesInWorkshop = \App\Models\Vehicle::where('is_in_workshop', true)->count();
-    
-    // Count duplicate customer name groups for alert
-    // Uses same logic as CustomerController@duplicates for consistency
-    $duplicateCustomerCount = 0;
-    try {
-        $allNames = \Illuminate\Support\Facades\DB::table(
-            \Illuminate\Support\Facades\DB::raw("(
-                SELECT DISTINCT customer_name as name FROM vehicles WHERE customer_name IS NOT NULL AND customer_name != ''
-                UNION
-                SELECT DISTINCT customer_name as name FROM jobs WHERE customer_name IS NOT NULL AND customer_name != ''
-            ) as customers")
-        )->pluck('name')->toArray();
-        
-        // Use stricter algorithm (requires BOTH methods >90% AND >85%)
-        $processed = [];
-        foreach ($allNames as $name1) {
-            if (in_array($name1, $processed)) continue;
-            $similar = [$name1];
-            $normalized1 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name1))));
-            
-            foreach ($allNames as $name2) {
-                if ($name1 === $name2 || in_array($name2, $processed)) continue;
-                $normalized2 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name2))));
-                
-                // Levenshtein distance check
-                $levenshtein = levenshtein($normalized1, $normalized2);
-                $maxLen = max(strlen($normalized1), strlen($normalized2));
-                $similarity = $maxLen > 0 ? (1 - $levenshtein / $maxLen) * 100 : 0;
-                
-                // Similar text check
-                similar_text($normalized1, $normalized2, $percentSimilar);
-                
-                // Require BOTH methods show high similarity for more accuracy
-                if (($similarity > 90 && $percentSimilar > 85) || ($similarity > 85 && $percentSimilar > 90)) {
-                    $similar[] = $name2;
-                    $processed[] = $name2;
-                }
-            }
-            $processed[] = $name1;
-            
-            // Only count groups with 2+ names, excluding dismissed groups
-            if (count($similar) >= 2) {
-                if (!\App\Models\DismissedDuplicateGroup::isDismissed($similar)) {
-                    $duplicateCustomerCount++;
-                }
-            }
-        }
-    } catch (\Exception $e) {
-        $duplicateCustomerCount = 0;
-    }
+    // All data is now passed from DashboardController with caching
+    $uninvoicedCount = $stats['uninvoiced'];
+    $invoicedCount = $stats['invoiced'];
+    $needsPartsCount = $stats['needs_parts'];
+    $vehiclesInWorkshop = $stats['vehicles_in_workshop'];
 @endphp
 
 @if($duplicateCustomerCount > 0)
@@ -171,50 +122,11 @@
 
 <!-- Charts Row -->
 @php
-    // Get last 7 days job data
-    $last7Days = collect();
-    for ($i = 6; $i >= 0; $i--) {
-        $date = now()->subDays($i);
-        $last7Days->push([
-            'date' => $date->format('d M'),
-            'invoiced' => \App\Models\Job::whereDate('invoiced_at', $date)->count(),
-            'new' => \App\Models\Job::whereDate('job_date', $date)->count(),
-        ]);
-    }
-    
-    // Work status for pie chart
-    $statusCounts = $workStatusOptions->map(fn($opt) => [
-        'label' => $opt->label,
-        'count' => $workStatusCounts->get($opt->value)?->count ?? 0,
-        'color' => match($opt->color) {
-            'primary' => '#0d6efd',
-            'success' => '#198754',
-            'warning' => '#ffc107',
-            'danger' => '#dc3545',
-            'info' => '#0dcaf0',
-            'secondary' => '#6c757d',
-            default => '#6c757d'
-        }
-    ])->filter(fn($s) => $s['count'] > 0);
-    
-    // SA Revenue (Top 5 for uninvoiced jobs)
-    $saRevenue = \App\Models\Job::uninvoiced()
-        ->selectRaw('service_advisor, SUM(COALESCE(total_sales, 0)) as revenue, COUNT(*) as job_count')
-        ->whereNotNull('service_advisor')
-        ->groupBy('service_advisor')
-        ->orderByDesc('revenue')
-        ->take(5)
-        ->get();
-    
-    // Job Aging breakdown (uninvoiced only)
-    $today = now()->startOfDay();
-    $agingData = [
-        ['label' => '< 3 days', 'count' => \App\Models\Job::uninvoiced()->where('job_date', '>', $today->copy()->subDays(3))->count(), 'color' => '#198754'],
-        ['label' => '3-7 days', 'count' => \App\Models\Job::uninvoiced()->whereBetween('job_date', [$today->copy()->subDays(7), $today->copy()->subDays(3)])->count(), 'color' => '#0dcaf0'],
-        ['label' => '7-14 days', 'count' => \App\Models\Job::uninvoiced()->whereBetween('job_date', [$today->copy()->subDays(14), $today->copy()->subDays(7)])->count(), 'color' => '#ffc107'],
-        ['label' => '14-30 days', 'count' => \App\Models\Job::uninvoiced()->whereBetween('job_date', [$today->copy()->subDays(30), $today->copy()->subDays(14)])->count(), 'color' => '#fd7e14'],
-        ['label' => '> 30 days', 'count' => \App\Models\Job::uninvoiced()->where('job_date', '<', $today->copy()->subDays(30))->count(), 'color' => '#dc3545'],
-    ];
+    // All chart data is now passed from DashboardController with caching
+    $last7Days = $chartData['last7Days'];
+    $statusCounts = $chartData['statusCounts'];
+    $saRevenue = $chartData['saRevenue'];
+    $agingData = $chartData['agingData'];
 @endphp
 
 <div class="row g-4 mb-4">
@@ -281,7 +193,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse(\App\Models\Job::uninvoiced()->latest()->take(5)->get() as $job)
+                        @forelse($recentJobs as $job)
                         <tr onclick="window.location='{{ route('jobs.show', $job) }}'" style="cursor: pointer;">
                             <td class="fw-bold text-primary">{{ $job->job_number }}</td>
                             <td><span class="badge bg-light text-dark border">{{ $job->plate_number }}</span></td>
@@ -312,7 +224,7 @@
                 <a href="{{ route('jobs.index', ['need_part' => 1]) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">View All</a>
             </div>
             <div class="list-group list-group-flush">
-                @forelse(\App\Models\Job::uninvoiced()->needsParts()->latest()->take(5)->get() as $job)
+                @forelse($needsPartsJobs as $job)
                 <a href="{{ route('jobs.show', $job) }}" class="list-group-item list-group-item-action py-3">
                     <div class="d-flex w-100 justify-content-between align-items-center mb-1">
                         <h6 class="mb-0 fw-bold">{{ $job->plate_number }}</h6>

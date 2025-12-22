@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Jobs\CreateJob;
+use App\Actions\Jobs\MarkAsInvoiced;
+use App\Http\Requests\StoreJobRequest;
+use App\Http\Requests\UpdateJobRequest;
 use App\Models\Job;
 use App\Models\Vehicle;
 use Illuminate\Http\Request;
@@ -136,29 +140,17 @@ class JobController extends Controller
         return view('jobs.create');
     }
 
-    public function store(Request $request)
+    public function store(StoreJobRequest $request, CreateJob $action)
     {
-        $validated = $request->validate([
-            'job_number' => 'required|string|unique:jobs,job_number',
-            'franchise' => 'required|in:PC,CV',
-            'plate_number' => 'required|string',
-            'service_advisor' => 'nullable|string',
-            'technician' => 'nullable|string',
-            'job_type' => 'nullable|string',
-            'job_date' => 'nullable|date',
-            'promise_date' => 'nullable|date',
-            'estimated_amount' => 'nullable|numeric',
-            'work_status' => 'nullable|string',
-            'description' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
+        $user = auth()->user();
 
-        $validated['status'] = 'uninvoiced';
-
-        $job = Job::create($validated);
-
-        if ($request->filled('initial_remark')) {
-            $job->addRemark($request->initial_remark, auth()->user()?->name);
-        }
+        $job = $action->execute(
+            $validated,
+            $request->input('initial_remark'),
+            $user?->name,
+            $user?->id
+        );
 
         return redirect()->route('jobs.show', $job)
             ->with('success', 'Job created successfully.');
@@ -180,33 +172,9 @@ class JobController extends Controller
         return redirect()->route('jobs.show', $job);
     }
 
-    public function update(Request $request, Job $job)
+    public function update(UpdateJobRequest $request, Job $job)
     {
-        $validated = $request->validate([
-            'job_number' => 'required|string|unique:jobs,job_number,' . $job->id,
-            'job_card' => 'nullable|string',
-            'franchise' => 'required|in:PC,CV',
-            'plate_number' => 'required|string',
-            'unit' => 'nullable|string',
-            'type_unit' => 'nullable|string',
-            'account_no' => 'nullable|string',
-            'date_first_reg' => 'nullable|date',
-            'customer_name' => 'nullable|string',
-            'customer_address' => 'nullable|string',
-            'service_advisor' => 'nullable|string',
-            'technician' => 'nullable|string',
-            'foreman' => 'nullable|string',
-            'job_date' => 'nullable|date',
-            'labour_sales' => 'nullable|numeric',
-            'part_sales' => 'nullable|numeric',
-            'total_sales' => 'nullable|numeric',
-            'rq' => 'nullable|string',
-            'no_order_part_mbina' => 'nullable|string',
-            'lain_lain' => 'nullable|string',
-            'need_part' => 'nullable|boolean',
-        ]);
-
-        $job->update($validated);
+        $job->update($request->validated());
 
         return redirect()->route('jobs.show', $job)
             ->with('success', 'Job updated successfully.');
@@ -264,7 +232,7 @@ class JobController extends Controller
             ->with('success', 'Remark added successfully.');
     }
 
-    public function markInvoiced(Request $request, Job $job)
+    public function markInvoiced(Request $request, Job $job, MarkAsInvoiced $action)
     {
         // Enforce permission check
         if (!auth()->user()->canMarkInvoiced()) {
@@ -276,11 +244,14 @@ class JobController extends Controller
             'remark' => 'required|string',
         ]);
 
-        $job->markAsInvoiced($validated['invoice_number']);
-
-        // Add the mandatory remark
         $user = auth()->user();
-        $job->addRemark("Marked as Invoiced (Inv: {$validated['invoice_number']}): " . $validated['remark'], $user->name, $user->id);
+        $action->execute(
+            $job,
+            $validated['invoice_number'],
+            $validated['remark'],
+            $user->name,
+            $user->id
+        );
 
         return redirect()->route('jobs.show', $job)
             ->with('success', 'Job marked as invoiced.');

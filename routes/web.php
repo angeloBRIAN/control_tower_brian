@@ -30,10 +30,8 @@ Route::post('logout', [AuthController::class, 'logout'])->name('logout')->middle
 
 // Protected Routes - All Authenticated Users
 Route::middleware('auth')->group(function () {
-    // Dashboard - Everyone can see
-    Route::get('/', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    // Dashboard - Everyone can see (with cached stats)
+    Route::get('/', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     
     // Global Search
     Route::get('search', [\App\Http\Controllers\SearchController::class, 'search'])->name('search');

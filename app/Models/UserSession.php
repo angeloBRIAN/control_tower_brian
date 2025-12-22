@@ -20,10 +20,13 @@ class UserSession extends Model
         'last_active_at',
     ];
 
-    protected $casts = [
-        'is_current' => 'boolean',
-        'last_active_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'is_current' => 'boolean',
+            'last_active_at' => 'datetime',
+        ];
+    }
 
     public function user(): BelongsTo
     {

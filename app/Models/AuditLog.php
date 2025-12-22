@@ -22,10 +22,13 @@ class AuditLog extends Model
         'user_agent',
     ];
 
-    protected $casts = [
-        'old_values' => 'array',
-        'new_values' => 'array',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'old_values' => 'array',
+            'new_values' => 'array',
+        ];
+    }
 
     /**
      * Get the auditable model (Booking, PdiRecord, TowingRecord, etc.)
