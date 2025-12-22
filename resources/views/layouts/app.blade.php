@@ -531,25 +531,69 @@
         }
         
         // PWA Install Prompt
-        let deferredPrompt;
+        let deferredPrompt = null;
+        const installBtn = document.getElementById('pwaInstallBtn');
+        
+        // Check if already installed (using localStorage as per-device tracking)
+        const isPwaInstalled = localStorage.getItem('pwaInstalled') === 'true' || 
+                               window.matchMedia('(display-mode: standalone)').matches ||
+                               window.navigator.standalone === true;
+        
+        if (isPwaInstalled && installBtn) {
+            console.log('[PWA] Already installed on this device');
+            installBtn.style.display = 'none';
+        }
+        
         window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('[PWA] beforeinstallprompt fired');
             e.preventDefault();
             deferredPrompt = e;
             
-            // Show install button if not already installed
-            const installBtn = document.getElementById('pwaInstallBtn');
-            if (installBtn) {
+            // Only show if not already installed on THIS device
+            if (installBtn && !isPwaInstalled) {
                 installBtn.style.display = 'block';
-                installBtn.addEventListener('click', () => {
+            }
+        });
+        
+        // Handle install button click
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) {
+                    console.log('[PWA] No install prompt available');
+                    // Try showing browser's native install dialog as fallback
+                    alert('To install: tap the menu button (⋮) and select "Add to Home screen" or "Install app"');
+                    return;
+                }
+                
+                console.log('[PWA] Showing install prompt');
+                installBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Installing...';
+                installBtn.disabled = true;
+                
+                try {
                     deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then((choice) => {
-                        if (choice.outcome === 'accepted') {
-                            console.log('PWA installed');
-                        }
-                        deferredPrompt = null;
-                        installBtn.style.display = 'none';
-                    });
-                });
+                    const choice = await deferredPrompt.userChoice;
+                    console.log('[PWA] User choice:', choice.outcome);
+                    
+                    if (choice.outcome === 'accepted') {
+                        localStorage.setItem('pwaInstalled', 'true');
+                        console.log('[PWA] Installed successfully');
+                    }
+                    deferredPrompt = null;
+                    installBtn.style.display = 'none';
+                } catch (err) {
+                    console.error('[PWA] Install error:', err);
+                    installBtn.innerHTML = '<i class="bi bi-download me-2"></i>Install App';
+                    installBtn.disabled = false;
+                }
+            });
+        }
+        
+        // Listen for successful installation
+        window.addEventListener('appinstalled', (e) => {
+            console.log('[PWA] App installed event fired');
+            localStorage.setItem('pwaInstalled', 'true');
+            if (installBtn) {
+                installBtn.style.display = 'none';
             }
         });
     </script>
