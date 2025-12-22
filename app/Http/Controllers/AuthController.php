@@ -28,10 +28,16 @@ class AuthController extends Controller
 
         $user = null;
 
-        // Step 1: Try local database first
+        // Step 1: Try local database first (null auth_source treated as 'local')
         $localUser = User::where('email', $request->email)->first();
         
-        if ($localUser && $localUser->auth_source === 'local' && Hash::check($request->password, $localUser->password)) {
+        $isLocalUser = $localUser && (
+            $localUser->auth_source === 'local' || 
+            $localUser->auth_source === null || 
+            $localUser->auth_source === ''
+        );
+        
+        if ($isLocalUser && Hash::check($request->password, $localUser->password)) {
             $user = $localUser;
         }
 
