@@ -61,6 +61,7 @@
                         $currentDir = request('dir', $userDir);
                         $sortMap = [
                             'plate' => 'plate_number',
+                            'vin' => 'vin',
                             'model' => 'model',
                             'year' => 'year',
                             'customer' => 'customer_name',
@@ -75,6 +76,7 @@
                         <th data-col="no">#</th>
                         @foreach([
                             'plate' => 'Plate Number',
+                            'vin' => 'VIN / Chassis',
                             'model' => 'Model',
                             'year' => 'Year',
                             'customer' => 'Customer',
@@ -113,6 +115,7 @@
                         </td>
                         <td data-col="no">{{ $vehicles->firstItem() + $index }}</td>
                         <td data-col="plate"><a href="{{ route('vehicles.show', $vehicle) }}" class="fw-bold text-primary">{{ $vehicle->plate_number }}</a></td>
+                        <td data-col="vin">{{ $vehicle->vin ?? '-' }}</td>
                         <td data-col="model">{{ $vehicle->model ?? '-' }}</td>
                         <td data-col="year">{{ $vehicle->year ?? '-' }}</td>
                         <td data-col="customer">{{ $vehicle->customer_name ?? '-' }}</td>
@@ -180,8 +183,8 @@
 @push('scripts')
 @php
     $defaultPrefs = [
-        'columns' => ['no' => true, 'plate' => true, 'model' => true, 'year' => false, 'customer' => true, 'workshop' => true, 'jobs' => true, 'actions' => true],
-        'order' => ['no', 'plate', 'model', 'year', 'customer', 'workshop', 'jobs', 'actions'],
+        'columns' => ['no' => true, 'plate' => true, 'vin' => false, 'model' => true, 'year' => false, 'customer' => true, 'workshop' => true, 'jobs' => true, 'actions' => true],
+        'order' => ['no', 'plate', 'vin', 'model', 'year', 'customer', 'workshop', 'jobs', 'actions'],
         'widths' => [],
         'sort' => 'created_at',
         'dir' => 'desc'
@@ -201,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const userSort = @json($userSort);
     const userDir = @json($userDir);
     const columnLabels = {
-        'no': '#', 'plate': 'Plate Number', 'model': 'Model', 'year': 'Year',
+        'no': '#', 'plate': 'Plate Number', 'vin': 'VIN / Chassis', 'model': 'Model', 'year': 'Year',
         'customer': 'Customer', 'workshop': 'In Workshop', 'jobs': 'Jobs', 'actions': 'Actions'
     };
     const container = document.getElementById('columnToggles');
