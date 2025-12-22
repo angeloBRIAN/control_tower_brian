@@ -172,14 +172,22 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Revenue: ' + new Intl.NumberFormat('id-ID').format(context.raw);
+                        }
+                    }
+                }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return 'Rp ' + (value / 1000000).toFixed(0) + 'M';
+                            // Use Jt (Juta) for million - Indonesian standard
+                            return 'Rp ' + (value / 1000000).toFixed(0) + ' Jt';
                         }
                     }
                 }
