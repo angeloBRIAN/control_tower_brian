@@ -160,10 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Select all toggle
+    // Select all toggle (only enabled checkboxes)
     selectAllBtn.addEventListener('click', function() {
-        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-        checkboxes.forEach(cb => cb.checked = !allChecked);
+        const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+        const allChecked = enabledCheckboxes.every(cb => cb.checked);
+        enabledCheckboxes.forEach(cb => cb.checked = !allChecked);
         this.textContent = allChecked ? 'Select All' : 'Deselect All';
         
         // Trigger change event
