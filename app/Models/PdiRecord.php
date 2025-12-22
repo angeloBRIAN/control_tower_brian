@@ -25,9 +25,12 @@ class PdiRecord extends Model
         'import_id',
     ];
 
-    protected $casts = [
-        'pdi_date' => 'date',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'pdi_date' => 'date',
+        ];
+    }
 
     public function import(): BelongsTo
     {

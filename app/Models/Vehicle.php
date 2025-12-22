@@ -24,9 +24,12 @@ class Vehicle extends Model
         'import_id',
     ];
 
-    protected $casts = [
-        'is_in_workshop' => 'boolean',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'is_in_workshop' => 'boolean',
+        ];
+    }
 
     public function jobs(): HasMany
     {

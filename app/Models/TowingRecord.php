@@ -24,10 +24,13 @@ class TowingRecord extends Model
         'import_id',
     ];
 
-    protected $casts = [
-        'scheduled_date' => 'date',
-        'scheduled_time' => 'datetime:H:i',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'scheduled_date' => 'date',
+            'scheduled_time' => 'datetime:H:i',
+        ];
+    }
 
     public function import(): BelongsTo
     {

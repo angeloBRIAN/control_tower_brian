@@ -19,10 +19,13 @@ class Notification extends Model
         'read_at',
     ];
 
-    protected $casts = [
-        'data' => 'array',
-        'read_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'data' => 'array',
+            'read_at' => 'datetime',
+        ];
+    }
 
     // Notification types
     const TYPE_STALE_JOB = 'stale_job';

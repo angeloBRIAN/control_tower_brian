@@ -26,10 +26,13 @@ class Booking extends Model
         'import_id',
     ];
 
-    protected $casts = [
-        'booking_date' => 'date',
-        'booking_time' => 'datetime:H:i',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'booking_date' => 'date',
+            'booking_time' => 'datetime:H:i',
+        ];
+    }
 
     public function import(): BelongsTo
     {

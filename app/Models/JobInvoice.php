@@ -23,12 +23,15 @@ class JobInvoice extends Model
         'import_id',
     ];
 
-    protected $casts = [
-        'invoice_date' => 'date',
-        'inv_amount' => 'decimal:2',
-        'inv_ppn' => 'decimal:2',
-        'inv_ppn_meterai' => 'decimal:2',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'invoice_date' => 'date',
+            'inv_amount' => 'decimal:2',
+            'inv_ppn' => 'decimal:2',
+            'inv_ppn_meterai' => 'decimal:2',
+        ];
+    }
 
     /**
      * Get the job this invoice belongs to

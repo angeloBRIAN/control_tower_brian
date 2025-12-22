@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Route;
 // Auth Routes (Guest only)
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1'); // 5 attempts per minute
     Route::get('register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('register', [AuthController::class, 'register']);
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:3,1'); // 3 registrations per minute
 });
 
 // 2FA Challenge (separate from auth middleware)
