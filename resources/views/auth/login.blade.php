@@ -199,7 +199,7 @@
         </div>
         
         <p class="footer-text">
-            <i class="bi bi-shield-lock me-1"></i>Secure Login &bull; © {{ date('Y') }} Control Tower
+            <i class="bi bi-shield-lock me-1"></i>Secure Login &bull; © {{ date('Y') }} IT Dept HRM Surabaya
         </p>
     </div>
 </div>
