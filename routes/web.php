@@ -201,6 +201,15 @@ Route::middleware('auth')->group(function () {
         Route::put('dropdowns/{dropdown}', [\App\Http\Controllers\DropdownController::class, 'update'])->name('dropdowns.update');
         Route::delete('dropdowns/{dropdown}', [\App\Http\Controllers\DropdownController::class, 'destroy'])->name('dropdowns.destroy');
         Route::post('dropdowns/order', [\App\Http\Controllers\DropdownController::class, 'updateOrder'])->name('dropdowns.order');
+
+        // Report Settings
+        Route::get('report-settings', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'index'])->name('report-settings.index');
+        Route::put('report-settings/{report}', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'updateReport'])->name('report-settings.update');
+        Route::post('report-settings/{report}/recipients', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'addRecipient'])->name('report-settings.add-recipient');
+        Route::post('report-settings/{report}/recipients/remove', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'removeRecipient'])->name('report-settings.remove-recipient');
+        Route::post('report-settings/{report}/send', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'sendNow'])->name('report-settings.send-now');
+        Route::put('report-settings/smtp', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'updateSmtp'])->name('report-settings.smtp');
+        Route::post('report-settings/smtp/test', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'testSmtp'])->name('report-settings.test-smtp');
     });
 
     // Delete operations - Admin only (outside prefix to keep normal route names)
