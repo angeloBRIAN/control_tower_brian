@@ -355,7 +355,7 @@
                     </div>
                     @elseif(auth()->user()->hasRole('sparepart') && $job->need_part)
                     {{-- Sparepart role: can edit RQ, Order Part, Lain-lain on jobs that need parts --}}
-                    </form>{{-- Close main form --}}
+                    {{-- Note: Sparepart doesn't have canEdit() so no main form is open --}}
                     <form action="{{ route('jobs.update-order-parts', $job) }}" method="POST" id="orderPartsForm">
                         @csrf
                         @method('PATCH')
@@ -374,9 +374,8 @@
                             </div>
                         </div>
                     </form>
-                    <form>{{-- Reopen dummy form to avoid HTML issues --}}
                     @else
-                    {{-- Read-only view for SA, Foreman, Audit, etc --}}
+                    {{-- Read-only view for SA, Foreman, Audit, Sparepart (when job doesn't need parts), etc --}}
                     <div class="row g-2">
                         <div class="col-md-3">
                             <label class="form-label small text-muted mb-0">RQ</label>
@@ -405,7 +404,7 @@
                 </div>
             </div>
 
-            {{-- Close main form before comments to avoid nested form issue --}}
+            {{-- Close main form/div before comments to avoid nested form issue --}}
             @if(auth()->user()->canEdit())
             </form>
             @else
