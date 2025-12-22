@@ -70,8 +70,10 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @php $currentSessionId = session()->getId(); @endphp
                     @forelse($sessions as $session)
-                    <tr>
+                    @php $isCurrentSession = $session->session_id === $currentSessionId; @endphp
+                    <tr class="{{ $isCurrentSession ? 'table-primary' : '' }}">
                         <td>
                             <div class="d-flex align-items-center">
                                 <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" style="width: 35px; height: 35px;">
@@ -79,6 +81,9 @@
                                 </div>
                                 <div>
                                     <strong>{{ $session->user->name ?? 'Unknown' }}</strong>
+                                    @if($isCurrentSession)
+                                    <span class="badge bg-primary ms-1">This Device</span>
+                                    @endif
                                     <br><small class="text-muted">{{ $session->user->email ?? '' }}</small>
                                 </div>
                             </div>
@@ -93,7 +98,9 @@
                         <td><code>{{ $session->ip_address ?? '-' }}</code></td>
                         <td>{{ $session->last_active_at?->diffForHumans() ?? 'Unknown' }}</td>
                         <td>
-                            @if($session->last_active_at && $session->last_active_at >= now()->subMinutes(5))
+                            @if($isCurrentSession)
+                            <span class="badge bg-primary"><i class="bi bi-circle-fill me-1"></i>Current</span>
+                            @elseif($session->last_active_at && $session->last_active_at >= now()->subMinutes(5))
                             <span class="badge bg-success"><i class="bi bi-circle-fill me-1"></i>Online</span>
                             @elseif($session->last_active_at && $session->last_active_at >= now()->subHours(1))
                             <span class="badge bg-warning text-dark">Idle</span>
@@ -102,6 +109,9 @@
                             @endif
                         </td>
                         <td>
+                            @if($isCurrentSession)
+                            <span class="text-muted" title="Cannot terminate current session"><i class="bi bi-lock"></i></span>
+                            @else
                             <form action="{{ route('admin.sessions.terminate', $session) }}" method="POST" 
                                   onsubmit="return confirm('Terminate this session for {{ $session->user->name ?? 'user' }}?')">
                                 @csrf
@@ -110,6 +120,7 @@
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                             </form>
+                            @endif
                         </td>
                     </tr>
                     @empty
