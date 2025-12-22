@@ -37,14 +37,26 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Plate Number <span class="text-danger">*</span></label>
-                    <input type="text" name="plate_number" class="form-control @error('plate_number') is-invalid @enderror" value="{{ old('plate_number') }}" required>
+                    <div class="input-group">
+                        <input type="text" name="plate_number" id="plate_number" class="form-control @error('plate_number') is-invalid @enderror" value="{{ old('plate_number') }}" required>
+                        <span class="input-group-text" id="plate_lookup_status"><i class="bi bi-search"></i></span>
+                    </div>
+                    <small class="text-muted" id="plate_hint">Type plate number to lookup vehicle</small>
                     @error('plate_number')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
                 <div class="col-md-4">
+                    <label class="form-label">Unit Type / Model</label>
+                    <input type="text" name="unit_type" id="unit_type" class="form-control" value="{{ old('unit_type') }}" placeholder="e.g. XPANDER, L300">
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Chassis Number</label>
                     <input type="text" name="chassis_number" class="form-control" value="{{ old('chassis_number') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Customer Name</label>
+                    <input type="text" name="customer_name" id="customer_name" class="form-control" value="{{ old('customer_name') }}">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Service Advisor</label>
@@ -109,4 +121,64 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const plateInput = document.getElementById('plate_number');
+    const unitTypeInput = document.getElementById('unit_type');
+    const customerNameInput = document.getElementById('customer_name');
+    const lookupStatus = document.getElementById('plate_lookup_status');
+    const plateHint = document.getElementById('plate_hint');
+    
+    let lookupTimeout = null;
+    
+    plateInput.addEventListener('input', function() {
+        clearTimeout(lookupTimeout);
+        const plate = this.value.trim();
+        
+        if (plate.length < 3) {
+            lookupStatus.innerHTML = '<i class="bi bi-search"></i>';
+            plateHint.textContent = 'Type plate number to lookup vehicle';
+            return;
+        }
+        
+        lookupStatus.innerHTML = '<i class="bi bi-hourglass-split spin"></i>';
+        plateHint.textContent = 'Looking up...';
+        
+        lookupTimeout = setTimeout(() => {
+            fetch(`/api/vehicles/lookup?plate=${encodeURIComponent(plate)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found) {
+                        lookupStatus.innerHTML = '<i class="bi bi-check-circle text-success"></i>';
+                        plateHint.innerHTML = '<span class="text-success">Vehicle found!</span>';
+                        
+                        // Auto-fill unit type if empty
+                        if (!unitTypeInput.value && data.model) {
+                            unitTypeInput.value = data.model;
+                        }
+                        // Auto-fill customer name if empty
+                        if (!customerNameInput.value && data.customer_name) {
+                            customerNameInput.value = data.customer_name;
+                        }
+                    } else {
+                        lookupStatus.innerHTML = '<i class="bi bi-plus-circle text-info"></i>';
+                        plateHint.innerHTML = '<span class="text-info">New vehicle - enter details</span>';
+                    }
+                })
+                .catch(err => {
+                    lookupStatus.innerHTML = '<i class="bi bi-search"></i>';
+                    plateHint.textContent = 'Type plate number to lookup vehicle';
+                });
+        }, 500);
+    });
+});
+</script>
+<style>
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+@endpush
 @endsection
+
