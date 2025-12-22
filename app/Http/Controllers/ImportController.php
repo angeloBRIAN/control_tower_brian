@@ -984,11 +984,16 @@ class ImportController extends Controller
                     ]
                 );
 
-                // Add remark about invoice
+                // Add remark about invoice (wrapped to prevent broadcast failures)
                 $remarkDate = ($invoiceDate instanceof \Carbon\Carbon) ? $invoiceDate->format('d/m/Y') : ($invoiceDate ?: date('d/m/Y'));
                 $remarkType = $isCreditNote ? 'Credit Note' : 'Invoice';
                 $remarkText = "{$remarkType} on {$remarkDate}" . ($invoiceNumber ? " - #{$invoiceNumber}" : '');
-                $job->addRemark($remarkText, 'System Import');
+                try {
+                    $job->addRemark($remarkText, 'System Import');
+                } catch (\Exception $remarkError) {
+                    // Silently ignore broadcast failures - remark might still be saved
+                    \Log::debug("Remark broadcast failed for job {$job->job_number}: " . $remarkError->getMessage());
+                }
 
                 // Update vehicle - don't change workshop status, just link/update info
                 if (!empty($plateNumber)) {
