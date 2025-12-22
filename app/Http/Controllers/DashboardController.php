@@ -6,51 +6,37 @@ use App\Models\DismissedDuplicateGroup;
 use App\Models\DropdownOption;
 use App\Models\Job;
 use App\Models\Vehicle;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     /**
-     * Display the dashboard with cached statistics.
+     * Display the dashboard with real-time statistics.
      */
     public function index()
     {
-        // Cache dashboard stats for 5 minutes
-        $stats = Cache::remember('dashboard_stats', 300, function () {
-            return [
-                'uninvoiced' => Job::uninvoiced()->count(),
-                'invoiced' => Job::invoiced()->count(),
-                'needs_parts' => Job::uninvoiced()->needsParts()->count(),
-                'vehicles_in_workshop' => Vehicle::where('is_in_workshop', true)->count(),
-            ];
-        });
+        // Always fetch fresh data - no caching
+        $stats = [
+            'uninvoiced' => Job::uninvoiced()->count(),
+            'invoiced' => Job::invoiced()->count(),
+            'needs_parts' => Job::uninvoiced()->needsParts()->count(),
+            'vehicles_in_workshop' => Vehicle::where('is_in_workshop', true)->count(),
+        ];
 
-        // Cache work status counts for 5 minutes
-        $workStatusCounts = Cache::remember('dashboard_work_status', 300, function () {
-            return Job::uninvoiced()
-                ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
-                ->groupBy('work_status')
-                ->get()
-                ->keyBy('work_status');
-        });
+        $workStatusCounts = Job::uninvoiced()
+            ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+            ->groupBy('work_status')
+            ->get()
+            ->keyBy('work_status');
 
-        // Cache dropdown options (rarely changes)
-        $workStatusOptions = Cache::remember('dropdown_work_status', 3600, function () {
-            return DropdownOption::getOptions('work_status');
-        });
+        $workStatusOptions = DropdownOption::getOptions('work_status');
 
-        // Cache duplicate count for 10 minutes (expensive operation)
-        $duplicateCustomerCount = Cache::remember('dashboard_duplicates', 600, function () {
-            return $this->countDuplicateCustomers();
-        });
+        // Duplicate count (skip expensive calculation, show link instead)
+        $duplicateCustomerCount = $this->countDuplicateCustomers();
 
-        // Cache chart data for 5 minutes
-        $chartData = Cache::remember('dashboard_charts', 300, function () use ($workStatusOptions, $workStatusCounts) {
-            return $this->getChartData($workStatusOptions, $workStatusCounts);
-        });
+        $chartData = $this->getChartData($workStatusOptions, $workStatusCounts);
 
-        // Recent jobs with eager loading (not cached, always fresh)
+        // Recent jobs with eager loading
         $recentJobs = Job::uninvoiced()
             ->with('vehicle')
             ->latest()
@@ -75,7 +61,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Count duplicate customer names (expensive operation).
+     * Count duplicate customer names.
      */
     protected function countDuplicateCustomers(): int
     {
@@ -182,16 +168,5 @@ class DashboardController extends Controller
             'saRevenue' => $saRevenue,
             'agingData' => $agingData,
         ];
-    }
-
-    /**
-     * Clear dashboard cache (called after data changes).
-     */
-    public static function clearCache(): void
-    {
-        Cache::forget('dashboard_stats');
-        Cache::forget('dashboard_work_status');
-        Cache::forget('dashboard_duplicates');
-        Cache::forget('dashboard_charts');
     }
 }
