@@ -40,18 +40,23 @@ class User extends Authenticatable
     ];
 
     /**
-     * The attributes that should be cast.
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
      */
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'column_preferences' => 'array',
-        'booking_preferences' => 'array',
-        'pdi_preferences' => 'array',
-        'towing_preferences' => 'array',
-        'vehicle_preferences' => 'array',
-        'customer_preferences' => 'array',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'column_preferences' => 'array',
+            'booking_preferences' => 'array',
+            'pdi_preferences' => 'array',
+            'towing_preferences' => 'array',
+            'vehicle_preferences' => 'array',
+            'customer_preferences' => 'array',
+        ];
+    }
 
     /**
      * Get the foreman linked to this user

@@ -67,27 +67,35 @@ class Job extends Model
         'is_dummy_wip',
     ];
 
-    protected $casts = [
-        'job_date' => 'date',
-        'date_in' => 'date',
-        'date_out' => 'date',
-        'invoice_date' => 'date',
-        'deadline' => 'date',
-        'promise_date' => 'date',
-        'date_first_reg' => 'date',
-        'estimated_amount' => 'decimal:2',
-        'labour_sales' => 'decimal:2',
-        'part_sales' => 'decimal:2',
-        'total_sales' => 'decimal:2',
-        'inv_amount' => 'decimal:2',
-        'inv_ppn' => 'decimal:2',
-        'inv_ppn_meterai' => 'decimal:2',
-        'latest_remark_at' => 'datetime',
-        'update_at' => 'datetime',
-        'invoiced_at' => 'datetime',
-        'need_part' => 'boolean',
-        'is_dummy_wip' => 'boolean',
-    ];
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'job_date' => 'date',
+            'date_in' => 'date',
+            'date_out' => 'date',
+            'invoice_date' => 'date',
+            'deadline' => 'date',
+            'promise_date' => 'date',
+            'date_first_reg' => 'date',
+            'estimated_amount' => 'decimal:2',
+            'labour_sales' => 'decimal:2',
+            'part_sales' => 'decimal:2',
+            'total_sales' => 'decimal:2',
+            'inv_amount' => 'decimal:2',
+            'inv_ppn' => 'decimal:2',
+            'inv_ppn_meterai' => 'decimal:2',
+            'latest_remark_at' => 'datetime',
+            'update_at' => 'datetime',
+            'invoiced_at' => 'datetime',
+            'need_part' => 'boolean',
+            'is_dummy_wip' => 'boolean',
+        ];
+    }
 
     public function vehicle(): BelongsTo
     {
