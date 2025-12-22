@@ -859,7 +859,7 @@ class ImportController extends Controller
                         $job->update([
                             'job_number' => $normalizedJobNumber,
                             'is_dummy_wip' => false,
-                            'description' => $job->description . " [RECONCILED: Original Typo WIP was {$job->job_number}]"
+                            'description' => ($job->description ?? '') . " [RECONCILED: Original Typo WIP was {$job->job_number}]"
                         ]);
                         \Log::info("INVOICE import: RECONCILED Dummy Job {$job->id} (Plate {$plateNumber}) to Real WIP {$normalizedJobNumber}");
                     }
