@@ -94,7 +94,7 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-danger" id="deleteBtn" disabled>
+                        <button type="submit" class="btn btn-danger" id="deleteBtn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Data
                         </button>
                         <a href="{{ route('dashboard') }}" class="btn btn-secondary">Cancel</a>
