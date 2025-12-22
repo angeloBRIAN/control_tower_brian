@@ -13,26 +13,31 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // Dynamic backup schedule from database
-        $backupSchedule = \App\Models\BackupSchedule::first();
-        
-        if ($backupSchedule && $backupSchedule->enabled) {
-            $command = $schedule->command('backup:run', ['--remark' => $backupSchedule->remark ?? 'Scheduled backup']);
+        // Wrapped in try-catch to handle fresh installs where table doesn't exist yet
+        try {
+            $backupSchedule = \App\Models\BackupSchedule::first();
             
-            switch ($backupSchedule->frequency) {
-                case 'daily':
-                    $command->dailyAt($backupSchedule->time);
-                    break;
-                case 'weekly':
-                    $dayOfWeek = $backupSchedule->day_of_week ?? 0; // Default Sunday
-                    $command->weeklyOn($dayOfWeek, $backupSchedule->time);
-                    break;
-                case 'monthly':
-                    $dayOfMonth = $backupSchedule->day_of_month ?? 1; // Default 1st
-                    $command->monthlyOn($dayOfMonth, $backupSchedule->time);
-                    break;
-                default:
-                    $command->dailyAt($backupSchedule->time);
+            if ($backupSchedule && $backupSchedule->enabled) {
+                $command = $schedule->command('backup:run', ['--remark' => $backupSchedule->remark ?? 'Scheduled backup']);
+                
+                switch ($backupSchedule->frequency) {
+                    case 'daily':
+                        $command->dailyAt($backupSchedule->time);
+                        break;
+                    case 'weekly':
+                        $dayOfWeek = $backupSchedule->day_of_week ?? 0; // Default Sunday
+                        $command->weeklyOn($dayOfWeek, $backupSchedule->time);
+                        break;
+                    case 'monthly':
+                        $dayOfMonth = $backupSchedule->day_of_month ?? 1; // Default 1st
+                        $command->monthlyOn($dayOfMonth, $backupSchedule->time);
+                        break;
+                    default:
+                        $command->dailyAt($backupSchedule->time);
+                }
             }
+        } catch (\Exception $e) {
+            // Table doesn't exist yet - skip backup schedule during initial deployment
         }
         
         // Daily stale job notifications at 8 AM
