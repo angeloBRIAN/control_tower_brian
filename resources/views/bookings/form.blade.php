@@ -18,7 +18,11 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="plate_number" class="form-label">Plate Number <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control @error('plate_number') is-invalid @enderror" id="plate_number" name="plate_number" value="{{ old('plate_number', $booking->plate_number ?? '') }}" required>
+                        <div class="input-group">
+                            <input type="text" class="form-control @error('plate_number') is-invalid @enderror" id="plate_number" name="plate_number" value="{{ old('plate_number', $booking->plate_number ?? '') }}" required>
+                            <span class="input-group-text" id="plateStatus"><i class="bi bi-search"></i></span>
+                        </div>
+                        <small class="text-muted" id="plateHint">Enter plate number to lookup customer</small>
                         @error('plate_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-6 mb-3">
@@ -75,4 +79,53 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const plateInput = document.getElementById('plate_number');
+    const customerInput = document.getElementById('customer_name');
+    const plateStatus = document.getElementById('plateStatus');
+    const plateHint = document.getElementById('plateHint');
+    let lookupTimeout;
+    
+    plateInput.addEventListener('input', function() {
+        clearTimeout(lookupTimeout);
+        const plate = this.value.trim();
+        
+        if (plate.length < 3) {
+            plateStatus.innerHTML = '<i class="bi bi-search"></i>';
+            plateHint.textContent = 'Enter plate number to lookup customer';
+            plateHint.className = 'text-muted';
+            return;
+        }
+        
+        plateStatus.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        lookupTimeout = setTimeout(() => {
+            fetch(`/api/vehicles/lookup?plate=${encodeURIComponent(plate)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.found) {
+                        plateStatus.innerHTML = '<i class="bi bi-check-circle text-success"></i>';
+                        plateHint.textContent = 'Vehicle found!';
+                        plateHint.className = 'text-success';
+                        if (data.customer_name && !customerInput.value) {
+                            customerInput.value = data.customer_name;
+                        }
+                    } else {
+                        plateStatus.innerHTML = '<i class="bi bi-plus-circle text-primary"></i>';
+                        plateHint.textContent = 'New vehicle';
+                        plateHint.className = 'text-primary';
+                    }
+                })
+                .catch(() => {
+                    plateStatus.innerHTML = '<i class="bi bi-search"></i>';
+                });
+        }, 400);
+    });
+});
+</script>
+@endpush
 @endsection
+

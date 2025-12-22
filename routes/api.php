@@ -19,7 +19,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Vehicle lookup API for job creation form
+// Vehicle lookup API for job creation, booking, and towing forms
 Route::get('/vehicles/lookup', function (Request $request) {
     $plate = $request->query('plate');
     
@@ -27,8 +27,10 @@ Route::get('/vehicles/lookup', function (Request $request) {
         return response()->json(['found' => false]);
     }
     
-    $vehicle = Vehicle::where('plate_number', $plate)
-        ->orWhere('plate_number', 'LIKE', str_replace(' ', '', $plate))
+    // Normalize plate: remove spaces and search case-insensitive
+    $normalizedPlate = strtoupper(preg_replace('/\s+/', '', $plate));
+    
+    $vehicle = Vehicle::whereRaw('UPPER(REPLACE(plate_number, " ", "")) = ?', [$normalizedPlate])
         ->first();
     
     if ($vehicle) {
@@ -36,8 +38,10 @@ Route::get('/vehicles/lookup', function (Request $request) {
             'found' => true,
             'model' => $vehicle->model,
             'customer_name' => $vehicle->customer_name,
+            'vin' => $vehicle->vin,
         ]);
     }
     
     return response()->json(['found' => false]);
 });
+

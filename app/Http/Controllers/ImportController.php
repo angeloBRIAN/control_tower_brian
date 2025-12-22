@@ -1001,6 +1001,7 @@ class ImportController extends Controller
                         ['plate_number' => $plateNumber],
                         array_filter([
                             'customer_name' => $customerName,
+                            'vin' => $chassisNumber, // Add chassis number as VIN
                             'import_id' => $importId,
                             // Don't set is_in_workshop - user should update manually after invoice
                         ], fn($v) => !is_null($v))
