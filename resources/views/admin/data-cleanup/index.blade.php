@@ -19,7 +19,7 @@
                 <i class="bi bi-exclamation-triangle me-2"></i>Warning: This action is irreversible!
             </div>
             <div class="card-body">
-                <form action="{{ route('admin.data-cleanup.execute') }}" method="POST" id="cleanupForm" onsubmit="return confirmDelete();">
+                <form action="{{ route('admin.data-cleanup.execute') }}" method="POST" id="cleanupForm">
                     @csrf
                     
                     <div class="alert alert-warning">
@@ -94,7 +94,7 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-danger" id="deleteBtn">
+                        <button type="button" class="btn btn-danger" id="deleteBtn" data-bs-toggle="modal" data-bs-target="#confirmModal">
                             <i class="bi bi-trash me-1"></i>Delete Selected Data
                         </button>
                         <a href="{{ route('dashboard') }}" class="btn btn-secondary">Cancel</a>
@@ -137,11 +137,45 @@
     </div>
 </div>
 
+<!-- Bootstrap Modal for Confirmation (Chrome-friendly) -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Final Confirmation
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fw-bold">Are you absolutely sure?</p>
+                <p>This will permanently delete data from <span id="tableCount" class="fw-bold text-danger">0</span> table(s).</p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-octagon me-2"></i>
+                    <strong>This action CANNOT be undone!</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash me-1"></i>Yes, Delete Everything
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAllBtn = document.getElementById('selectAll');
     const checkboxes = document.querySelectorAll('input[name="tables[]"]:not(:disabled)');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const confirmInput = document.getElementById('confirmInput');
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const tableCountSpan = document.getElementById('tableCount');
+    const form = document.getElementById('cleanupForm');
 
     // Select all toggle
     if (selectAllBtn) {
@@ -151,16 +185,37 @@ document.addEventListener('DOMContentLoaded', function() {
             this.textContent = allChecked ? 'Select All' : 'Deselect All';
         });
     }
-});
 
-function confirmDelete() {
-    var selected = document.querySelectorAll('input[name="tables[]"]:checked');
-    if (selected.length === 0) {
-        alert('Please select at least one table to delete.');
-        return false;
-    }
-    return confirm('Are you absolutely sure?\n\nThis will permanently delete data from ' + selected.length + ' table(s).\n\nThis action CANNOT be undone!');
-}
+    // When modal opens, validate and update count
+    confirmModal.addEventListener('show.bs.modal', function(event) {
+        const selected = document.querySelectorAll('input[name="tables[]"]:checked');
+        const confirmText = confirmInput.value;
+        
+        // Validation
+        if (selected.length === 0) {
+            event.preventDefault();
+            alert('Please select at least one table to delete.');
+            return;
+        }
+        
+        if (confirmText !== 'DELETE ALL DATA') {
+            event.preventDefault();
+            alert('Please type "DELETE ALL DATA" to confirm.');
+            confirmInput.focus();
+            return;
+        }
+        
+        // Update modal with count
+        tableCountSpan.textContent = selected.length;
+    });
+
+    // Confirm delete button in modal
+    confirmDeleteBtn.addEventListener('click', function() {
+        // Close modal and submit form
+        bootstrap.Modal.getInstance(confirmModal).hide();
+        form.submit();
+    });
+});
 </script>
 @endpush
 @endsection
