@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,3 +18,17 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+/*
+|--------------------------------------------------------------------------
+| Task Scheduling
+|--------------------------------------------------------------------------
+|
+| Schedule recurring tasks for the application.
+|
+*/
+
+// Weekly Report - Sends every Monday at 8:00 AM
+Schedule::command('report:weekly')->weeklyOn(1, '08:00')
+    ->timezone('Asia/Jakarta')
+    ->description('Send weekly workshop report to admins and managers');
