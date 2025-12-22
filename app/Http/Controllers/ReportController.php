@@ -423,7 +423,7 @@ class ReportController extends Controller
         ];
         
         foreach ($allJobs as $job) {
-            $daysOld = $job->job_date ? $now->diffInDays($job->job_date) : 999;
+            $daysOld = $job->job_date ? $now->diffInDays($job->job_date, true) : 999;
             
             if ($daysOld <= 7) {
                 $agingGroups['0-7']['jobs']->push($job);
@@ -439,7 +439,7 @@ class ReportController extends Controller
         // Statistics
         $totalJobs = $allJobs->count();
         $totalSales = $allJobs->sum('total_sales');
-        $avgAge = $allJobs->avg(fn($j) => $j->job_date ? $now->diffInDays($j->job_date) : 0);
+        $avgAge = $allJobs->avg(fn($j) => $j->job_date ? abs($now->diffInDays($j->job_date)) : 0);
         
         // Filter options
         $filterOptions = [

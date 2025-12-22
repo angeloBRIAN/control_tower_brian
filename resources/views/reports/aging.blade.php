@@ -99,9 +99,9 @@
                     </div>
                 @else
                     <ul class="list-group list-group-flush">
-                        @foreach($group['jobs']->sortByDesc(fn($j) => $j->job_date ? now()->diffInDays($j->job_date) : 999)->take(20) as $job)
+                        @foreach($group['jobs']->sortByDesc(fn($j) => $j->job_date ? abs(now()->diffInDays($j->job_date)) : 999)->take(20) as $job)
                         @php
-                            $daysOld = $job->job_date ? now()->diffInDays($job->job_date) : 0;
+                            $daysOld = $job->job_date ? abs(now()->diffInDays($job->job_date)) : 0;
                         @endphp
                         <li class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
