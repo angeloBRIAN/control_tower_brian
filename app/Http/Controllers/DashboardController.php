@@ -6,6 +6,7 @@ use App\Models\DismissedDuplicateGroup;
 use App\Models\DropdownOption;
 use App\Models\Job;
 use App\Models\Vehicle;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -31,8 +32,10 @@ class DashboardController extends Controller
 
         $workStatusOptions = DropdownOption::getOptions('work_status');
 
-        // Duplicate count (skip expensive calculation, show link instead)
-        $duplicateCustomerCount = $this->countDuplicateCustomers();
+        // Cache only the expensive duplicate calculation (10 minutes)
+        $duplicateCustomerCount = Cache::remember('dashboard_duplicates', 600, function () {
+            return $this->countDuplicateCustomers();
+        });
 
         $chartData = $this->getChartData($workStatusOptions, $workStatusCounts);
 
