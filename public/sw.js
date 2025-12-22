@@ -1,7 +1,7 @@
 // Service Worker for Control Tower PWA
-const CACHE_NAME = 'control-tower-v1';
-const STATIC_CACHE = 'control-tower-static-v1';
-const DYNAMIC_CACHE = 'control-tower-dynamic-v1';
+const CACHE_NAME = 'control-tower-v2';
+const STATIC_CACHE = 'control-tower-static-v2';
+const DYNAMIC_CACHE = 'control-tower-dynamic-v2';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -45,42 +45,42 @@ self.addEventListener('activate', (event) => {
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
     const request = event.request;
-    
+
     // Skip non-GET requests
     if (request.method !== 'GET') {
         return;
     }
-    
+
     // Skip cross-origin requests except CDN assets
     const url = new URL(request.url);
     const isCDN = url.hostname.includes('cdn.jsdelivr.net');
     const isSameOrigin = url.origin === location.origin;
-    
+
     if (!isSameOrigin && !isCDN) {
         return;
     }
-    
+
     // API requests - network first
     if (url.pathname.startsWith('/api') || url.pathname === '/search' || url.pathname === '/notifications') {
         event.respondWith(networkFirst(request));
         return;
     }
-    
+
     // Static assets - cache first
-    if (request.destination === 'style' || 
-        request.destination === 'script' || 
+    if (request.destination === 'style' ||
+        request.destination === 'script' ||
         request.destination === 'image' ||
         request.destination === 'font') {
         event.respondWith(cacheFirst(request));
         return;
     }
-    
+
     // HTML pages - network first with offline fallback
     if (request.headers.get('accept')?.includes('text/html')) {
         event.respondWith(networkFirstWithOffline(request));
         return;
     }
-    
+
     // Default - network first
     event.respondWith(networkFirst(request));
 });
@@ -91,7 +91,7 @@ async function cacheFirst(request) {
     if (cached) {
         return cached;
     }
-    
+
     try {
         const response = await fetch(request);
         if (response.ok) {
