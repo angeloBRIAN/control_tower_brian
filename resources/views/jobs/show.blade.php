@@ -444,7 +444,35 @@
                     </div>
 
                     <!-- Add Comment Form (Inline) -->
-                    @if(auth()->user()->canAddRemarks())
+                    @php
+                        $canComment = false;
+                        $commentBlockReason = '';
+                        $user = auth()->user();
+                        
+                        if ($user->hasAnyRole(['admin', 'manager', 'control_tower'])) {
+                            $canComment = true;
+                        } elseif ($user->hasRole('sa')) {
+                            if ($user->serviceAdvisor?->name === $job->service_advisor) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
+                            }
+                        } elseif ($user->hasRole('foreman')) {
+                            if ($user->foreman?->name === $job->foreman) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
+                            }
+                        } elseif ($user->hasRole('sparepart')) {
+                            if ($job->need_part) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs that need parts.';
+                            }
+                        }
+                    @endphp
+                    
+                    @if($canComment)
                     <div class="comment-form-container">
                         <form id="inlineCommentForm" class="d-flex gap-2 align-items-start">
                             @csrf
@@ -458,6 +486,10 @@
                                 <i class="bi bi-send"></i>
                             </button>
                         </form>
+                    </div>
+                    @elseif($commentBlockReason)
+                    <div class="p-3 text-center text-muted small">
+                        <i class="bi bi-lock me-1"></i>{{ $commentBlockReason }}
                     </div>
                     @endif
                 </div>

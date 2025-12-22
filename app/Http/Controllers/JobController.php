@@ -14,6 +14,9 @@ class JobController extends Controller
 {
     /**
      * Check if user is authorized to view/edit this specific job
+     * SA: must be assigned as service_advisor
+     * Foreman: must be assigned as foreman  
+     * Sparepart: job must have need_part = true
      */
     private function checkAssignmentAuthorization(Job $job)
     {
@@ -26,6 +29,10 @@ class JobController extends Controller
         } elseif ($user->hasRole('foreman')) {
             if ($user->foreman?->name !== $job->foreman) {
                 abort(403, 'Unauthorized. You are not assigned to this job.');
+            }
+        } elseif ($user->hasRole('sparepart')) {
+            if (!$job->need_part) {
+                abort(403, 'Unauthorized. This job does not require parts.');
             }
         }
         return true;

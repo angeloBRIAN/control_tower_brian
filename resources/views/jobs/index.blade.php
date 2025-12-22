@@ -308,12 +308,29 @@
                             @endif
                         </td>
                         <td data-col="action" onclick="event.stopPropagation()" class="text-center">
+                            @php
+                                $canAddRemark = false;
+                                $user = auth()->user();
+                                if ($user->hasAnyRole(['admin', 'manager', 'control_tower'])) {
+                                    $canAddRemark = true;
+                                } elseif ($user->hasRole('sa')) {
+                                    $canAddRemark = $user->serviceAdvisor?->name === $job->service_advisor;
+                                } elseif ($user->hasRole('foreman')) {
+                                    $canAddRemark = $user->foreman?->name === $job->foreman;
+                                } elseif ($user->hasRole('sparepart')) {
+                                    $canAddRemark = $job->need_part;
+                                }
+                            @endphp
+                            @if($canAddRemark)
                             <button type="button" class="btn btn-sm btn-outline-primary btn-add-remark" 
                                     data-job-id="{{ $job->id }}" 
                                     data-job-number="{{ $job->job_number }}"
                                     title="Add Remark">
                                 <i class="bi bi-chat-text"></i>
                             </button>
+                            @else
+                            <span class="text-muted" title="Not authorized"><i class="bi bi-chat-text opacity-25"></i></span>
+                            @endif
                         </td>
                     </tr>
                     @empty
