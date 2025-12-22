@@ -184,22 +184,18 @@
                         </div>
                     </div>
                     
-                    @if($ldapServers->count() > 0)
                     <div class="mb-3">
                         <label class="form-label">Login Source</label>
                         <div class="input-icon">
                             <i class="bi bi-server"></i>
                             <select name="login_source" class="form-select">
                                 <option value="local">Internal Database</option>
-                                @foreach($ldapServers as $server)
+                                @foreach($ldapServers ?? [] as $server)
                                     <option value="{{ $server->id }}">{{ $server->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                     </div>
-                    @else
-                    <input type="hidden" name="login_source" value="local">
-                    @endif
 
                     <div class="mb-4 form-check">
                         <input type="checkbox" name="remember" class="form-check-input" id="remember">
