@@ -26,7 +26,15 @@
                     <option value="no" {{ request('in_workshop') == 'no' ? 'selected' : '' }}>Not in Workshop</option>
                 </select>
             </div>
-            <div class="col-md-3 d-flex gap-1">
+            <div class="col-md-2">
+                <select name="job_status" class="form-select form-select-sm">
+                    <option value="">All Job Status</option>
+                    <option value="invoiced" {{ request('job_status') == 'invoiced' ? 'selected' : '' }}>Latest Job Invoiced</option>
+                    <option value="uninvoiced" {{ request('job_status') == 'uninvoiced' ? 'selected' : '' }}>Latest Job Uninvoiced</option>
+                    <option value="no_jobs" {{ request('job_status') == 'no_jobs' ? 'selected' : '' }}>No Jobs</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-1">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
                 <a href="{{ route('vehicles.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
 

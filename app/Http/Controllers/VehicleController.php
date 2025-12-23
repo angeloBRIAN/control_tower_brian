@@ -24,6 +24,36 @@ class VehicleController extends Controller
             $query->where('is_in_workshop', $request->in_workshop === 'yes');
         }
 
+        // Filter by latest job status (invoiced/uninvoiced)
+        if ($request->filled('job_status')) {
+            $status = $request->job_status;
+            
+            // Subquery to get the latest job date for each vehicle's plate
+            $latestJobSubquery = \App\Models\Job::selectRaw('plate_number, MAX(job_date) as latest_date')
+                ->groupBy('plate_number');
+            
+            if ($status === 'invoiced') {
+                // Vehicles where the latest job is invoiced
+                $query->whereExists(function ($q) {
+                    $q->from('jobs as j1')
+                      ->whereColumn('j1.plate_number', 'vehicles.plate_number')
+                      ->where('j1.status', 'invoiced')
+                      ->whereRaw('j1.job_date = (SELECT MAX(j2.job_date) FROM jobs j2 WHERE j2.plate_number = vehicles.plate_number)');
+                });
+            } elseif ($status === 'uninvoiced') {
+                // Vehicles where the latest job is uninvoiced
+                $query->whereExists(function ($q) {
+                    $q->from('jobs as j1')
+                      ->whereColumn('j1.plate_number', 'vehicles.plate_number')
+                      ->where('j1.status', 'uninvoiced')
+                      ->whereRaw('j1.job_date = (SELECT MAX(j2.job_date) FROM jobs j2 WHERE j2.plate_number = vehicles.plate_number)');
+                });
+            } elseif ($status === 'no_jobs') {
+                // Vehicles with no jobs at all
+                $query->whereDoesntHave('jobs');
+            }
+        }
+
         // Sorting
         $sortField = $request->input('sort', 'created_at');
         $sortDir = $request->input('dir', 'desc');
