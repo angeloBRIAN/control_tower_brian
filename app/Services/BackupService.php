@@ -31,7 +31,7 @@ class BackupService
         
         // Build mysqldump command - capture stderr, disable SSL for internal Docker network
         $command = sprintf(
-            'mysqldump --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s 2>&1',
+            'mysqldump --skip-ssl --user=%s --password=%s --host=%s --port=%s %s 2>&1',
             escapeshellarg($config['username']),
             escapeshellarg($config['password']),
             escapeshellarg($config['host']),
@@ -136,7 +136,7 @@ class BackupService
         
         if ($isGzipped) {
             $command = sprintf(
-                'gunzip < %s | mysql --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s',
+                'gunzip < %s | mysql --skip-ssl --user=%s --password=%s --host=%s --port=%s %s',
                 escapeshellarg($path),
                 escapeshellarg($config['username']),
                 escapeshellarg($config['password']),
@@ -146,7 +146,7 @@ class BackupService
             );
         } else {
             $command = sprintf(
-                'mysql --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s < %s',
+                'mysql --skip-ssl --user=%s --password=%s --host=%s --port=%s %s < %s',
                 escapeshellarg($config['username']),
                 escapeshellarg($config['password']),
                 escapeshellarg($config['host']),
