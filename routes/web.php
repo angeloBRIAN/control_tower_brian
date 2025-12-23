@@ -236,6 +236,10 @@ Route::middleware('auth')->group(function () {
         Route::post('customer-merge/{suggestion}/merge', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'merge'])->name('customer-merge.merge');
         Route::post('customer-merge/{suggestion}/ignore', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'ignore'])->name('customer-merge.ignore');
         Route::delete('customer-merge/clear-ignored', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'clearIgnored'])->name('customer-merge.clear-ignored');
+
+        // Scheduler Management
+        Route::get('scheduler', [\App\Http\Controllers\Admin\SchedulerController::class, 'index'])->name('scheduler.index');
+        Route::post('scheduler/run', [\App\Http\Controllers\Admin\SchedulerController::class, 'runNow'])->name('scheduler.run');
     });
 
     // Delete operations - Admin only (outside prefix to keep normal route names)

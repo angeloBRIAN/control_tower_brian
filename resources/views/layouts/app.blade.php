@@ -295,6 +295,11 @@
                             <i class="bi bi-database-check"></i> Database Backups
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.scheduler.*') ? 'active' : '' }}" href="{{ route('admin.scheduler.index') }}">
+                            <i class="bi bi-clock-history"></i> Scheduler
+                        </a>
+                    </li>
                 </div>
                 @endif
 
