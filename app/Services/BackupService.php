@@ -29,9 +29,9 @@ class BackupService
         // Create temporary SQL file first, then gzip (more reliable than piping)
         $tempSqlPath = $path . '.tmp.sql';
         
-        // Build mysqldump command - capture stderr
+        // Build mysqldump command - capture stderr, disable SSL for internal Docker network
         $command = sprintf(
-            'mysqldump --user=%s --password=%s --host=%s --port=%s %s 2>&1',
+            'mysqldump --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s 2>&1',
             escapeshellarg($config['username']),
             escapeshellarg($config['password']),
             escapeshellarg($config['host']),
@@ -136,7 +136,7 @@ class BackupService
         
         if ($isGzipped) {
             $command = sprintf(
-                'gunzip < %s | mysql --user=%s --password=%s --host=%s --port=%s %s',
+                'gunzip < %s | mysql --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s',
                 escapeshellarg($path),
                 escapeshellarg($config['username']),
                 escapeshellarg($config['password']),
@@ -146,7 +146,7 @@ class BackupService
             );
         } else {
             $command = sprintf(
-                'mysql --user=%s --password=%s --host=%s --port=%s %s < %s',
+                'mysql --ssl-mode=DISABLED --user=%s --password=%s --host=%s --port=%s %s < %s',
                 escapeshellarg($config['username']),
                 escapeshellarg($config['password']),
                 escapeshellarg($config['host']),
