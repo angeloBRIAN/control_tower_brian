@@ -372,10 +372,20 @@ class JobController extends Controller
         $jobsByStatus = [];
         $totalsByStatus = [];
         
-        foreach ($workStatuses as $status) {
-            // Filter jobs for this status (NULL work_status counts as 'pending')
-            $statusJobs = $jobs->filter(function($job) use ($status) {
-                $jobStatus = $job->work_status ?? 'pending';
+        // Get the first status value as default for NULL work_status
+        $defaultStatus = $workStatuses->first()?->value ?? 'pending';
+        
+        foreach ($workStatuses as $index => $status) {
+            // Filter jobs for this status
+            // Jobs with NULL work_status go to the FIRST column
+            $statusJobs = $jobs->filter(function($job) use ($status, $defaultStatus, $index) {
+                $jobStatus = $job->work_status;
+                
+                // If job has no status, put in first column
+                if (empty($jobStatus)) {
+                    return $index === 0;
+                }
+                
                 return strtolower($jobStatus) === strtolower($status->value);
             });
             
