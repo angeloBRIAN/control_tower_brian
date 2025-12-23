@@ -148,3 +148,68 @@ self.addEventListener('message', (event) => {
         self.skipWaiting();
     }
 });
+
+// Push notification received
+self.addEventListener('push', (event) => {
+    console.log('[SW] Push received');
+
+    let data = {
+        title: 'Control Tower',
+        body: 'You have a new notification',
+        icon: '/images/icon-192.png',
+        url: '/',
+    };
+
+    try {
+        if (event.data) {
+            data = { ...data, ...event.data.json() };
+        }
+    } catch (e) {
+        console.log('[SW] Push data parse error:', e);
+    }
+
+    const options = {
+        body: data.body,
+        icon: data.icon || '/images/icon-192.png',
+        badge: data.badge || '/images/icon-192.png',
+        vibrate: [100, 50, 100],
+        data: {
+            url: data.url || '/',
+        },
+        actions: [
+            { action: 'open', title: 'Open' },
+            { action: 'close', title: 'Dismiss' },
+        ],
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
+    );
+});
+
+// Notification click handler
+self.addEventListener('notificationclick', (event) => {
+    console.log('[SW] Notification clicked:', event.action);
+    event.notification.close();
+
+    if (event.action === 'close') {
+        return;
+    }
+
+    const url = event.notification.data?.url || '/';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((clientList) => {
+                // If a window is already open, focus it
+                for (const client of clientList) {
+                    if (client.url.includes(self.location.origin) && 'focus' in client) {
+                        client.navigate(url);
+                        return client.focus();
+                    }
+                }
+                // Otherwise open a new window
+                return clients.openWindow(url);
+            })
+    );
+});

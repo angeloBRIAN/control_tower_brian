@@ -97,6 +97,21 @@ class Notification extends Model
         // Broadcast real-time notification via WebSocket
         event(new \App\Events\NewNotification($notification));
 
+        // Send push notification (works even when browser is closed)
+        try {
+            $user = User::find($userId);
+            if ($user && $user->pushSubscriptions->isNotEmpty()) {
+                app(\App\Services\WebPushService::class)->sendToUser(
+                    $user,
+                    $title,
+                    $message,
+                    $link,
+                );
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Push notification failed: ' . $e->getMessage());
+        }
+
         return $notification;
     }
 

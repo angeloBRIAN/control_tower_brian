@@ -749,6 +749,88 @@
             } catch (e) {}
         }
     })();
+    
+    // Push Notification Subscription
+    (async function() {
+        // Check if push notifications are supported
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.log('[Push] Push notifications not supported');
+            return;
+        }
+        
+        // Wait for service worker to be ready
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Check current subscription status
+        let subscription = await registration.pushManager.getSubscription();
+        
+        if (subscription) {
+            console.log('[Push] Already subscribed');
+            return;
+        }
+        
+        // Check permission
+        if (Notification.permission === 'denied') {
+            console.log('[Push] Notification permission denied');
+            return;
+        }
+        
+        // Request permission if not granted
+        if (Notification.permission === 'default') {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                console.log('[Push] Permission not granted');
+                return;
+            }
+        }
+        
+        try {
+            // Get VAPID public key from server
+            const response = await fetch('/push/vapid-public-key');
+            const { publicKey } = await response.json();
+            
+            if (!publicKey) {
+                console.log('[Push] VAPID key not configured');
+                return;
+            }
+            
+            // Convert VAPID key to Uint8Array
+            const vapidKey = urlBase64ToUint8Array(publicKey);
+            
+            // Subscribe to push
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidKey,
+            });
+            
+            console.log('[Push] Subscribed:', subscription.endpoint);
+            
+            // Send subscription to server
+            await fetch('/push/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify(subscription.toJSON()),
+            });
+            
+            console.log('[Push] Subscription saved to server');
+            
+        } catch (err) {
+            console.warn('[Push] Subscription failed:', err.message);
+        }
+        
+        // Helper function to convert base64 to Uint8Array
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+        }
+    })();
     </script>
     @endauth
     

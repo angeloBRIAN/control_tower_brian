@@ -45,6 +45,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/', [\App\Http\Controllers\NotificationController::class, 'clearAll'])->name('clear-all');
     });
     
+    // Push Subscriptions (PWA)
+    Route::prefix('push')->name('push.')->group(function () {
+        Route::post('subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('subscribe');
+        Route::delete('unsubscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'destroy'])->name('unsubscribe');
+        Route::get('vapid-public-key', [\App\Http\Controllers\PushSubscriptionController::class, 'vapidPublicKey'])->name('vapid');
+    });
+    
     // Two-Factor Authentication
     Route::prefix('two-factor')->name('2fa.')->group(function () {
         Route::get('/', [\App\Http\Controllers\TwoFactorController::class, 'index'])->name('index');

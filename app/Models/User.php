@@ -84,6 +84,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get push subscriptions for this user
+     */
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
+
+    /**
      * Get column preferences with defaults
      */
     public function getColumnPrefs(): array
