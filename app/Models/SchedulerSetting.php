@@ -100,6 +100,13 @@ class SchedulerSetting extends Model
                 'time' => '07:00',
             ],
             [
+                'command' => 'customers:refresh-summaries',
+                'name' => 'Customer Summaries Refresh',
+                'description' => 'Refresh customer list cache for fast loading',
+                'schedule' => 'daily',
+                'time' => '06:00',
+            ],
+            [
                 'command' => 'reports:send',
                 'name' => 'Scheduled Email Reports',
                 'description' => 'Check and send scheduled email reports',

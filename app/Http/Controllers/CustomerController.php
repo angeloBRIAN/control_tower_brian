@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Vehicle;
 use App\Models\Job;
 use App\Models\CustomerMergeLog;
+use App\Models\CustomerSummary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
     /**
-     * Display a listing of unique customers from vehicles and jobs.
+     * Display a listing of unique customers - uses cached summary table for speed.
      */
     public function index(Request $request)
     {
@@ -19,84 +20,46 @@ class CustomerController extends Controller
         $filter = $request->input('filter');
         $sortField = $request->input('sort', 'name');
         $sortDir = $request->input('dir', 'asc');
+        $perPage = $request->input('per_page', 20);
 
-        // Get unique customer names from both vehicles and jobs
-        $customersQuery = DB::table(
-            DB::raw("(
-                SELECT DISTINCT customer_name as name FROM vehicles WHERE customer_name IS NOT NULL AND customer_name != ''
-                UNION
-                SELECT DISTINCT customer_name as name FROM jobs WHERE customer_name IS NOT NULL AND customer_name != ''
-            ) as customers")
-        );
+        // Use cached summary table for instant loading
+        $query = CustomerSummary::query();
 
         if ($search) {
-            $customersQuery->where('name', 'like', "%{$search}%");
+            $query->where('name', 'like', "%{$search}%");
         }
 
-        // Get all customer names for counting
-        $customerNames = (clone $customersQuery)->pluck('name')->toArray();
-        
-        // Now get paginated customers with counts
-        $perPage = $request->input('per_page', 20);
-        
-        // For name sorting, use DB-level ordering
-        if ($sortField === 'name') {
-            $customers = $customersQuery
-                ->orderBy('name', $sortDir === 'asc' ? 'asc' : 'desc')
-                ->paginate($perPage)
-                ->withQueryString();
-        } else {
-            // For other fields, get all and sort after enriching
-            $customers = $customersQuery
-                ->orderBy('name', 'asc')
-                ->paginate($perPage)
-                ->withQueryString();
+        // Apply filters
+        if ($filter === 'with_uninvoiced') {
+            $query->where('uninvoiced_count', '>', 0);
+        } elseif ($filter === 'with_sales') {
+            $query->where('total_sales', '>', 0);
+        } elseif ($filter === 'multi_vehicle') {
+            $query->where('vehicle_count', '>=', 2);
         }
 
-        // Add counts for each customer on current page
-        $customerData = [];
-        foreach ($customers as $customer) {
-            $vehicleCount = Vehicle::where('customer_name', $customer->name)->count();
-            $jobCount = Job::where('customer_name', $customer->name)->count();
-            $uninvoicedCount = Job::where('customer_name', $customer->name)->where('status', 'uninvoiced')->count();
-            $salesAmount = Job::where('customer_name', $customer->name)
-                ->where('status', 'invoiced')
-                ->sum('inv_ppn_meterai') ?? 0;
-            
-            // Apply filters
-            if ($filter === 'with_uninvoiced' && $uninvoicedCount == 0) {
-                continue;
-            }
-            if ($filter === 'with_sales' && $salesAmount == 0) {
-                continue;
-            }
-            if ($filter === 'multi_vehicle' && $vehicleCount < 2) {
-                continue;
-            }
-            
-            $customerData[] = (object)[
-                'name' => $customer->name,
-                'vehicle_count' => $vehicleCount,
-                'job_count' => $jobCount,
-                'uninvoiced_count' => $uninvoicedCount,
-                'sales_amount' => $salesAmount,
-                'estimated_sales' => Job::where('customer_name', $customer->name)
-                    ->where('status', 'uninvoiced')
-                    ->sum('total_sales') ?? 0,
+        // Map sort field
+        $dbSortField = match($sortField) {
+            'sales_amount' => 'total_sales',
+            default => $sortField,
+        };
+
+        $customers = $query
+            ->orderBy($dbSortField, $sortDir)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // Convert to expected format
+        $customerData = $customers->map(function ($c) {
+            return (object)[
+                'name' => $c->name,
+                'vehicle_count' => $c->vehicle_count,
+                'job_count' => $c->job_count,
+                'uninvoiced_count' => $c->uninvoiced_count,
+                'sales_amount' => $c->total_sales,
+                'estimated_sales' => $c->estimated_sales,
             ];
-        }
-
-        // Sort by non-name fields if needed
-        if ($sortField !== 'name' && in_array($sortField, ['vehicle_count', 'job_count', 'sales_amount', 'uninvoiced_count'])) {
-            usort($customerData, function($a, $b) use ($sortField, $sortDir) {
-                $aVal = $a->$sortField;
-                $bVal = $b->$sortField;
-                if ($sortDir === 'asc') {
-                    return $aVal <=> $bVal;
-                }
-                return $bVal <=> $aVal;
-            });
-        }
+        })->toArray();
 
         return view('customers.index', [
             'customers' => $customers,
@@ -104,7 +67,7 @@ class CustomerController extends Controller
             'search' => $search,
             'sortField' => $sortField,
             'sortDir' => $sortDir,
-            'totalCustomers' => count($customerNames),
+            'totalCustomers' => CustomerSummary::count(),
         ]);
     }
 
