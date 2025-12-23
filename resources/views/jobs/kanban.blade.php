@@ -173,7 +173,8 @@
                 <div class="meta">
                     <span class="sa-badge">{{ $job->service_advisor ?? 'N/A' }}</span>
                     @php
-                        $days = $job->job_date ? now()->diffInDays($job->job_date) : 0;
+                        $days = $job->job_date ? (int) now()->diffInDays($job->job_date, false) : 0;
+                        $days = abs($days); // Always show positive
                         $ageClass = $days > 14 ? 'urgent' : ($days > 7 ? 'warning' : '');
                     @endphp
                     <span class="age {{ $ageClass }}">{{ $days }}d</span>
