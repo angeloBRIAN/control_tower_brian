@@ -8,26 +8,14 @@
             <p class="text-muted small">Manage database backups, view audit logs, and perform restoration.</p>
         </div>
         <div class="col-md-6 text-end">
-            <!-- Create Backup Button triggering Modal -->
+            <button type="button" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#restoreFromFileModal">
+                <i class="bi bi-upload me-1"></i>Restore from File
+            </button>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBackupModal">
-                <i class="bi bi-plus-circle me-1"></i> Create New Backup
+                <i class="bi bi-plus-circle me-1"></i>Create New Backup
             </button>
         </div>
     </div>
-
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
 
     <div class="card shadow mb-4">
         <div class="card-body">
@@ -57,7 +45,13 @@
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-                                <td>{{ number_format($backup->size / 1048576, 2) }} MB</td>
+                                <td>
+                                    @if($backup->size > 0)
+                                        {{ number_format($backup->size / 1048576, 2) }} MB
+                                    @else
+                                        <span class="text-muted">calculating...</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="badge bg-secondary">{{ $backup->created_by ?? 'System' }}</span>
                                 </td>
@@ -67,9 +61,9 @@
                                         <a href="{{ route('admin.backups.download', $backup->filename) }}" class="btn btn-outline-secondary" title="Download">
                                             <i class="bi bi-download"></i>
                                         </a>
-                                        <form action="{{ route('admin.backups.restore', $backup->filename) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('admin.backups.restore', $backup->filename) }}" method="POST" class="d-inline restore-form">
                                             @csrf
-                                            <button type="submit" class="btn btn-outline-danger" title="Restore" onclick="return confirm('⚠️ WARNING: Restore database from {{ $backup->filename }}?\n\nThis will OVERWRITE all current data. This action cannot be undone!\n\nAre you absolutely sure?');">
+                                            <button type="submit" class="btn btn-outline-warning" title="Restore" onclick="return confirmRestore('{{ $backup->filename }}');">
                                                 <i class="bi bi-arrow-counterclockwise"></i>
                                             </button>
                                         </form>
@@ -163,18 +157,39 @@
     </div>
 </div>
 
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;">
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; color:white;">
+        <div class="spinner-border text-light" style="width:3rem; height:3rem;" role="status"></div>
+        <p class="mt-3 fs-5" id="loadingText">Creating backup...</p>
+    </div>
+</div>
+
 <script>
 function toggleDayFields() {
     const freq = document.getElementById('frequency').value;
     document.getElementById('dayOfWeekGroup').style.display = freq === 'weekly' ? '' : 'none';
     document.getElementById('dayOfMonthGroup').style.display = freq === 'monthly' ? '' : 'none';
 }
+
+function showLoading(text) {
+    document.getElementById('loadingText').innerText = text;
+    document.getElementById('loadingOverlay').style.display = 'block';
+}
+
+function confirmRestore(filename) {
+    if (confirm('⚠️ WARNING: Restore database from ' + filename + '?\n\nThis will OVERWRITE all current data. This action cannot be undone!\n\nAre you absolutely sure?')) {
+        showLoading('Restoring database...');
+        return true;
+    }
+    return false;
+}
 </script>
 
 <!-- Create Backup Modal -->
 <div class="modal fade" id="createBackupModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-        <form action="{{ route('admin.backups.create') }}" method="POST">
+        <form action="{{ route('admin.backups.create') }}" method="POST" onsubmit="showLoading('Creating backup...');">
             @csrf
             <div class="modal-content">
                 <div class="modal-header">
@@ -191,6 +206,36 @@ function toggleDayFields() {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Backup</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Restore from File Modal -->
+<div class="modal fade" id="restoreFromFileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="{{ route('admin.backups.restore-file') }}" method="POST" enctype="multipart/form-data" onsubmit="showLoading('Restoring database...');">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Restore from File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This will OVERWRITE all current data!
+                    </div>
+                    <div class="mb-3">
+                        <label for="backup_file" class="form-label">Backup File (.sql.gz)</label>
+                        <input type="file" class="form-control" id="backup_file" name="backup_file" accept=".sql.gz,.gz,.sql" required>
+                    </div>
+                    <p class="text-muted small">Upload a previously downloaded backup file to restore the database.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Restore Database</button>
                 </div>
             </div>
         </form>

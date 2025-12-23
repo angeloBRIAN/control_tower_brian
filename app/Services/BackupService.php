@@ -3,8 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
+use Illuminate\Http\UploadedFile;
 use Carbon\Carbon;
 use App\Models\BackupLog;
 use App\Models\AuditLog;
@@ -37,19 +36,23 @@ class BackupService
             escapeshellarg($path)
         );
 
-        // Using exec for simplicity with pipes, Process component can be tricky with pipes and shell redirection
+        // Using exec for simplicity with pipes
         exec($command, $output, $returnVar);
 
         if ($returnVar !== 0) {
             throw new \Exception('Backup failed with exit code ' . $returnVar);
         }
 
+        // Wait a moment for file to be fully written, then get accurate size
+        clearstatcache(true, $path);
+        $fileSize = file_exists($path) ? filesize($path) : 0;
+
         // Create BackupLog record
         BackupLog::create([
             'filename' => $filename,
             'path' => $this->backupFolder . '/' . $filename,
             'disk' => $this->disk,
-            'size' => Storage::disk($this->disk)->size($this->backupFolder . '/' . $filename),
+            'size' => $fileSize,
             'remark' => $remark,
             'created_by' => Auth::check() ? Auth::user()->name : 'System/Scheduler',
         ]);
@@ -71,17 +74,62 @@ class BackupService
             throw new \Exception('Backup file not found.');
         }
 
+        $this->restoreFromPath($path, $filename);
+        return true;
+    }
+
+    /**
+     * Restore from uploaded file
+     */
+    public function restoreFromFile(UploadedFile $file)
+    {
+        // Save uploaded file temporarily
+        $tempPath = storage_path('app/temp_restore_' . time() . '.sql.gz');
+        $file->move(dirname($tempPath), basename($tempPath));
+
+        try {
+            $this->restoreFromPath($tempPath, $file->getClientOriginalName());
+        } finally {
+            // Clean up temp file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Common restore logic
+     */
+    protected function restoreFromPath($path, $filename)
+    {
         $config = config('database.connections.mysql');
         
-        $command = sprintf(
-            'gunzip < %s | mysql --user=%s --password=%s --host=%s --port=%s %s',
-            escapeshellarg($path),
-            escapeshellarg($config['username']),
-            escapeshellarg($config['password']),
-            escapeshellarg($config['host']),
-            escapeshellarg($config['port']),
-            escapeshellarg($config['database'])
-        );
+        // Detect if file is gzipped
+        $isGzipped = str_ends_with(strtolower($filename), '.gz');
+        
+        if ($isGzipped) {
+            $command = sprintf(
+                'gunzip < %s | mysql --user=%s --password=%s --host=%s --port=%s %s',
+                escapeshellarg($path),
+                escapeshellarg($config['username']),
+                escapeshellarg($config['password']),
+                escapeshellarg($config['host']),
+                escapeshellarg($config['port']),
+                escapeshellarg($config['database'])
+            );
+        } else {
+            $command = sprintf(
+                'mysql --user=%s --password=%s --host=%s --port=%s %s < %s',
+                escapeshellarg($config['username']),
+                escapeshellarg($config['password']),
+                escapeshellarg($config['host']),
+                escapeshellarg($config['port']),
+                escapeshellarg($config['database']),
+                escapeshellarg($path)
+            );
+        }
 
         exec($command, $output, $returnVar);
 
@@ -89,8 +137,7 @@ class BackupService
             throw new \Exception('Restore failed with exit code ' . $returnVar);
         }
         
-        // Log the restoration action to AuditLogs (this will be stored in the restored DB if DB was wiped, 
-        // effectively appearing as a new log entry after restore)
+        // Log the restoration action
         AuditLog::create([
             'user_id' => Auth::id(),
             'action' => 'RESTORE',
@@ -104,8 +151,6 @@ class BackupService
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent()
         ]);
-
-        return true;
     }
 
     public function delete($filename)

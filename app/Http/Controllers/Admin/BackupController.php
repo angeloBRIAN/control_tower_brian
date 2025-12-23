@@ -78,6 +78,21 @@ class BackupController extends Controller
         }
     }
 
+    public function restoreFromFile(Request $request)
+    {
+        $request->validate([
+            'backup_file' => 'required|file|max:512000', // 500MB max
+        ]);
+
+        try {
+            $this->backupService->restoreFromFile($request->file('backup_file'));
+            return redirect()->route('admin.backups.index')->with('success', 'Database restored from uploaded file successfully.');
+        } catch (\Exception $e) {
+            Log::error('Restore from file failed: ' . $e->getMessage());
+            return redirect()->route('admin.backups.index')->with('error', 'Restore failed: ' . $e->getMessage());
+        }
+    }
+
     public function delete($filename)
     {
         try {
