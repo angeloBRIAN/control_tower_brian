@@ -610,13 +610,15 @@
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
     <script>
     (function() {
-        // Reverb/Pusher configuration
+        // Reverb/Pusher configuration for frontend (using VITE_* or fallback)
+        // VITE_REVERB_* = public URL for browser connection
+        // REVERB_* = internal Docker URL for server-side broadcasting
         const reverbConfig = {
-            key: '{{ env("REVERB_APP_KEY", "control-tower-key") }}',
-            wsHost: '{{ env("REVERB_HOST", "localhost") }}',
-            wsPort: {{ env("REVERB_PORT", 8080) }},
-            wssPort: {{ env("REVERB_PORT", 443) }},
-            forceTLS: '{{ env("REVERB_SCHEME", "http") }}' === 'https',
+            key: '{{ env("VITE_REVERB_APP_KEY", env("REVERB_APP_KEY", "control-tower-key")) }}',
+            wsHost: '{{ env("VITE_REVERB_HOST", env("REVERB_HOST", "localhost")) }}',
+            wsPort: {{ env("VITE_REVERB_PORT", env("REVERB_PORT", 8080)) }},
+            wssPort: {{ env("VITE_REVERB_PORT", env("REVERB_PORT", 443)) }},
+            forceTLS: '{{ env("VITE_REVERB_SCHEME", env("REVERB_SCHEME", "http")) }}' === 'https',
             enabledTransports: ['ws', 'wss'],
             disableStats: true,
         };
