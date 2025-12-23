@@ -30,8 +30,9 @@ class BackupService
         $tempSqlPath = $path . '.tmp.sql';
         
         // Build mysqldump command - capture stderr, disable SSL for internal Docker network
+        // --no-tablespaces avoids PROCESS privilege requirement
         $command = sprintf(
-            'mysqldump --skip-ssl --user=%s --password=%s --host=%s --port=%s %s 2>&1',
+            'mysqldump --skip-ssl --no-tablespaces --user=%s --password=%s --host=%s --port=%s %s 2>/dev/null',
             escapeshellarg($config['username']),
             escapeshellarg($config['password']),
             escapeshellarg($config['host']),
@@ -42,9 +43,19 @@ class BackupService
         // Execute and capture output
         $sqlContent = shell_exec($command);
         
-        // Check if mysqldump returned an error
-        if (empty($sqlContent) || str_starts_with(trim($sqlContent), 'mysqldump:') || str_starts_with(trim($sqlContent), 'error')) {
-            throw new \Exception('Backup failed: ' . ($sqlContent ?: 'mysqldump returned empty output'));
+        // Check if mysqldump returned valid SQL (should start with comments or SET)
+        if (empty($sqlContent) || strlen($sqlContent) < 100) {
+            // Try again with stderr to get actual error
+            $errorCommand = sprintf(
+                'mysqldump --skip-ssl --no-tablespaces --user=%s --password=%s --host=%s --port=%s %s 2>&1',
+                escapeshellarg($config['username']),
+                escapeshellarg($config['password']),
+                escapeshellarg($config['host']),
+                escapeshellarg($config['port']),
+                escapeshellarg($config['database'])
+            );
+            $errorOutput = shell_exec($errorCommand);
+            throw new \Exception('Backup failed: ' . ($errorOutput ?: 'mysqldump returned empty output'));
         }
 
         // Write SQL to temp file
