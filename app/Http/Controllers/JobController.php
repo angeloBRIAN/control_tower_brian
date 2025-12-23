@@ -373,17 +373,19 @@ class JobController extends Controller
         $totalsByStatus = [];
         
         // Get the first status value as default for NULL work_status
-        $defaultStatus = $workStatuses->first()?->value ?? 'pending';
+        $firstStatusValue = $workStatuses->first()?->value;
         
-        foreach ($workStatuses as $index => $status) {
+        foreach ($workStatuses as $status) {
+            $isFirstColumn = ($status->value === $firstStatusValue);
+            
             // Filter jobs for this status
             // Jobs with NULL work_status go to the FIRST column
-            $statusJobs = $jobs->filter(function($job) use ($status, $defaultStatus, $index) {
+            $statusJobs = $jobs->filter(function($job) use ($status, $isFirstColumn) {
                 $jobStatus = $job->work_status;
                 
                 // If job has no status, put in first column
                 if (empty($jobStatus)) {
-                    return $index === 0;
+                    return $isFirstColumn;
                 }
                 
                 return strtolower($jobStatus) === strtolower($status->value);
