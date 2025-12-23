@@ -439,10 +439,22 @@
                         <td class="col-job_date">{{ $job->job_date?->format('d/m/Y') }}</td>
                         <td class="col-date_in d-none">{{ $job->date_in?->format('d/m/Y') ?? '-' }}</td>
                         <td class="col-date_out d-none">{{ $job->date_out?->format('d/m/Y') ?? '-' }}</td>
-                        <td class="col-invoice_number"><span class="badge bg-success">{{ $job->invoice_number }}</span></td>
+                        <td class="col-invoice_number">
+                            @if($hasMultiple)
+                                <span class="badge bg-warning text-dark">{{ $job->invoices_count }} invoices</span>
+                            @else
+                                <span class="badge bg-success">{{ $job->invoice_number }}</span>
+                            @endif
+                        </td>
                         <td class="col-invoice_date">{{ $job->invoice_date?->format('d/m/Y') }}</td>
                         <td class="col-type_sale d-none"><span class="badge bg-info">{{ $job->type_sale ?? '-' }}</span></td>
-                        <td class="col-inv_ppn_meterai text-end">{{ $job->inv_ppn_meterai ? number_format($job->inv_ppn_meterai, 0, ',', '.') : '-' }}</td>
+                        <td class="col-inv_ppn_meterai text-end">
+                            @if($hasMultiple)
+                                <strong>{{ number_format($job->total_invoice_amount, 0, ',', '.') }}</strong>
+                            @else
+                                {{ $job->inv_ppn_meterai ? number_format($job->inv_ppn_meterai, 0, ',', '.') : '-' }}
+                            @endif
+                        </td>
                         <td class="text-center">
                             @if($hasMultiple)
                                 <button class="btn btn-warning btn-sm py-0 px-1" type="button" data-bs-toggle="collapse" data-bs-target="#inv-{{ $job->id }}">
