@@ -212,4 +212,93 @@ class BackupService
          }
          return null;
     }
+
+    /**
+     * Delete multiple backups
+     */
+    public function deleteBatch(array $filenames): int
+    {
+        $deleted = 0;
+        foreach ($filenames as $filename) {
+            try {
+                $this->delete($filename);
+                $deleted++;
+            } catch (\Exception $e) {
+                // Continue with other files
+            }
+        }
+        return $deleted;
+    }
+
+    /**
+     * Prune old backups based on retention policy (like borgbackup)
+     */
+    public function prune(int $keepDaily = 7, int $keepWeekly = 4, int $keepMonthly = 6): array
+    {
+        $backups = BackupLog::orderByDesc('created_at')->get();
+        
+        $keepSet = [];
+        $dailyCounts = [];
+        $weeklyCounts = [];
+        $monthlyCounts = [];
+
+        foreach ($backups as $backup) {
+            $date = $backup->created_at;
+            $dayKey = $date->format('Y-m-d');
+            $weekKey = $date->format('Y-W');
+            $monthKey = $date->format('Y-m');
+
+            $keep = false;
+
+            // Keep daily
+            if (!isset($dailyCounts[$dayKey])) {
+                $dailyCounts[$dayKey] = 0;
+            }
+            if ($dailyCounts[$dayKey] < 1 && count($dailyCounts) <= $keepDaily) {
+                $keep = true;
+                $dailyCounts[$dayKey]++;
+            }
+
+            // Keep weekly (first of each week)
+            if (!isset($weeklyCounts[$weekKey])) {
+                $weeklyCounts[$weekKey] = 0;
+            }
+            if ($weeklyCounts[$weekKey] < 1 && count($weeklyCounts) <= $keepWeekly) {
+                $keep = true;
+                $weeklyCounts[$weekKey]++;
+            }
+
+            // Keep monthly (first of each month)
+            if (!isset($monthlyCounts[$monthKey])) {
+                $monthlyCounts[$monthKey] = 0;
+            }
+            if ($monthlyCounts[$monthKey] < 1 && count($monthlyCounts) <= $keepMonthly) {
+                $keep = true;
+                $monthlyCounts[$monthKey]++;
+            }
+
+            if ($keep) {
+                $keepSet[$backup->filename] = true;
+            }
+        }
+
+        // Delete backups not in keep set
+        $deleted = [];
+        foreach ($backups as $backup) {
+            if (!isset($keepSet[$backup->filename])) {
+                try {
+                    $this->delete($backup->filename);
+                    $deleted[] = $backup->filename;
+                } catch (\Exception $e) {
+                    // Continue
+                }
+            }
+        }
+
+        return [
+            'kept' => count($keepSet),
+            'deleted' => count($deleted),
+            'deleted_files' => $deleted,
+        ];
+    }
 }

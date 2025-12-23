@@ -50,6 +50,10 @@ class BackupController extends Controller
             'day_of_week' => 'nullable|integer|min:0|max:6',
             'day_of_month' => 'nullable|integer|min:1|max:31',
             'remark' => 'nullable|string|max:255',
+            'prune_enabled' => 'nullable|boolean',
+            'keep_daily' => 'nullable|integer|min:0|max:365',
+            'keep_weekly' => 'nullable|integer|min:0|max:52',
+            'keep_monthly' => 'nullable|integer|min:0|max:24',
         ]);
 
         BackupSchedule::updateOrCreate(
@@ -61,6 +65,10 @@ class BackupController extends Controller
                 'day_of_week' => $request->input('day_of_week'),
                 'day_of_month' => $request->input('day_of_month'),
                 'remark' => $request->input('remark'),
+                'prune_enabled' => $request->boolean('prune_enabled'),
+                'keep_daily' => $request->input('keep_daily', 7),
+                'keep_weekly' => $request->input('keep_weekly', 4),
+                'keep_monthly' => $request->input('keep_monthly', 6),
             ]
         );
 
@@ -107,5 +115,41 @@ class BackupController extends Controller
     {
         return $this->backupService->download($filename);
     }
-}
 
+    /**
+     * Bulk delete selected backups
+     */
+    public function deleteBatch(Request $request)
+    {
+        $request->validate([
+            'filenames' => 'required|array|min:1',
+            'filenames.*' => 'string',
+        ]);
+
+        try {
+            $deleted = $this->backupService->deleteBatch($request->input('filenames'));
+            return redirect()->route('admin.backups.index')->with('success', "Deleted {$deleted} backup(s) successfully.");
+        } catch (\Exception $e) {
+            return redirect()->route('admin.backups.index')->with('error', 'Failed to delete backups: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Prune old backups based on retention policy
+     */
+    public function prune(Request $request)
+    {
+        $schedule = BackupSchedule::first();
+        $keepDaily = $schedule->keep_daily ?? 7;
+        $keepWeekly = $schedule->keep_weekly ?? 4;
+        $keepMonthly = $schedule->keep_monthly ?? 6;
+
+        try {
+            $result = $this->backupService->prune($keepDaily, $keepWeekly, $keepMonthly);
+            return redirect()->route('admin.backups.index')
+                ->with('success', "Pruning complete: Kept {$result['kept']} backups, deleted {$result['deleted']}.");
+        } catch (\Exception $e) {
+            return redirect()->route('admin.backups.index')->with('error', 'Prune failed: ' . $e->getMessage());
+        }
+    }
+}

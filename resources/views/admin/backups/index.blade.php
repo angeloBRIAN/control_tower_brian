@@ -18,83 +18,106 @@
     </div>
 
     <div class="card shadow mb-4">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Filename</th>
-                            <th>Remark</th>
-                            <th>Size</th>
-                            <th>Created By</th>
-                            <th>Created At</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($backups as $backup)
-                            <tr>
-                                <td>
-                                    <i class="bi bi-file-earmark-zip-fill text-warning me-2"></i>
-                                    {{ $backup->filename }}
-                                </td>
-                                <td>
-                                    @if($backup->remark)
-                                        <span class="text-muted fst-italic">{{ $backup->remark }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($backup->size > 0)
-                                        {{ number_format($backup->size / 1048576, 2) }} MB
-                                    @else
-                                        <span class="text-muted">calculating...</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ $backup->created_by ?? 'System' }}</span>
-                                </td>
-                                <td>{{ $backup->created_at->format('d M Y H:i:s') }} <br> <small class="text-muted">({{ $backup->created_at->diffForHumans() }})</small></td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ route('admin.backups.download', $backup->filename) }}" class="btn btn-outline-secondary" title="Download">
-                                            <i class="bi bi-download"></i>
-                                        </a>
-                                        <form action="{{ route('admin.backups.restore', $backup->filename) }}" method="POST" class="d-inline restore-form">
-                                            @csrf
-                                            <button type="submit" class="btn btn-outline-warning" title="Restore" onclick="return confirmRestore('{{ $backup->filename }}');">
-                                                <i class="bi bi-arrow-counterclockwise"></i>
-                                            </button>
-                                        </form>
-                                        <form action="{{ route('admin.backups.destroy', $backup->filename) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Delete this backup file?');">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    No backups found. Create one to get started.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <span><i class="bi bi-archive me-2"></i>Backup Files</span>
+            <div>
+                <form action="{{ route('admin.backups.prune') }}" method="POST" class="d-inline" onsubmit="return confirm('Run automatic pruning based on retention policy?');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-scissors me-1"></i>Auto Prune
+                    </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="deleteSelectedBtn" style="display:none;" onclick="deleteSelected()">
+                    <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selectedCount">0</span>)
+                </button>
             </div>
+        </div>
+        <div class="card-body p-0">
+            <form id="batchDeleteForm" action="{{ route('admin.backups.delete-batch') }}" method="POST">
+                @csrf
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width:40px;">
+                                    <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll(this)">
+                                </th>
+                                <th>Filename</th>
+                                <th>Remark</th>
+                                <th>Size</th>
+                                <th>Created By</th>
+                                <th>Created At</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($backups as $backup)
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input backup-checkbox" name="filenames[]" value="{{ $backup->filename }}" onchange="updateSelectedCount()">
+                                    </td>
+                                    <td>
+                                        <i class="bi bi-file-earmark-zip-fill text-warning me-2"></i>
+                                        {{ $backup->filename }}
+                                    </td>
+                                    <td>
+                                        @if($backup->remark)
+                                            <span class="text-muted fst-italic">{{ $backup->remark }}</span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($backup->size > 0)
+                                            {{ number_format($backup->size / 1048576, 2) }} MB
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ $backup->created_by ?? 'System' }}</span>
+                                    </td>
+                                    <td>{{ $backup->created_at->format('d M Y H:i:s') }} <br> <small class="text-muted">({{ $backup->created_at->diffForHumans() }})</small></td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ route('admin.backups.download', $backup->filename) }}" class="btn btn-outline-secondary" title="Download">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            <form action="{{ route('admin.backups.restore', $backup->filename) }}" method="POST" class="d-inline restore-form">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-warning" title="Restore" onclick="return confirmRestore('{{ $backup->filename }}');">
+                                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('admin.backups.destroy', $backup->filename) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Delete this backup file?');">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                        No backups found. Create one to get started.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Schedule Configuration Card -->
+    <!-- Schedule & Pruning Configuration Card -->
     <div class="card shadow mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Scheduled Backup</h5>
+            <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Schedule & Retention</h5>
             <span class="badge {{ $schedule->enabled ? 'bg-success' : 'bg-secondary' }}">
                 {{ $schedule->enabled ? 'Enabled' : 'Disabled' }}
             </span>
@@ -102,7 +125,10 @@
         <div class="card-body">
             <form action="{{ route('admin.backups.schedule') }}" method="POST">
                 @csrf
-                <div class="row g-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <h6 class="text-muted"><i class="bi bi-clock me-1"></i>Schedule Settings</h6>
+                    </div>
                     <div class="col-md-2">
                         <label class="form-label">Status</label>
                         <div class="form-check form-switch mt-2">
@@ -125,13 +151,9 @@
                     <div class="col-md-2" id="dayOfWeekGroup" style="{{ $schedule->frequency == 'weekly' ? '' : 'display:none' }}">
                         <label for="day_of_week" class="form-label">Day of Week</label>
                         <select class="form-select" name="day_of_week" id="day_of_week">
-                            <option value="0" {{ $schedule->day_of_week == 0 ? 'selected' : '' }}>Sunday</option>
-                            <option value="1" {{ $schedule->day_of_week == 1 ? 'selected' : '' }}>Monday</option>
-                            <option value="2" {{ $schedule->day_of_week == 2 ? 'selected' : '' }}>Tuesday</option>
-                            <option value="3" {{ $schedule->day_of_week == 3 ? 'selected' : '' }}>Wednesday</option>
-                            <option value="4" {{ $schedule->day_of_week == 4 ? 'selected' : '' }}>Thursday</option>
-                            <option value="5" {{ $schedule->day_of_week == 5 ? 'selected' : '' }}>Friday</option>
-                            <option value="6" {{ $schedule->day_of_week == 6 ? 'selected' : '' }}>Saturday</option>
+                            @foreach(['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as $i => $day)
+                            <option value="{{ $i }}" {{ ($schedule->day_of_week ?? 0) == $i ? 'selected' : '' }}>{{ $day }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div class="col-md-2" id="dayOfMonthGroup" style="{{ $schedule->frequency == 'monthly' ? '' : 'display:none' }}">
@@ -142,15 +164,45 @@
                         <label for="scheduleRemark" class="form-label">Remark</label>
                         <input type="text" class="form-control" name="remark" id="scheduleRemark" value="{{ $schedule->remark }}" placeholder="e.g. Daily backup">
                     </div>
-                    <div class="col-md-1 d-flex align-items-end">
+                </div>
+
+                <hr>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <h6 class="text-muted"><i class="bi bi-scissors me-1"></i>Retention Policy (like borgbackup)</h6>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Auto Prune</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" name="prune_enabled" value="1" id="pruneEnabled" {{ ($schedule->prune_enabled ?? true) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="pruneEnabled">Enable</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="keep_daily" class="form-label">Keep Daily</label>
+                        <input type="number" class="form-control" name="keep_daily" id="keep_daily" min="0" max="365" value="{{ $schedule->keep_daily ?? 7 }}">
+                        <small class="text-muted">Last N days</small>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="keep_weekly" class="form-label">Keep Weekly</label>
+                        <input type="number" class="form-control" name="keep_weekly" id="keep_weekly" min="0" max="52" value="{{ $schedule->keep_weekly ?? 4 }}">
+                        <small class="text-muted">Last N weeks</small>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="keep_monthly" class="form-label">Keep Monthly</label>
+                        <input type="number" class="form-control" name="keep_monthly" id="keep_monthly" min="0" max="24" value="{{ $schedule->keep_monthly ?? 6 }}">
+                        <small class="text-muted">Last N months</small>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-save"></i> Save
+                            <i class="bi bi-save me-1"></i>Save
                         </button>
                     </div>
                 </div>
                 <p class="text-muted small mt-3 mb-0">
                     <i class="bi bi-info-circle me-1"></i>
-                    For scheduling to work, ensure a cron job runs <code>php artisan schedule:run</code> every minute on your server.
+                    Retention keeps the most recent backup for each period. Default: 7 daily + 4 weekly + 6 monthly = up to 17 backups.
                 </p>
             </form>
         </div>
@@ -161,7 +213,7 @@
 <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;">
     <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; color:white;">
         <div class="spinner-border text-light" style="width:3rem; height:3rem;" role="status"></div>
-        <p class="mt-3 fs-5" id="loadingText">Creating backup...</p>
+        <p class="mt-3 fs-5" id="loadingText">Processing...</p>
     </div>
 </div>
 
@@ -183,6 +235,25 @@ function confirmRestore(filename) {
         return true;
     }
     return false;
+}
+
+function toggleSelectAll(checkbox) {
+    document.querySelectorAll('.backup-checkbox').forEach(cb => cb.checked = checkbox.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('.backup-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = selected;
+    document.getElementById('deleteSelectedBtn').style.display = selected > 0 ? 'inline-block' : 'none';
+}
+
+function deleteSelected() {
+    const count = document.querySelectorAll('.backup-checkbox:checked').length;
+    if (confirm('Delete ' + count + ' selected backup(s)?')) {
+        showLoading('Deleting backups...');
+        document.getElementById('batchDeleteForm').submit();
+    }
 }
 </script>
 
