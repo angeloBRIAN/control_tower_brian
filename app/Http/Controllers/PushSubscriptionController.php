@@ -19,12 +19,14 @@ class PushSubscriptionController extends Controller
         ]);
 
         $user = auth()->user();
+        $endpointHash = hash('sha256', $validated['endpoint']);
 
-        // Upsert subscription (in case endpoint already exists)
+        // Upsert subscription (using hash for uniqueness since endpoint is TEXT)
         PushSubscription::updateOrCreate(
-            ['endpoint' => $validated['endpoint']],
+            ['endpoint_hash' => $endpointHash],
             [
                 'user_id' => $user->id,
+                'endpoint' => $validated['endpoint'],
                 'public_key' => $validated['keys']['p256dh'],
                 'auth_token' => $validated['keys']['auth'],
                 'content_encoding' => 'aesgcm',
@@ -42,7 +44,8 @@ class PushSubscriptionController extends Controller
         $endpoint = $request->input('endpoint');
 
         if ($endpoint) {
-            PushSubscription::where('endpoint', $endpoint)->delete();
+            $endpointHash = hash('sha256', $endpoint);
+            PushSubscription::where('endpoint_hash', $endpointHash)->delete();
         }
 
         return response()->json(['success' => true, 'message' => 'Push subscription removed']);
