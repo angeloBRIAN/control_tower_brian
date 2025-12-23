@@ -3,30 +3,33 @@
 namespace App\Console\Commands;
 
 use App\Models\CustomerMergeSuggestion;
+use App\Models\DismissedDuplicateGroup;
 use App\Models\Job;
 use Illuminate\Console\Command;
 
 class FindCustomerDuplicates extends Command
 {
-    protected $signature = 'customers:find-duplicates {--force : Clear existing suggestions and re-scan}';
+    protected $signature = 'customers:find-duplicates {--force : Clear pending and re-scan}';
     protected $description = 'Find potential duplicate customer names and store as merge suggestions';
 
     public function handle(): int
     {
-        // If force, clear pending suggestions
+        // If force, clear pending suggestions only (keep merged/ignored history)
         if ($this->option('force')) {
             CustomerMergeSuggestion::pending()->delete();
             $this->info('Cleared existing pending suggestions.');
         }
 
-        // Skip if we already have pending suggestions
-        $pendingCount = CustomerMergeSuggestion::pending()->count();
-        if ($pendingCount > 0 && !$this->option('force')) {
-            $this->info("Already have {$pendingCount} pending suggestions. Use --force to re-scan.");
-            return Command::SUCCESS;
-        }
-
         $this->info('Scanning for duplicate customer names...');
+
+        // Get already processed pairs (merged or ignored) to skip
+        $processedPairs = CustomerMergeSuggestion::whereIn('status', ['merged', 'ignored'])
+            ->get()
+            ->map(fn($s) => $this->normalizeKey($s->customer_name_a, $s->customer_name_b))
+            ->toArray();
+
+        // Also check DismissedDuplicateGroup for old dismissals
+        $dismissedGroups = DismissedDuplicateGroup::pluck('group_hash')->toArray();
 
         // Get unique customer names with job counts
         $customers = Job::whereNotNull('customer_name')
@@ -42,7 +45,6 @@ class FindCustomerDuplicates extends Command
         $processed = 0;
         $total = $customers->count();
 
-        // Compare each pair (optimized - only forward comparisons)
         foreach ($customers as $i => $customerA) {
             $processed++;
             
@@ -52,7 +54,6 @@ class FindCustomerDuplicates extends Command
 
             $nameA = trim(strtolower($customerA->customer_name));
             
-            // Skip very short names
             if (strlen($nameA) < 3) {
                 continue;
             }
@@ -60,12 +61,23 @@ class FindCustomerDuplicates extends Command
             foreach ($customers->slice($i + 1) as $customerB) {
                 $nameB = trim(strtolower($customerB->customer_name));
                 
-                // Skip very short names
                 if (strlen($nameB) < 3) {
                     continue;
                 }
 
-                // Quick length check - if too different, skip
+                // Skip if already processed (merged/ignored)
+                $pairKey = $this->normalizeKey($customerA->customer_name, $customerB->customer_name);
+                if (in_array($pairKey, $processedPairs)) {
+                    continue;
+                }
+
+                // Skip if in dismissed groups
+                $groupHash = DismissedDuplicateGroup::generateHash([$customerA->customer_name, $customerB->customer_name]);
+                if (in_array($groupHash, $dismissedGroups)) {
+                    continue;
+                }
+
+                // Quick length check
                 $lenDiff = abs(strlen($nameA) - strlen($nameB));
                 if ($lenDiff > 5) {
                     continue;
@@ -74,7 +86,6 @@ class FindCustomerDuplicates extends Command
                 // Calculate similarity
                 similar_text($nameA, $nameB, $similarity);
                 
-                // Only suggest if very similar (>80%)
                 if ($similarity >= 80) {
                     $suggestions[] = [
                         'customer_name_a' => $customerA->customer_name,
@@ -91,11 +102,13 @@ class FindCustomerDuplicates extends Command
         }
 
         if (empty($suggestions)) {
-            $this->info('No duplicate suggestions found.');
+            $this->info('No new duplicate suggestions found.');
             return Command::SUCCESS;
         }
 
-        // Insert in batches
+        // Clear old pending and insert new
+        CustomerMergeSuggestion::pending()->delete();
+        
         $chunks = array_chunk($suggestions, 100);
         foreach ($chunks as $chunk) {
             CustomerMergeSuggestion::insert($chunk);
@@ -103,5 +116,15 @@ class FindCustomerDuplicates extends Command
 
         $this->info("Found " . count($suggestions) . " potential duplicates.");
         return Command::SUCCESS;
+    }
+
+    /**
+     * Generate normalized key for pair to avoid duplicates
+     */
+    private function normalizeKey(string $a, string $b): string
+    {
+        $names = [strtolower(trim($a)), strtolower(trim($b))];
+        sort($names);
+        return implode('|', $names);
     }
 }

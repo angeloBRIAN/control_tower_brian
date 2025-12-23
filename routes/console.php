@@ -32,3 +32,13 @@ Artisan::command('inspire', function () {
 Schedule::command('report:weekly')->weeklyOn(1, '08:00')
     ->timezone('Asia/Jakarta')
     ->description('Send weekly workshop report to admins and managers');
+
+// Daily Customer Duplicate Scan at 7:00 AM
+Schedule::command('customers:find-duplicates')->dailyAt('07:00')
+    ->timezone('Asia/Jakarta')
+    ->description('Scan for duplicate customer names');
+
+// Scheduled Email Reports - Check every minute
+Schedule::command('reports:send')->everyMinute()
+    ->timezone('Asia/Jakarta')
+    ->description('Send scheduled email reports');

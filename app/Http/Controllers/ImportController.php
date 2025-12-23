@@ -389,6 +389,9 @@ class ImportController extends Controller
             'failed_rows' => $failedRows,
         ]);
 
+        // Recalculate customer duplicates in background after import
+        \Illuminate\Support\Facades\Artisan::queue('customers:find-duplicates');
+
         return redirect()->route('imports.show', $import)
             ->with('success', "Import completed: {$imported} new, {$updated} updated, {$failed} failed.");
     }
