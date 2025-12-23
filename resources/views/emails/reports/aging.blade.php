@@ -44,7 +44,7 @@
                 <td>{{ Str::limit($job->customer_name, 25) }}</td>
                 <td>{{ $job->service_advisor ?? '-' }}</td>
                 <td>{{ $job->job_date?->format('d/m/Y') }}</td>
-                <td class="urgent">{{ $job->job_date ? now()->diffInDays($job->job_date) : '-' }}d</td>
+                <td class="urgent">{{ $job->job_date ? (int) abs(now()->diffInDays($job->job_date)) : '-' }}d</td>
                 <td class="amount">Rp {{ number_format($job->total_sales ?? 0, 0, ',', '.') }}</td>
             </tr>
             @endforeach
