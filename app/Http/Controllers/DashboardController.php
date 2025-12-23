@@ -32,10 +32,8 @@ class DashboardController extends Controller
 
         $workStatusOptions = DropdownOption::getOptions('work_status');
 
-        // Cache only the expensive duplicate calculation (10 minutes)
-        $duplicateCustomerCount = Cache::remember('dashboard_duplicates', 600, function () {
-            return $this->countDuplicateCustomers();
-        });
+        // Just count pending merge suggestions - much faster than calculating on the fly
+        $duplicateCustomerCount = \App\Models\CustomerMergeSuggestion::pending()->count();
 
         $chartData = $this->getChartData($workStatusOptions, $workStatusCounts);
 
@@ -61,58 +59,6 @@ class DashboardController extends Controller
             'recentJobs' => $recentJobs,
             'needsPartsJobs' => $needsPartsJobs,
         ]);
-    }
-
-    /**
-     * Count duplicate customer names.
-     */
-    protected function countDuplicateCustomers(): int
-    {
-        try {
-            $allNames = DB::table(
-                DB::raw("(
-                    SELECT DISTINCT customer_name as name FROM vehicles WHERE customer_name IS NOT NULL AND customer_name != ''
-                    UNION
-                    SELECT DISTINCT customer_name as name FROM jobs WHERE customer_name IS NOT NULL AND customer_name != ''
-                ) as customers")
-            )->pluck('name')->toArray();
-
-            $processed = [];
-            $count = 0;
-
-            foreach ($allNames as $name1) {
-                if (in_array($name1, $processed)) continue;
-                $similar = [$name1];
-                $normalized1 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name1))));
-
-                foreach ($allNames as $name2) {
-                    if ($name1 === $name2 || in_array($name2, $processed)) continue;
-                    $normalized2 = strtoupper(preg_replace('/\s+/', ' ', preg_replace('/[^A-Z0-9\s]/i', ' ', trim($name2))));
-
-                    $levenshtein = levenshtein($normalized1, $normalized2);
-                    $maxLen = max(strlen($normalized1), strlen($normalized2));
-                    $similarity = $maxLen > 0 ? (1 - $levenshtein / $maxLen) * 100 : 0;
-
-                    similar_text($normalized1, $normalized2, $percentSimilar);
-
-                    if (($similarity > 90 && $percentSimilar > 85) || ($similarity > 85 && $percentSimilar > 90)) {
-                        $similar[] = $name2;
-                        $processed[] = $name2;
-                    }
-                }
-                $processed[] = $name1;
-
-                if (count($similar) >= 2) {
-                    if (!DismissedDuplicateGroup::isDismissed($similar)) {
-                        $count++;
-                    }
-                }
-            }
-
-            return $count;
-        } catch (\Exception $e) {
-            return 0;
-        }
     }
 
     /**

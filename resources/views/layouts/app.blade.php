@@ -286,6 +286,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.customer-merge.*') ? 'active' : '' }}" href="{{ route('admin.customer-merge.index') }}">
+                            <i class="bi bi-people"></i> Customer Merge
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.backups.*') ? 'active' : '' }}" href="{{ route('admin.backups.index') }}">
                             <i class="bi bi-database-check"></i> Database Backups
                         </a>

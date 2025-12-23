@@ -229,6 +229,13 @@ Route::middleware('auth')->group(function () {
         Route::patch('scheduled-reports/{scheduledReport}/toggle', [\App\Http\Controllers\Admin\ScheduledReportController::class, 'toggle'])->name('scheduled-reports.toggle');
         Route::post('scheduled-reports/{scheduledReport}/send', [\App\Http\Controllers\Admin\ScheduledReportController::class, 'sendNow'])->name('scheduled-reports.send');
         Route::post('report-settings/smtp/test', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'testSmtp'])->name('report-settings.test-smtp');
+
+        // Customer Merge Suggestions
+        Route::get('customer-merge', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'index'])->name('customer-merge.index');
+        Route::post('customer-merge/refresh', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'refresh'])->name('customer-merge.refresh');
+        Route::post('customer-merge/{suggestion}/merge', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'merge'])->name('customer-merge.merge');
+        Route::post('customer-merge/{suggestion}/ignore', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'ignore'])->name('customer-merge.ignore');
+        Route::delete('customer-merge/clear-ignored', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'clearIgnored'])->name('customer-merge.clear-ignored');
     });
 
     // Delete operations - Admin only (outside prefix to keep normal route names)
