@@ -200,7 +200,25 @@ class JobController extends Controller
 
     public function update(UpdateJobRequest $request, Job $job)
     {
+        // Track key field changes for activity log
+        $oldForeman = $job->foreman;
+        $oldWorkStatus = $job->work_status;
+        
         $job->update($request->validated());
+        
+        // Log activity for key field changes
+        if ($oldForeman !== $job->foreman) {
+            \App\Models\JobActivity::log($job, 'updated', 
+                "Foreman changed from '" . ($oldForeman ?? 'None') . "' to '" . ($job->foreman ?? 'None') . "'",
+                ['field' => 'foreman', 'old' => $oldForeman, 'new' => $job->foreman]
+            );
+        }
+        if ($oldWorkStatus !== $job->work_status) {
+            \App\Models\JobActivity::log($job, 'work_status_changed', 
+                "Work status changed from '" . ($oldWorkStatus ?? 'None') . "' to '" . ($job->work_status ?? 'None') . "'",
+                ['old' => $oldWorkStatus, 'new' => $job->work_status]
+            );
+        }
 
         return redirect()->route('jobs.show', $job)
             ->with('success', 'Job updated successfully.');
@@ -224,6 +242,11 @@ class JobController extends Controller
 
         $user = auth()->user();
         $remark = $job->addRemark($validated['remark_text'], $user?->name, $user?->id);
+        
+        // Log activity
+        \App\Models\JobActivity::log($job, 'remark_added', 
+            "Comment added: \"" . \Illuminate\Support\Str::limit($validated['remark_text'], 50) . "\""
+        );
         
         // Load the user relationship for the response
         $remark->load('user');
@@ -433,7 +456,14 @@ class JobController extends Controller
             'work_status' => 'required|string',
         ]);
         
+        $oldStatus = $job->work_status;
         $job->update(['work_status' => $validated['work_status']]);
+        
+        // Log activity
+        \App\Models\JobActivity::log($job, 'work_status_changed', 
+            "Work status changed from '" . ($oldStatus ?? 'None') . "' to '{$validated['work_status']}'",
+            ['old' => $oldStatus, 'new' => $validated['work_status']]
+        );
         
         return response()->json([
             'success' => true,
