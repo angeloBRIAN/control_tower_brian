@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\Auditable;
 
 class SchedulerSetting extends Model
 {
+    use Auditable;
     protected $fillable = [
         'command',
         'name',
@@ -127,6 +129,13 @@ class SchedulerSetting extends Model
                 'description' => 'Archive old audit logs to keep database fast',
                 'schedule' => 'daily',
                 'time' => '02:00',
+            ],
+            [
+                'command' => 'sessions:cleanup',
+                'name' => 'Cleanup Inactive Sessions',
+                'description' => 'Remove inactive user sessions from database',
+                'schedule' => 'daily',
+                'time' => '03:00',
             ],
         ];
 

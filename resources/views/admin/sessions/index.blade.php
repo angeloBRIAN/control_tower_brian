@@ -9,21 +9,121 @@
         <p class="text-muted">View and manage all active user sessions</p>
     </div>
     <div>
-        <span class="badge bg-success fs-6"><i class="bi bi-circle-fill me-1"></i>{{ $sessions->where('last_active_at', '>=', now()->subMinutes(5))->count() }} Online</span>
-        <span class="badge bg-secondary fs-6 ms-2">{{ $sessions->count() }} Total Sessions</span>
+        <form action="{{ route('admin.sessions.cleanup') }}" method="POST" class="d-inline" onsubmit="return confirm('Clean up sessions inactive for {{ $schedule->session_cleanup_days ?? 7 }} days?');">
+            @csrf
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="bi bi-trash me-1"></i>Cleanup Inactive
+            </button>
+        </form>
     </div>
 </div>
 
-@if(session('success'))
-<div class="alert alert-success alert-dismissible fade show">
-    {{ session('success') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">Online Now</h6>
+                        <h2 class="mb-0">{{ $stats['online_now'] }}</h2>
+                    </div>
+                    <i class="bi bi-circle-fill fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">Logins Today</h6>
+                        <h2 class="mb-0">{{ $stats['today_logins'] }}</h2>
+                    </div>
+                    <i class="bi bi-calendar-day fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">Active Users Today</h6>
+                        <h2 class="mb-0">{{ $stats['unique_users_today'] }}</h2>
+                    </div>
+                    <i class="bi bi-people fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">Total Sessions</h6>
+                        <h2 class="mb-0">{{ $stats['total_sessions'] }}</h2>
+                    </div>
+                    <i class="bi bi-display fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-@endif
+
+<!-- Device Breakdown -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>Devices:</strong></span>
+                    <div>
+                        <span class="badge bg-primary me-2"><i class="bi bi-pc-display me-1"></i>Desktop: {{ $stats['devices']['desktop'] }}</span>
+                        <span class="badge bg-success me-2"><i class="bi bi-phone me-1"></i>Mobile: {{ $stats['devices']['mobile'] }}</span>
+                        <span class="badge bg-warning text-dark"><i class="bi bi-tablet me-1"></i>Tablet: {{ $stats['devices']['tablet'] }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cleanup Settings Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Session Cleanup Settings</h6>
+    </div>
+    <div class="card-body">
+        <form action="{{ route('admin.sessions.settings') }}" method="POST" class="row g-3 align-items-end">
+            @csrf
+            <div class="col-md-2">
+                <label class="form-label">Auto Cleanup</label>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" name="session_cleanup_enabled" value="1" id="cleanupEnabled" {{ ($schedule->session_cleanup_enabled ?? true) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="cleanupEnabled">Enable</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="session_cleanup_days" class="form-label">Remove inactive after (days)</label>
+                <input type="number" class="form-control" name="session_cleanup_days" id="session_cleanup_days" min="1" max="365" value="{{ $schedule->session_cleanup_days ?? 7 }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button>
+            </div>
+            <div class="col-md-5 text-muted small">
+                <i class="bi bi-info-circle me-1"></i>Sessions inactive for longer than this will be automatically removed. Runs daily via scheduler.
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Filter by User -->
 <div class="card mb-4">
-    <div class="card-body">
+    <div class="card-body py-2">
         <form method="GET" class="row g-3 align-items-end">
             <div class="col-md-4">
                 <label class="form-label">Filter by User</label>
@@ -58,7 +158,7 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="bg-light">
+                <thead class="table-dark">
                     <tr>
                         <th>User</th>
                         <th>Device</th>

@@ -207,6 +207,8 @@ Route::middleware('auth')->group(function () {
 
         // Session Manager
         Route::get('sessions', [\App\Http\Controllers\Admin\SessionController::class, 'index'])->name('sessions.index');
+        Route::post('sessions/settings', [\App\Http\Controllers\Admin\SessionController::class, 'updateSettings'])->name('sessions.settings');
+        Route::post('sessions/cleanup', [\App\Http\Controllers\Admin\SessionController::class, 'cleanup'])->name('sessions.cleanup');
         Route::delete('sessions/{session}', [\App\Http\Controllers\Admin\SessionController::class, 'terminate'])->name('sessions.terminate');
         Route::delete('sessions/user/{user}', [\App\Http\Controllers\Admin\SessionController::class, 'terminateUser'])->name('sessions.terminate-user');
 
