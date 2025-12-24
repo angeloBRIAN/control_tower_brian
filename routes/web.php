@@ -92,8 +92,6 @@ Route::middleware('auth')->group(function () {
         Route::get('needs-parts', [ReportController::class, 'needsParts'])->name('needs-parts');
         Route::get('aging', [ReportController::class, 'aging'])->name('aging');
         Route::get('sa-performance', [ReportController::class, 'saPerformance'])->name('sa-performance');
-        Route::get('customer-merges', [ReportController::class, 'customerMerges'])->name('customer-merges');
-        Route::get('customer-merges/export', [ReportController::class, 'exportCustomerMerges'])->name('customer-merges.export');
         Route::get('wip-conflicts', [\App\Http\Controllers\WipConflictReportController::class, 'index'])->name('wip-conflicts');
         Route::post('wip-conflicts/{job}/resolve', [\App\Http\Controllers\WipConflictReportController::class, 'resolve'])->name('wip-conflicts.resolve');
         Route::get('orphan-vehicles', [\App\Http\Controllers\OrphanVehicleReportController::class, 'index'])->name('orphan-vehicles');
@@ -234,13 +232,6 @@ Route::middleware('auth')->group(function () {
         Route::patch('scheduled-reports/{scheduledReport}/toggle', [\App\Http\Controllers\Admin\ScheduledReportController::class, 'toggle'])->name('scheduled-reports.toggle');
         Route::post('scheduled-reports/{scheduledReport}/send', [\App\Http\Controllers\Admin\ScheduledReportController::class, 'sendNow'])->name('scheduled-reports.send');
         Route::post('report-settings/smtp/test', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'testSmtp'])->name('report-settings.test-smtp');
-
-        // Customer Merge Suggestions
-        Route::get('customer-merge', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'index'])->name('customer-merge.index');
-        Route::post('customer-merge/refresh', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'refresh'])->name('customer-merge.refresh');
-        Route::post('customer-merge/{suggestion}/merge', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'merge'])->name('customer-merge.merge');
-        Route::post('customer-merge/{suggestion}/ignore', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'ignore'])->name('customer-merge.ignore');
-        Route::delete('customer-merge/clear-ignored', [\App\Http\Controllers\Admin\CustomerMergeController::class, 'clearIgnored'])->name('customer-merge.clear-ignored');
 
         // Scheduler Management
         Route::get('scheduler', [\App\Http\Controllers\Admin\SchedulerController::class, 'index'])->name('scheduler.index');

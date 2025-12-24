@@ -218,11 +218,6 @@
                             <i class="bi bi-person-badge"></i> SA Performance
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('reports.customer-merges') ? 'active' : '' }}" href="{{ route('reports.customer-merges') }}">
-                            <i class="bi bi-people"></i> Customer Merges
-                        </a>
-                    </li>
                     @if(Auth::user()->canEdit())
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('reports.builder') ? 'active' : '' }}" href="{{ route('reports.builder') }}">
@@ -283,11 +278,6 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.scheduled-reports.*') ? 'active' : '' }}" href="{{ route('admin.scheduled-reports.index') }}">
                             <i class="bi bi-envelope-at"></i> Scheduled Reports
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.customer-merge.*') ? 'active' : '' }}" href="{{ route('admin.customer-merge.index') }}">
-                            <i class="bi bi-people"></i> Customer Merge
                         </a>
                     </li>
                     <li class="nav-item">
