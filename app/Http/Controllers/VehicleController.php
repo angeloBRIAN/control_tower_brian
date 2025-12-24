@@ -21,7 +21,8 @@ class VehicleController extends Controller
         }
 
         if ($request->filled('in_workshop')) {
-            $query->where('is_in_workshop', $request->in_workshop === 'yes');
+            $val = $request->in_workshop;
+            $query->where('is_in_workshop', in_array($val, ['yes', '1', 'true'], true) || $val === true);
         }
 
         // Filter by latest job status (invoiced/uninvoiced)

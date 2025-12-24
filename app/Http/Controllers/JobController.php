@@ -117,9 +117,11 @@ class JobController extends Controller
                 $query->where($filterCol, $request->input("filter_{$filterCol}"));
             }
         }
-        // Boolean filter for need_part
+        // Boolean filter for need_part (supports both filter_need_part and need_part params)
         if ($request->filled('filter_need_part')) {
             $query->where('need_part', $request->input('filter_need_part') === '1');
+        } elseif ($request->filled('need_part')) {
+            $query->where('need_part', $request->input('need_part') == '1');
         }
 
         $perPage = request()->input('per_page', 20);

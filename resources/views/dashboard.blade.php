@@ -78,14 +78,19 @@
 
 @php
     // Work Status breakdown for uninvoiced jobs - using dynamic options from database
+    // Count NULL work_status separately to add to first option
     $workStatusCounts = \App\Models\Job::uninvoiced()
-        ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+        ->selectRaw('work_status, COUNT(*) as count')
         ->groupBy('work_status')
         ->get()
         ->keyBy('work_status');
     
+    // Count of jobs with NULL work_status
+    $nullCount = $workStatusCounts->get(null)?->count ?? $workStatusCounts->get('')?->count ?? 0;
+    
     // Get configured work statuses from database
     $workStatusOptions = \App\Models\DropdownOption::getOptions('work_status');
+    $firstStatusValue = $workStatusOptions->first()?->value;
 @endphp
 
 <!-- Work Status Breakdown -->
@@ -99,6 +104,10 @@
             @forelse($workStatusOptions as $option)
             @php
                 $count = $workStatusCounts->get($option->value)?->count ?? 0;
+                // Add NULL count to first option (like Kanban does)
+                if ($option->value === $firstStatusValue) {
+                    $count += $nullCount;
+                }
             @endphp
             <div class="col-md col-6">
                 <a href="{{ route('jobs.index', ['status' => 'uninvoiced', 'work_status' => $option->value]) }}" class="text-decoration-none">
