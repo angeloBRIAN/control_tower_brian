@@ -11,44 +11,64 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    // Cache TTL in seconds (5 minutes)
+    const CACHE_TTL = 300;
+    
     /**
-     * Display the dashboard with real-time statistics.
+     * Display the dashboard with cached statistics.
      */
     public function index()
     {
-        // Always fetch fresh data - no caching
-        $stats = [
-            'uninvoiced' => Job::uninvoiced()->count(),
-            'invoiced' => Job::invoiced()->count(),
-            'needs_parts' => Job::uninvoiced()->needsParts()->count(),
-            'vehicles_in_workshop' => Vehicle::where('is_in_workshop', true)->count(),
-        ];
+        // Cache dashboard stats for 5 minutes
+        $stats = Cache::remember('dashboard_stats', self::CACHE_TTL, function () {
+            return [
+                'uninvoiced' => Job::uninvoiced()->count(),
+                'invoiced' => Job::invoiced()->count(),
+                'needs_parts' => Job::uninvoiced()->needsParts()->count(),
+                'vehicles_in_workshop' => Vehicle::where('is_in_workshop', true)->count(),
+            ];
+        });
 
-        $workStatusCounts = Job::uninvoiced()
-            ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
-            ->groupBy('work_status')
-            ->get()
-            ->keyBy('work_status');
+        $workStatusCounts = Cache::remember('dashboard_work_status_counts', self::CACHE_TTL, function () {
+            return Job::uninvoiced()
+                ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+                ->groupBy('work_status')
+                ->get()
+                ->keyBy('work_status');
+        });
 
         $workStatusOptions = DropdownOption::getOptions('work_status');
 
-        // Count pending duplicate groups - instant lookup from cached table
-        $duplicateCustomerCount = \App\Models\DuplicateCustomerGroup::pending()->count();
+        // Count pending duplicate groups
+        $duplicateCustomerCount = Cache::remember('dashboard_duplicate_count', self::CACHE_TTL, function () {
+            return \App\Models\DuplicateCustomerGroup::pending()->count();
+        });
 
-        $chartData = $this->getChartData($workStatusOptions, $workStatusCounts);
+        $chartData = Cache::remember('dashboard_chart_data', self::CACHE_TTL, function () use ($workStatusOptions) {
+            $workStatusCounts = Job::uninvoiced()
+                ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+                ->groupBy('work_status')
+                ->get()
+                ->keyBy('work_status');
+            return $this->getChartData($workStatusOptions, $workStatusCounts);
+        });
 
-        // Recent jobs with eager loading
-        $recentJobs = Job::uninvoiced()
-            ->with('vehicle')
-            ->latest()
-            ->take(5)
-            ->get();
+        // Recent jobs - shorter cache (2 minutes)
+        $recentJobs = Cache::remember('dashboard_recent_jobs', 120, function () {
+            return Job::uninvoiced()
+                ->with('vehicle')
+                ->latest()
+                ->take(5)
+                ->get();
+        });
 
-        $needsPartsJobs = Job::uninvoiced()
-            ->needsParts()
-            ->latest()
-            ->take(5)
-            ->get();
+        $needsPartsJobs = Cache::remember('dashboard_needs_parts_jobs', 120, function () {
+            return Job::uninvoiced()
+                ->needsParts()
+                ->latest()
+                ->take(5)
+                ->get();
+        });
 
         return view('dashboard', [
             'stats' => $stats,
@@ -59,6 +79,19 @@ class DashboardController extends Controller
             'recentJobs' => $recentJobs,
             'needsPartsJobs' => $needsPartsJobs,
         ]);
+    }
+
+    /**
+     * Clear dashboard cache (call when jobs are modified).
+     */
+    public static function clearCache(): void
+    {
+        Cache::forget('dashboard_stats');
+        Cache::forget('dashboard_work_status_counts');
+        Cache::forget('dashboard_duplicate_count');
+        Cache::forget('dashboard_chart_data');
+        Cache::forget('dashboard_recent_jobs');
+        Cache::forget('dashboard_needs_parts_jobs');
     }
 
     /**

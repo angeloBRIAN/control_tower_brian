@@ -440,5 +440,21 @@ class JobController extends Controller
             'message' => "Job {$job->job_number} moved to {$validated['work_status']}",
         ]);
     }
-}
 
+    /**
+     * Export job details to PDF
+     */
+    public function exportPdf(Job $job)
+    {
+        $this->checkAssignmentAuthorization($job);
+        
+        $job->load(['vehicle', 'remarks.user', 'invoices', 'activities']);
+        
+        // Use simple HTML to PDF conversion
+        $html = view('exports.job-pdf', compact('job'))->render();
+        
+        return response($html)
+            ->header('Content-Type', 'text/html')
+            ->header('Content-Disposition', 'inline; filename="job-' . $job->job_number . '.html"');
+    }
+}

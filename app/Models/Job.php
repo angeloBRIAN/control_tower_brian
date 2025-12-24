@@ -141,6 +141,14 @@ class Job extends Model
     }
 
     /**
+     * Get all activities (timeline) for this job.
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(JobActivity::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
      * Get all invoices for this job
      */
     public function invoices(): HasMany
