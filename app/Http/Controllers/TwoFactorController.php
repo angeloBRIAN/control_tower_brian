@@ -58,7 +58,8 @@ class TwoFactorController extends Controller
             'code' => 'required|string|size:6',
         ]);
         
-        $user = auth()->user();
+        // Refresh user from database to get latest two_factor_secret
+        $user = User::find(auth()->id());
         
         if (!$user->two_factor_secret) {
             return back()->with('error', 'Please start the 2FA setup first.');
