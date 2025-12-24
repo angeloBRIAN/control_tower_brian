@@ -105,6 +105,19 @@
 .kanban-column[data-color="info"] .kanban-header { background: linear-gradient(135deg, #0dcaf020, #0dcaf040); }
 .kanban-column[data-color="success"] .kanban-header { background: linear-gradient(135deg, #19875420, #19875440); }
 .kanban-column[data-color="danger"] .kanban-header { background: linear-gradient(135deg, #dc354520, #dc354540); }
+
+/* Search input in column */
+.kanban-search {
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+.kanban-search input {
+    font-size: 0.8rem;
+    background: var(--bs-body-bg);
+}
+.kanban-card.hidden {
+    display: none !important;
+}
 </style>
 
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -161,6 +174,12 @@
             <span class="badge bg-{{ $status->color }} ms-auto" title="{{ $total }} jobs total">
                 {{ $total }}@if($total > 100)+@endif
             </span>
+        </div>
+        <div class="kanban-search px-2 py-1">
+            <input type="text" class="form-control form-control-sm column-search" 
+                   placeholder="Search..." 
+                   data-column="{{ $status->value }}"
+                   onkeyup="filterColumn(this)">
         </div>
         <div class="kanban-body" id="column-{{ $status->value }}">
             @forelse($jobsByStatus[$status->value] as $job)
@@ -261,5 +280,40 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => container.querySelector('.toast')?.remove(), 3000);
     }
 });
+
+// Filter cards in a column by search text
+function filterColumn(input) {
+    const search = input.value.toLowerCase().trim();
+    const columnId = input.dataset.column;
+    const column = document.getElementById('column-' + columnId);
+    
+    if (!column) return;
+    
+    const cards = column.querySelectorAll('.kanban-card');
+    let visibleCount = 0;
+    
+    cards.forEach(card => {
+        const plate = card.querySelector('.plate')?.textContent?.toLowerCase() || '';
+        const wip = card.querySelector('.wip')?.textContent?.toLowerCase() || '';
+        const customer = card.querySelector('.customer')?.textContent?.toLowerCase() || '';
+        const sa = card.querySelector('.sa-badge')?.textContent?.toLowerCase() || '';
+        
+        const matches = plate.includes(search) || wip.includes(search) || 
+                       customer.includes(search) || sa.includes(search);
+        
+        if (matches || search === '') {
+            card.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            card.classList.add('hidden');
+        }
+    });
+    
+    // Update visible count in badge
+    const badge = column.closest('.kanban-column').querySelector('.badge');
+    if (badge && search !== '') {
+        badge.textContent = visibleCount;
+    }
+}
 </script>
 @endpush
