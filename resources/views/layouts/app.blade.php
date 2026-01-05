@@ -358,7 +358,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <div class="px-3 py-2 text-muted small">
+                    <div class="px-3 py-2 text-light small">
                         <i class="bi bi-person-circle me-1"></i>{{ Auth::user()->name }}
                         <span class="badge bg-secondary ms-1">{{ Auth::user()->getRoleDisplayName() }}</span>
                     </div>
