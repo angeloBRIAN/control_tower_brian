@@ -9,6 +9,11 @@ class DropdownOptionSeeder extends Seeder
 {
     public function run(): void
     {
+        // Remove old English work statuses if they exist
+        DropdownOption::where('type', 'work_status')
+            ->whereIn('value', ['pending', 'in_progress', 'waiting_parts', 'waiting_approval', 'completed'])
+            ->delete();
+        
         $options = [
             // Work Status - Indonesian Workflow
             ['type' => 'work_status', 'value' => 'belum_diproses', 'label' => 'Belum Diproses', 'icon' => 'inbox', 'color' => 'secondary', 'sort_order' => 0],
