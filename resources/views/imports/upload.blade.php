@@ -3,14 +3,71 @@
 @section('title', 'Upload Data')
 
 @section('content')
-<!-- Loading Overlay -->
-<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
-    <div class="spinner-border text-light" style="width: 4rem; height: 4rem;" role="status">
-        <span class="visually-hidden">Loading...</span>
+<!-- Enhanced Loading Overlay -->
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(13, 110, 253, 0.95) 0%, rgba(102, 16, 242, 0.95) 100%); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+    <div class="loading-container text-center">
+        <!-- Animated Spinner -->
+        <div class="position-relative mb-4">
+            <div class="spinner-grow text-light" style="width: 5rem; height: 5rem; animation-duration: 1s;" role="status"></div>
+            <div class="spinner-grow text-light position-absolute" style="width: 5rem; height: 5rem; top: 0; left: 50%; transform: translateX(-50%); animation-delay: 0.3s; opacity: 0.7;" role="status"></div>
+            <div class="spinner-grow text-light position-absolute" style="width: 5rem; height: 5rem; top: 0; left: 50%; transform: translateX(-50%); animation-delay: 0.6s; opacity: 0.4;" role="status"></div>
+        </div>
+        
+        <!-- Main Message -->
+        <h3 class="text-white mb-3">
+            <i class="bi bi-file-earmark-arrow-up me-2"></i>
+            Importing Data...
+        </h3>
+        
+        <!-- Animated Status Messages -->
+        <div id="loadingStatus" class="text-white-50 fs-5 mb-3" style="min-height: 30px;">
+            Preparing import...
+        </div>
+        
+        <!-- Elapsed Time -->
+        <div class="text-white-50 mb-4">
+            <i class="bi bi-clock me-1"></i>
+            Elapsed: <span id="elapsedTime">0:00</span>
+        </div>
+        
+        <!-- Progress Steps -->
+        <div class="d-flex justify-content-center gap-2 mb-4">
+            <div class="step-dot" id="step1"></div>
+            <div class="step-dot" id="step2"></div>
+            <div class="step-dot" id="step3"></div>
+            <div class="step-dot" id="step4"></div>
+            <div class="step-dot" id="step5"></div>
+        </div>
+        
+        <!-- Tip -->
+        <div class="text-white-50 small" style="max-width: 400px;">
+            <i class="bi bi-info-circle me-1"></i>
+            Large files may take several minutes. Please don't close this page.
+        </div>
     </div>
-    <div class="text-light mt-3 fs-5">Importing data, please wait...</div>
-    <div class="text-light mt-2 small">This may take several minutes for large files</div>
 </div>
+
+<style>
+.step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+}
+.step-dot.active {
+    background: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.8);
+    transform: scale(1.2);
+}
+@keyframes pulse-message {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+#loadingStatus {
+    animation: pulse-message 2s ease-in-out infinite;
+}
+</style>
 
 <div class="page-header">
     <nav aria-label="breadcrumb">
@@ -142,12 +199,74 @@
 document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('.import-form');
     const overlay = document.getElementById('loadingOverlay');
+    const statusEl = document.getElementById('loadingStatus');
+    const elapsedEl = document.getElementById('elapsedTime');
+    
+    let startTime = null;
+    let timerInterval = null;
+    let messageInterval = null;
+    let stepInterval = null;
+    let currentStep = 0;
+    
+    const statusMessages = [
+        'Preparing import...',
+        'Reading file contents...',
+        'Parsing spreadsheet data...',
+        'Validating records...',
+        'Processing jobs...',
+        'Updating database...',
+        'Checking for duplicates...',
+        'Syncing vehicle records...',
+        'Almost done...',
+        'Finalizing import...'
+    ];
+    
+    function formatElapsed(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function startLoadingAnimation() {
+        startTime = Date.now();
+        let messageIndex = 0;
+        
+        // Update elapsed time every second
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            elapsedEl.textContent = formatElapsed(elapsed);
+        }, 1000);
+        
+        // Cycle through status messages every 3 seconds
+        messageInterval = setInterval(() => {
+            messageIndex = (messageIndex + 1) % statusMessages.length;
+            statusEl.textContent = statusMessages[messageIndex];
+        }, 3000);
+        
+        // Animate progress dots
+        stepInterval = setInterval(() => {
+            // Clear all dots
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById('step' + i).classList.remove('active');
+            }
+            // Activate current dot
+            currentStep = (currentStep % 5) + 1;
+            document.getElementById('step' + currentStep).classList.add('active');
+        }, 600);
+    }
     
     forms.forEach(form => {
         form.addEventListener('submit', function() {
             overlay.style.display = 'flex';
+            startLoadingAnimation();
         });
     });
+    
+    // Also trigger for direct import
+    window.startImportLoading = function() {
+        overlay.style.display = 'flex';
+        startLoadingAnimation();
+    };
 });
 
 // Direct import (skip preview)
@@ -159,6 +278,9 @@ function directImport(form, importType) {
     };
     
     if (routeMap[importType]) {
+        if (window.startImportLoading) {
+            window.startImportLoading();
+        }
         form.action = routeMap[importType];
         form.submit();
     }
