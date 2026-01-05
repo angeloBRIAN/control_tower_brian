@@ -52,7 +52,7 @@ class DashboardController extends Controller
 
         $workStatusCounts = Cache::remember('dashboard_work_status_counts', self::CACHE_TTL, function () {
             return Job::uninvoiced()
-                ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+                ->selectRaw('COALESCE(work_status, "belum_diproses") as work_status, COUNT(*) as count')
                 ->groupBy('work_status')
                 ->get()
                 ->keyBy('work_status');
@@ -67,7 +67,7 @@ class DashboardController extends Controller
 
         $chartData = Cache::remember('dashboard_chart_data', self::CACHE_TTL, function () use ($workStatusOptions) {
             $workStatusCounts = Job::uninvoiced()
-                ->selectRaw('COALESCE(work_status, "pending") as work_status, COUNT(*) as count')
+                ->selectRaw('COALESCE(work_status, "belum_diproses") as work_status, COUNT(*) as count')
                 ->groupBy('work_status')
                 ->get()
                 ->keyBy('work_status');
