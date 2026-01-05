@@ -32,6 +32,8 @@ class JobActivity extends Model
     const ACTION_INVOICED = 'invoiced';
     const ACTION_UNINVOICED = 'uninvoiced';
     const ACTION_PARTS_UPDATED = 'parts_updated';
+    const ACTION_IMPORT_CREATED = 'import_created';
+    const ACTION_IMPORT_UPDATED = 'import_updated';
 
     /**
      * Get the job this activity belongs to.
@@ -81,6 +83,8 @@ class JobActivity extends Model
             self::ACTION_INVOICED => 'check-circle',
             self::ACTION_UNINVOICED => 'x-circle',
             self::ACTION_PARTS_UPDATED => 'tools',
+            self::ACTION_IMPORT_CREATED => 'cloud-arrow-up',
+            self::ACTION_IMPORT_UPDATED => 'cloud-check',
             default => 'circle',
         };
     }
@@ -99,6 +103,8 @@ class JobActivity extends Model
             self::ACTION_REMARK_ADDED => 'secondary',
             self::ACTION_UNINVOICED => 'danger',
             self::ACTION_PARTS_UPDATED => 'info',
+            self::ACTION_IMPORT_CREATED => 'success',
+            self::ACTION_IMPORT_UPDATED => 'primary',
             default => 'secondary',
         };
     }

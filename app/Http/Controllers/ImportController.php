@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Import;
 use App\Models\Job;
+use App\Models\JobActivity;
 use App\Models\JobInvoice;
 use App\Models\Vehicle;
 use App\Models\Foreman;
@@ -521,12 +522,18 @@ class ImportController extends Controller
                         $existingJob->update(array_filter(array_merge($jobData, ['import_id' => $importId]), fn($value) => !is_null($value)));
                         $job = $existingJob;
                         $updated++;
+                        
+                        // Log import update activity
+                        JobActivity::log($job, JobActivity::ACTION_IMPORT_UPDATED, 'Job updated via data import');
                     }
                 } else {
                     // New Job - filter null values to allow DB defaults (especially franchise)
                     $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId]), fn($value) => !is_null($value)));
                     $imported++;
                     \Log::info("PROGRESS: Created job {$jobNumber}", ['data' => array_filter($jobData, fn($v) => !is_null($v))]);
+                    
+                    // Log import creation activity
+                    JobActivity::log($job, JobActivity::ACTION_IMPORT_CREATED, 'Job created via data import');
                 }
 
                 // Create or update vehicle with model from unit_type

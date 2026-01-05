@@ -1022,6 +1022,12 @@ input:checked+.slider:before {
     .d-screen-only {
         display: none !important;
     }
+
+    /* Activity timeline - show all items without scroll */
+    .activity-timeline-card .timeline-container {
+        max-height: none !important;
+        overflow: visible !important;
+    }
 }
 
 /* ----------------------------------------
