@@ -23,22 +23,28 @@
 </div>
 
 <div class="row g-4">
-    <div class="col-md-4">
+<div class="col-md-4">
         <div class="card h-100">
             <div class="card-header bg-primary text-white">
                 <i class="bi bi-clipboard-check me-2"></i>Import Progress Data
             </div>
             <div class="card-body">
                 <p class="text-muted">Import job progress data from PROGRES JOB file. This will create new jobs or update existing ones.</p>
-                <form action="{{ route('imports.progress') }}" method="POST" enctype="multipart/form-data" class="import-form">
+                <form action="{{ route('imports.preview') }}" method="POST" enctype="multipart/form-data" class="import-form">
                     @csrf
+                    <input type="hidden" name="import_type" value="progress">
 
                     <div class="mb-3">
                         <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.ods,.csv" required>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-upload me-1"></i>Import Progress
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="bi bi-eye me-1"></i>Preview
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="directImport(this.form, 'progress')" title="Skip preview">
+                            <i class="bi bi-lightning"></i>
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -143,6 +149,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Direct import (skip preview)
+function directImport(form, importType) {
+    const routeMap = {
+        'progress': '{{ route("imports.progress") }}',
+        'uninvoiced': '{{ route("imports.uninvoiced") }}',
+        'invoiced': '{{ route("imports.invoiced") }}'
+    };
+    
+    if (routeMap[importType]) {
+        form.action = routeMap[importType];
+        form.submit();
+    }
+}
 </script>
 @endpush
 @endsection

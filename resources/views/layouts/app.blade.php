@@ -171,6 +171,33 @@
                 </div>
 
                 @auth
+                @php
+                    $recentJobs = \App\Models\RecentlyViewed::getRecentForUser(auth()->id(), 5);
+                @endphp
+                @if($recentJobs->count() > 0)
+                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#recentMenu" aria-expanded="false">
+                    Recently Viewed <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                </div>
+                <div class="collapse" id="recentMenu">
+                    @foreach($recentJobs as $recentJob)
+                    <li class="nav-item">
+                        <a class="nav-link py-2" href="{{ route('jobs.show', $recentJob) }}" title="{{ $recentJob->customer_name }}">
+                            <i class="bi bi-clock-history text-muted"></i>
+                            <span class="d-flex flex-column lh-sm">
+                                <span class="small fw-semibold">{{ $recentJob->job_number }}</span>
+                                <span class="text-muted" style="font-size: 0.75rem;">{{ Str::limit($recentJob->plate_number, 12) }}</span>
+                            </span>
+                            @if($recentJob->status == 'invoiced')
+                            <span class="badge bg-success ms-auto" style="font-size: 0.65rem;">✓</span>
+                            @endif
+                        </a>
+                    </li>
+                    @endforeach
+                </div>
+                @endif
+                @endauth
+
+                @auth
                 @if(Auth::user()->canManageMasterData())
                 <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#importMenu" aria-expanded="{{ $isImportActive ? 'true' : 'false' }}">
                     Import Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
@@ -413,6 +440,68 @@
         @yield('content')
     </main>
 
+    <!-- Keyboard Shortcuts Help Modal -->
+    <div class="modal fade" id="shortcutsHelpModal" tabindex="-1" aria-labelledby="shortcutsHelpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shortcutsHelpModalLabel">
+                        <i class="bi bi-keyboard me-2"></i>Keyboard Shortcuts
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Shortcut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><kbd>N</kbd></td>
+                                <td>Create new job</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>S</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd></td>
+                                <td>Focus search</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>G</kbd> then <kbd>D</kbd></td>
+                                <td>Go to Dashboard</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>G</kbd> then <kbd>J</kbd></td>
+                                <td>Go to Jobs</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>G</kbd> then <kbd>R</kbd></td>
+                                <td>Go to Reports</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>G</kbd> then <kbd>C</kbd></td>
+                                <td>Go to Customers</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>?</kbd></td>
+                                <td>Show this help</td>
+                            </tr>
+                            <tr>
+                                <td><kbd>Esc</kbd></td>
+                                <td>Close modal / search</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="alert alert-info mt-3 mb-0 py-2 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Shortcuts are disabled when typing in text fields.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Dark Mode Logic
@@ -473,17 +562,97 @@
         const searchResults = document.getElementById('searchResults');
         let searchTimeout;
         
-        // Ctrl+K shortcut
+        // Ctrl+K shortcut and global keyboard shortcuts
+        let gKeyPressed = false;
+        let gTimeout = null;
+        
         document.addEventListener('keydown', function(e) {
+            // Skip if user is typing in an input field
+            const activeEl = document.activeElement;
+            const isTyping = activeEl && (
+                activeEl.tagName === 'INPUT' || 
+                activeEl.tagName === 'TEXTAREA' || 
+                activeEl.isContentEditable ||
+                activeEl.closest('.modal.show')
+            );
+            
+            // Always handle Ctrl+K (even when typing)
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                 e.preventDefault();
                 searchInput.focus();
                 searchInput.select();
+                return;
             }
-            // Escape to close results
+            
+            // Escape to close results and modals
             if (e.key === 'Escape') {
                 searchResults.style.display = 'none';
                 searchInput.blur();
+                gKeyPressed = false;
+                const shortcutsModal = bootstrap.Modal.getInstance(document.getElementById('shortcutsHelpModal'));
+                if (shortcutsModal) shortcutsModal.hide();
+                return;
+            }
+            
+            // Skip other shortcuts if typing
+            if (isTyping) return;
+            
+            // ? - Show keyboard shortcuts help
+            if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+                e.preventDefault();
+                const modal = new bootstrap.Modal(document.getElementById('shortcutsHelpModal'));
+                modal.show();
+                return;
+            }
+            
+            // N - New Job
+            if (e.key === 'n' || e.key === 'N') {
+                e.preventDefault();
+                window.location.href = '{{ route("jobs.create") }}';
+                return;
+            }
+            
+            // S - Focus Search
+            if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+                return;
+            }
+            
+            // G prefix for navigation (G then D = Dashboard, G then J = Jobs)
+            if (e.key === 'g' || e.key === 'G') {
+                e.preventDefault();
+                gKeyPressed = true;
+                clearTimeout(gTimeout);
+                gTimeout = setTimeout(() => { gKeyPressed = false; }, 1500);
+                return;
+            }
+            
+            if (gKeyPressed) {
+                gKeyPressed = false;
+                clearTimeout(gTimeout);
+                
+                if (e.key === 'd' || e.key === 'D') {
+                    e.preventDefault();
+                    window.location.href = '{{ route("dashboard") }}';
+                    return;
+                }
+                if (e.key === 'j' || e.key === 'J') {
+                    e.preventDefault();
+                    window.location.href = '{{ route("jobs.index") }}';
+                    return;
+                }
+                if (e.key === 'r' || e.key === 'R') {
+                    e.preventDefault();
+                    window.location.href = '{{ route("reports.uninvoiced") }}';
+                    return;
+                }
+                if (e.key === 'c' || e.key === 'C') {
+                    e.preventDefault();
+                    window.location.href = '{{ route("customers.index") }}';
+                    return;
+                }
             }
         });
         

@@ -238,6 +238,11 @@ class JobController extends Controller
     {
         $this->checkAssignmentAuthorization($job);
 
+        // Track this job as recently viewed
+        if (auth()->check()) {
+            \App\Models\RecentlyViewed::recordView(auth()->id(), $job->id);
+        }
+
         $job->load(['vehicle', 'remarks']);
         $serviceAdvisors = \App\Models\ServiceAdvisor::orderBy('name')->get();
         $foremen = \App\Models\Foreman::orderBy('name')->get();

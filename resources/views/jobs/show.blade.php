@@ -42,7 +42,10 @@
             @endif
         </h1>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 d-print-none">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
         <a href="{{ route('jobs.export-pdf', $job) }}" target="_blank" class="btn btn-outline-secondary">
             <i class="bi bi-file-pdf me-1"></i>Export PDF
         </a>

@@ -748,111 +748,561 @@ input:checked+.slider:before {
     }
 }
 
-/* Print styles - hide non-essential elements */
+/* ========================================
+   PRINT STYLES - Optimized for A4 Paper
+   ======================================== */
 @media print {
 
+    /* Hide non-essential elements */
     .sidebar,
     .mobile-menu-toggle,
     #pwaInstallBtn,
-    .btn,
-    .dropdown {
+    .global-search-container,
+    #shortcutsHelpModal,
+    .dropdown,
+    .alert-dismissible .btn-close,
+    .comment-form-container,
+    .sidebar-overlay,
+    #toastContainer,
+    .breadcrumb,
+    nav[aria-label="breadcrumb"] {
         display: none !important;
     }
 
+    /* Hide buttons but keep form content visible */
+    .btn:not(.d-print-inline):not(.d-print-block),
+    .modal,
+    form button[type="submit"],
+    [data-bs-toggle="modal"] {
+        display: none !important;
+    }
+
+    /* Reset main content layout */
     .main-content {
         margin: 0 !important;
+        padding: 0 !important;
         width: 100% !important;
     }
+
+    body {
+        font-size: 11pt;
+        line-height: 1.4;
+        color: #000 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Page setup */
+    @page {
+        size: A4;
+        margin: 15mm 10mm;
+    }
+
+    /* Page header for job details */
+    .page-header {
+        border-bottom: 2px solid #000;
+        padding-bottom: 10pt;
+        margin-bottom: 15pt;
+    }
+
+    .page-header h1 {
+        font-size: 16pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+    }
+
+    /* Cards styling for print */
+    .card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        margin-bottom: 10pt !important;
+        border-radius: 0 !important;
+    }
+
+    .card-header {
+        background-color: #f5f5f5 !important;
+        border-bottom: 1px solid #ccc !important;
+        padding: 8pt 10pt !important;
+        font-size: 11pt;
+        font-weight: bold;
+    }
+
+    .card-body {
+        padding: 10pt !important;
+    }
+
+    /* Form controls become plain text */
+    .form-control,
+    .form-select {
+        border: none !important;
+        padding: 2pt 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        height: auto !important;
+        min-height: auto !important;
+    }
+
+    .form-control:disabled,
+    .form-select:disabled {
+        color: #000 !important;
+        background: transparent !important;
+    }
+
+    /* Labels styling */
+    .form-label {
+        font-size: 9pt;
+        color: #666 !important;
+        font-weight: 600;
+        margin-bottom: 2pt !important;
+    }
+
+    /* Badge styling for print */
+    .badge {
+        border: 1px solid currentColor !important;
+        padding: 2pt 6pt !important;
+        color: #000 !important;
+        background: transparent !important;
+    }
+
+    .badge.bg-success {
+        border-color: #198754 !important;
+        color: #198754 !important;
+    }
+
+    .badge.bg-warning {
+        border-color: #ffc107 !important;
+        color: #856404 !important;
+    }
+
+    .badge.bg-danger {
+        border-color: #dc3545 !important;
+        color: #dc3545 !important;
+    }
+
+    .badge.bg-info {
+        border-color: #0dcaf0 !important;
+        color: #055160 !important;
+    }
+
+    .badge.bg-primary {
+        border-color: #0d6efd !important;
+        color: #0d6efd !important;
+    }
+
+    .badge.bg-secondary {
+        border-color: #6c757d !important;
+        color: #6c757d !important;
+    }
+
+    /* Table styling for print */
+    .table {
+        font-size: 10pt;
+    }
+
+    .table thead th {
+        background-color: #f5f5f5 !important;
+        border-bottom: 2px solid #000 !important;
+        font-weight: bold;
+        padding: 6pt !important;
+    }
+
+    .table tbody td {
+        padding: 5pt !important;
+        border-bottom: 1px solid #ccc !important;
+    }
+
+    /* Grid layout adjustments */
+    .row {
+        display: flex !important;
+    }
+
+    .col-md-8 {
+        width: 65% !important;
+        flex: 0 0 65% !important;
+    }
+
+    .col-md-4 {
+        width: 35% !important;
+        flex: 0 0 35% !important;
+    }
+
+    /* Hide action cards/buttons column on print */
+    .card:has(.btn) .card-body .btn {
+        display: none !important;
+    }
+
+    /* Comments section */
+    .comment-container {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .comment-item {
+        page-break-inside: avoid;
+        border-bottom: 1px dotted #ccc !important;
+    }
+
+    /* Timeline section - compact */
+    .timeline-container {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .timeline-item {
+        page-break-inside: avoid;
+    }
+
+    /* Links - show URL */
+    a[href]:after {
+        content: none;
+        /* Don't show URLs in print */
+    }
+
+    /* Avoid widows/orphans */
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        orphans: 3;
+        widows: 3;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        page-break-after: avoid;
+    }
+
+    /* Invoice history table */
+    .table-hover tbody tr:hover {
+        background: transparent !important;
+    }
+
+    /* Print-specific utility classes */
+    .d-print-none {
+        display: none !important;
+    }
+
+    .d-print-block {
+        display: block !important;
+    }
+
+    .d-print-inline {
+        display: inline !important;
+    }
+
+    /* Footer for printed page */
+    .print-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 9pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding-top: 5pt;
+    }
 }
+
+/* Screen-only utility (hidden when printing) */
+.d-screen-only {
+    display: block;
+}
+
+@media print {
+    .d-screen-only {
+        display: none !important;
+    }
+}
+
 /* ----------------------------------------
    Extended Color Palette for Dropdowns
    ---------------------------------------- */
-.bg-purple { background-color: #6f42c1 !important; color: white; }
-.text-purple { color: #6f42c1 !important; }
+.bg-purple {
+    background-color: #6f42c1 !important;
+    color: white;
+}
 
-.bg-pink { background-color: #d63384 !important; color: white; }
-.text-pink { color: #d63384 !important; }
+.text-purple {
+    color: #6f42c1 !important;
+}
 
-.bg-indigo { background-color: #6610f2 !important; color: white; }
-.text-indigo { color: #6610f2 !important; }
+.bg-pink {
+    background-color: #d63384 !important;
+    color: white;
+}
 
-.bg-orange { background-color: #fd7e14 !important; color: white; }
-.text-orange { color: #fd7e14 !important; }
+.text-pink {
+    color: #d63384 !important;
+}
 
-.bg-cyan { background-color: #0dcaf0 !important; color: white; }
-.text-cyan { color: #0dcaf0 !important; }
+.bg-indigo {
+    background-color: #6610f2 !important;
+    color: white;
+}
 
-.bg-lime { background-color: #82c91e !important; color: #1f2937; }
-.text-lime { color: #82c91e !important; }
+.text-indigo {
+    color: #6610f2 !important;
+}
 
-.bg-maroon { background-color: #800000 !important; color: white; }
-.text-maroon { color: #800000 !important; }
+.bg-orange {
+    background-color: #fd7e14 !important;
+    color: white;
+}
 
-.bg-navy { background-color: #001f3f !important; color: white; }
-.text-navy { color: #001f3f !important; }
+.text-orange {
+    color: #fd7e14 !important;
+}
 
-.bg-olive { background-color: #3d5a30 !important; color: white; }
-.text-olive { color: #3d5a30 !important; }
+.bg-cyan {
+    background-color: #0dcaf0 !important;
+    color: white;
+}
 
-.bg-magenta { background-color: #ff00ff !important; color: white; }
-.text-magenta { color: #ff00ff !important; }
+.text-cyan {
+    color: #0dcaf0 !important;
+}
 
-.bg-coral { background-color: #ff7f50 !important; color: white; }
-.text-coral { color: #ff7f50 !important; }
+.bg-lime {
+    background-color: #82c91e !important;
+    color: #1f2937;
+}
 
-.bg-gold { background-color: #ffd700 !important; color: #1f2937; }
-.text-gold { color: #ffd700 !important; }
+.text-lime {
+    color: #82c91e !important;
+}
 
-.bg-mint { background-color: #00d2d3 !important; color: #1f2937; }
-.text-mint { color: #00d2d3 !important; }
+.bg-maroon {
+    background-color: #800000 !important;
+    color: white;
+}
 
-.bg-slate { background-color: #64748b !important; color: white; }
-.text-slate { color: #64748b !important; }
+.text-maroon {
+    color: #800000 !important;
+}
 
-.bg-khaki { background-color: #f0e68c !important; color: #1f2937; }
-.text-khaki { color: #f0e68c !important; }
+.bg-navy {
+    background-color: #001f3f !important;
+    color: white;
+}
 
-.bg-lavender { background-color: #e6e6fa !important; color: #1f2937; }
-.text-lavender { color: #7f7fd5 !important; }
+.text-navy {
+    color: #001f3f !important;
+}
+
+.bg-olive {
+    background-color: #3d5a30 !important;
+    color: white;
+}
+
+.text-olive {
+    color: #3d5a30 !important;
+}
+
+.bg-magenta {
+    background-color: #ff00ff !important;
+    color: white;
+}
+
+.text-magenta {
+    color: #ff00ff !important;
+}
+
+.bg-coral {
+    background-color: #ff7f50 !important;
+    color: white;
+}
+
+.text-coral {
+    color: #ff7f50 !important;
+}
+
+.bg-gold {
+    background-color: #ffd700 !important;
+    color: #1f2937;
+}
+
+.text-gold {
+    color: #ffd700 !important;
+}
+
+.bg-mint {
+    background-color: #00d2d3 !important;
+    color: #1f2937;
+}
+
+.text-mint {
+    color: #00d2d3 !important;
+}
+
+.bg-slate {
+    background-color: #64748b !important;
+    color: white;
+}
+
+.text-slate {
+    color: #64748b !important;
+}
+
+.bg-khaki {
+    background-color: #f0e68c !important;
+    color: #1f2937;
+}
+
+.text-khaki {
+    color: #f0e68c !important;
+}
+
+.bg-lavender {
+    background-color: #e6e6fa !important;
+    color: #1f2937;
+}
+
+.text-lavender {
+    color: #7f7fd5 !important;
+}
 
 /* ----------------------------------------
    Work Status Card Styling (Theme Compatible)
    ---------------------------------------- */
 /* Custom color card backgrounds with proper opacity */
-.bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.1) !important; }
-.bg-pink.bg-opacity-10 { background-color: rgba(214, 51, 132, 0.1) !important; }
-.bg-indigo.bg-opacity-10 { background-color: rgba(102, 16, 242, 0.1) !important; }
-.bg-orange.bg-opacity-10 { background-color: rgba(253, 126, 20, 0.1) !important; }
-.bg-cyan.bg-opacity-10 { background-color: rgba(13, 202, 240, 0.1) !important; }
-.bg-lime.bg-opacity-10 { background-color: rgba(130, 201, 30, 0.1) !important; }
-.bg-maroon.bg-opacity-10 { background-color: rgba(128, 0, 0, 0.1) !important; }
-.bg-navy.bg-opacity-10 { background-color: rgba(0, 31, 63, 0.1) !important; }
-.bg-olive.bg-opacity-10 { background-color: rgba(61, 90, 48, 0.1) !important; }
-.bg-magenta.bg-opacity-10 { background-color: rgba(255, 0, 255, 0.1) !important; }
-.bg-coral.bg-opacity-10 { background-color: rgba(255, 127, 80, 0.1) !important; }
-.bg-gold.bg-opacity-10 { background-color: rgba(255, 215, 0, 0.1) !important; }
-.bg-mint.bg-opacity-10 { background-color: rgba(0, 210, 211, 0.1) !important; }
-.bg-slate.bg-opacity-10 { background-color: rgba(100, 116, 139, 0.1) !important; }
-.bg-khaki.bg-opacity-10 { background-color: rgba(240, 230, 140, 0.1) !important; }
-.bg-lavender.bg-opacity-10 { background-color: rgba(230, 230, 250, 0.15) !important; }
+.bg-purple.bg-opacity-10 {
+    background-color: rgba(111, 66, 193, 0.1) !important;
+}
+
+.bg-pink.bg-opacity-10 {
+    background-color: rgba(214, 51, 132, 0.1) !important;
+}
+
+.bg-indigo.bg-opacity-10 {
+    background-color: rgba(102, 16, 242, 0.1) !important;
+}
+
+.bg-orange.bg-opacity-10 {
+    background-color: rgba(253, 126, 20, 0.1) !important;
+}
+
+.bg-cyan.bg-opacity-10 {
+    background-color: rgba(13, 202, 240, 0.1) !important;
+}
+
+.bg-lime.bg-opacity-10 {
+    background-color: rgba(130, 201, 30, 0.1) !important;
+}
+
+.bg-maroon.bg-opacity-10 {
+    background-color: rgba(128, 0, 0, 0.1) !important;
+}
+
+.bg-navy.bg-opacity-10 {
+    background-color: rgba(0, 31, 63, 0.1) !important;
+}
+
+.bg-olive.bg-opacity-10 {
+    background-color: rgba(61, 90, 48, 0.1) !important;
+}
+
+.bg-magenta.bg-opacity-10 {
+    background-color: rgba(255, 0, 255, 0.1) !important;
+}
+
+.bg-coral.bg-opacity-10 {
+    background-color: rgba(255, 127, 80, 0.1) !important;
+}
+
+.bg-gold.bg-opacity-10 {
+    background-color: rgba(255, 215, 0, 0.1) !important;
+}
+
+.bg-mint.bg-opacity-10 {
+    background-color: rgba(0, 210, 211, 0.1) !important;
+}
+
+.bg-slate.bg-opacity-10 {
+    background-color: rgba(100, 116, 139, 0.1) !important;
+}
+
+.bg-khaki.bg-opacity-10 {
+    background-color: rgba(240, 230, 140, 0.1) !important;
+}
+
+.bg-lavender.bg-opacity-10 {
+    background-color: rgba(230, 230, 250, 0.15) !important;
+}
 
 /* Dark mode - increase opacity for better visibility */
-[data-bs-theme="dark"] .bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.25) !important; }
-[data-bs-theme="dark"] .bg-pink.bg-opacity-10 { background-color: rgba(214, 51, 132, 0.25) !important; }
-[data-bs-theme="dark"] .bg-indigo.bg-opacity-10 { background-color: rgba(102, 16, 242, 0.25) !important; }
-[data-bs-theme="dark"] .bg-orange.bg-opacity-10 { background-color: rgba(253, 126, 20, 0.25) !important; }
-[data-bs-theme="dark"] .bg-cyan.bg-opacity-10 { background-color: rgba(13, 202, 240, 0.2) !important; }
-[data-bs-theme="dark"] .bg-lime.bg-opacity-10 { background-color: rgba(130, 201, 30, 0.2) !important; }
-[data-bs-theme="dark"] .bg-maroon.bg-opacity-10 { background-color: rgba(128, 0, 0, 0.3) !important; }
-[data-bs-theme="dark"] .bg-navy.bg-opacity-10 { background-color: rgba(0, 31, 63, 0.3) !important; }
-[data-bs-theme="dark"] .bg-olive.bg-opacity-10 { background-color: rgba(61, 90, 48, 0.3) !important; }
-[data-bs-theme="dark"] .bg-magenta.bg-opacity-10 { background-color: rgba(255, 0, 255, 0.2) !important; }
-[data-bs-theme="dark"] .bg-coral.bg-opacity-10 { background-color: rgba(255, 127, 80, 0.25) !important; }
-[data-bs-theme="dark"] .bg-gold.bg-opacity-10 { background-color: rgba(255, 215, 0, 0.2) !important; }
-[data-bs-theme="dark"] .bg-mint.bg-opacity-10 { background-color: rgba(0, 210, 211, 0.2) !important; }
-[data-bs-theme="dark"] .bg-slate.bg-opacity-10 { background-color: rgba(100, 116, 139, 0.3) !important; }
-[data-bs-theme="dark"] .bg-khaki.bg-opacity-10 { background-color: rgba(240, 230, 140, 0.15) !important; }
-[data-bs-theme="dark"] .bg-lavender.bg-opacity-10 { background-color: rgba(230, 230, 250, 0.2) !important; }
+[data-bs-theme="dark"] .bg-purple.bg-opacity-10 {
+    background-color: rgba(111, 66, 193, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .bg-pink.bg-opacity-10 {
+    background-color: rgba(214, 51, 132, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .bg-indigo.bg-opacity-10 {
+    background-color: rgba(102, 16, 242, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .bg-orange.bg-opacity-10 {
+    background-color: rgba(253, 126, 20, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .bg-cyan.bg-opacity-10 {
+    background-color: rgba(13, 202, 240, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .bg-lime.bg-opacity-10 {
+    background-color: rgba(130, 201, 30, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .bg-maroon.bg-opacity-10 {
+    background-color: rgba(128, 0, 0, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .bg-navy.bg-opacity-10 {
+    background-color: rgba(0, 31, 63, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .bg-olive.bg-opacity-10 {
+    background-color: rgba(61, 90, 48, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .bg-magenta.bg-opacity-10 {
+    background-color: rgba(255, 0, 255, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .bg-coral.bg-opacity-10 {
+    background-color: rgba(255, 127, 80, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .bg-gold.bg-opacity-10 {
+    background-color: rgba(255, 215, 0, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .bg-mint.bg-opacity-10 {
+    background-color: rgba(0, 210, 211, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .bg-slate.bg-opacity-10 {
+    background-color: rgba(100, 116, 139, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .bg-khaki.bg-opacity-10 {
+    background-color: rgba(240, 230, 140, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .bg-lavender.bg-opacity-10 {
+    background-color: rgba(230, 230, 250, 0.2) !important;
+}
 
 /* CSS Variables for Work Status Card Backgrounds */
 :root {
@@ -912,6 +1362,7 @@ input:checked+.slider:before {
 .work-status-card {
     transition: transform 0.2s, box-shadow 0.2s;
 }
+
 .work-status-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);

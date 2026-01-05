@@ -42,6 +42,180 @@ class ImportController extends Controller
         return view('imports.upload');
     }
 
+    /**
+     * Preview import data before actual processing.
+     * Shows first 100 rows with validation status.
+     */
+    public function preview(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+            'import_type' => 'required|in:progress,uninvoiced,invoiced',
+            'franchise' => 'nullable|in:PC,CV',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $importType = $request->input('import_type');
+            $franchise = $request->input('franchise');
+
+            $extension = strtolower($file->getClientOriginalExtension());
+            $reader = IOFactory::createReaderForFile($file->getPathname());
+            
+            if ($extension === 'ods') {
+                $reader->setReadDataOnly(true);
+            }
+            $reader->setReadEmptyCells(false);
+            
+            $spreadsheet = $reader->load($file->getPathname());
+            $worksheet = $spreadsheet->getActiveSheet();
+            $rows = $worksheet->toArray();
+            
+            if (count($rows) < 2) {
+                return back()->with('error', 'File is empty or has no data rows.');
+            }
+
+            $header = array_shift($rows);
+            $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
+            
+            $previewRows = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $warningCount = 0;
+            $maxPreviewRows = 100;
+
+            foreach (array_slice($rows, 0, $maxPreviewRows) as $index => $row) {
+                $rowNum = $index + 2; // +2 because of header and 0-indexing
+                $errors = [];
+                $warnings = [];
+                
+                $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
+                $plateNumber = $this->getColumnValue($row, $headerMap, ['reg. no.', 'reg no', 'no polisi', 'plate_number', 'plate number']);
+                $customerName = $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama customer']);
+                
+                // Validation
+                if (empty($jobNumber)) {
+                    $errors[] = 'Missing WIP/Job Number';
+                }
+                if (empty($plateNumber) || strlen(trim($plateNumber)) < 3) {
+                    $errors[] = 'Missing or invalid Plate Number';
+                }
+                
+                // Check for existing job (warning)
+                if ($jobNumber) {
+                    $existing = Job::where('job_number', $jobNumber)->first();
+                    if ($existing) {
+                        if ($importType === 'progress') {
+                            $warnings[] = 'Job exists, will be updated';
+                        }
+                    }
+                }
+                
+                $status = 'valid';
+                if (!empty($errors)) {
+                    $status = 'error';
+                    $errorCount++;
+                } elseif (!empty($warnings)) {
+                    $status = 'warning';
+                    $warningCount++;
+                } else {
+                    $validCount++;
+                }
+
+                $previewRows[] = [
+                    'row' => $rowNum,
+                    'job_number' => $jobNumber ?: '-',
+                    'plate_number' => $plateNumber ?: '-',
+                    'customer_name' => $customerName ? \Str::limit($customerName, 30) : '-',
+                    'status' => $status,
+                    'errors' => $errors,
+                    'warnings' => $warnings,
+                ];
+            }
+
+            // Store file temporarily for confirmation
+            $tempPath = $file->store('temp_imports');
+            session(['import_preview' => [
+                'temp_path' => $tempPath,
+                'import_type' => $importType,
+                'franchise' => $franchise,
+                'file_name' => $file->getClientOriginalName(),
+                'total_rows' => count($rows),
+            ]]);
+
+            return view('imports.preview', [
+                'previewRows' => $previewRows,
+                'totalRows' => count($rows),
+                'validCount' => $validCount,
+                'errorCount' => $errorCount,
+                'warningCount' => $warningCount,
+                'fileName' => $file->getClientOriginalName(),
+                'importType' => $importType,
+                'franchise' => $franchise,
+                'headers' => array_keys($headerMap),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Import preview failed: ' . $e->getMessage());
+            return back()->with('error', 'Failed to read file: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Confirm and execute the previewed import.
+     */
+    public function confirmImport(Request $request)
+    {
+        $previewData = session('import_preview');
+        
+        if (!$previewData) {
+            return redirect()->route('imports.upload')
+                ->with('error', 'Preview session expired. Please upload the file again.');
+        }
+
+        $tempPath = storage_path('app/' . $previewData['temp_path']);
+        
+        if (!file_exists($tempPath)) {
+            session()->forget('import_preview');
+            return redirect()->route('imports.upload')
+                ->with('error', 'Temporary file not found. Please upload again.');
+        }
+
+        // Create a fake UploadedFile to pass to existing import methods
+        $file = new \Illuminate\Http\UploadedFile(
+            $tempPath,
+            $previewData['file_name'],
+            null,
+            null,
+            true
+        );
+        
+        // Build a fake request
+        $fakeRequest = new Request();
+        $fakeRequest->files->set('file', $file);
+        $fakeRequest->merge(['franchise' => $previewData['franchise']]);
+
+        // Call the appropriate import method
+        $importType = $previewData['import_type'];
+        session()->forget('import_preview');
+        
+        // Clean up temp file after import
+        try {
+            if ($importType === 'progress') {
+                return $this->importProgress($fakeRequest);
+            } elseif ($importType === 'uninvoiced') {
+                return $this->importUninvoiced($fakeRequest);
+            } elseif ($importType === 'invoiced') {
+                return $this->importInvoiced($fakeRequest);
+            }
+        } finally {
+            @unlink($tempPath);
+        }
+
+        return redirect()->route('imports.upload')
+            ->with('error', 'Unknown import type.');
+    }
+
     public function importProgress(Request $request)
     {
         // Increase limits for large files

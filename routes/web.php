@@ -145,6 +145,8 @@ Route::middleware('auth')->group(function () {
         Route::prefix('imports')->name('imports.')->group(function () {
             Route::get('/', [ImportController::class, 'index'])->name('index');
             Route::get('upload', [ImportController::class, 'showUploadForm'])->name('upload');
+            Route::post('preview', [ImportController::class, 'preview'])->name('preview');
+            Route::post('confirm', [ImportController::class, 'confirmImport'])->name('confirm');
             Route::post('progress', [ImportController::class, 'importProgress'])->name('progress');
             Route::post('uninvoiced', [ImportController::class, 'importUninvoiced'])->name('uninvoiced');
             Route::post('invoiced', [ImportController::class, 'importInvoiced'])->name('invoiced');
