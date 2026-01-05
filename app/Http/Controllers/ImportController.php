@@ -463,6 +463,8 @@ class ImportController extends Controller
                     'unit_type' => $this->getColumnValue($row, $headerMap, [
                         'tipe', 'type unit', 'unit', 'model', 'type', 'kendaraan'
                     ]),
+                    // Set default work_status for new jobs so they appear in Kanban
+                    'work_status' => 'belum_diproses',
                 ];
 
                 // Match by Job Number AND Franchise if possible? 

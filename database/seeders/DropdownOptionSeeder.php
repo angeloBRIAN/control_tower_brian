@@ -10,12 +10,20 @@ class DropdownOptionSeeder extends Seeder
     public function run(): void
     {
         $options = [
-            // Work Status
-            ['type' => 'work_status', 'value' => 'pending', 'label' => 'Pending', 'icon' => 'hourglass-split', 'color' => 'secondary', 'sort_order' => 1],
-            ['type' => 'work_status', 'value' => 'in_progress', 'label' => 'In Progress', 'icon' => 'play-circle', 'color' => 'primary', 'sort_order' => 2],
-            ['type' => 'work_status', 'value' => 'waiting_parts', 'label' => 'Waiting Parts', 'icon' => 'gear', 'color' => 'warning', 'sort_order' => 3],
-            ['type' => 'work_status', 'value' => 'waiting_approval', 'label' => 'Waiting Approval', 'icon' => 'hand-thumbs-up', 'color' => 'info', 'sort_order' => 4],
-            ['type' => 'work_status', 'value' => 'completed', 'label' => 'Completed', 'icon' => 'check2-circle', 'color' => 'success', 'sort_order' => 5],
+            // Work Status - Indonesian Workflow
+            ['type' => 'work_status', 'value' => 'belum_diproses', 'label' => 'Belum Diproses', 'icon' => 'inbox', 'color' => 'secondary', 'sort_order' => 0],
+            ['type' => 'work_status', 'value' => 'keluhan_awal', 'label' => 'Keluhan Awal', 'icon' => 'x-circle', 'color' => 'danger', 'sort_order' => 1],
+            ['type' => 'work_status', 'value' => 'estimasi', 'label' => 'Estimasi', 'icon' => 'clock', 'color' => 'warning', 'sort_order' => 2],
+            ['type' => 'work_status', 'value' => 'acc_customer', 'label' => 'Acc Customer', 'icon' => 'hand-thumbs-up', 'color' => 'info', 'sort_order' => 3],
+            ['type' => 'work_status', 'value' => 'pengerjaan', 'label' => 'Pengerjaan', 'icon' => 'play-circle', 'color' => 'primary', 'sort_order' => 4],
+            ['type' => 'work_status', 'value' => 'order_parts', 'label' => 'Order Parts', 'icon' => 'gear', 'color' => 'secondary', 'sort_order' => 5],
+            ['type' => 'work_status', 'value' => 'pemberkasan', 'label' => 'Pemberkasan', 'icon' => 'file-text', 'color' => 'info', 'sort_order' => 6],
+            ['type' => 'work_status', 'value' => 'penjadwalan', 'label' => 'Penjadwalan', 'icon' => 'calendar', 'color' => 'primary', 'sort_order' => 7],
+            ['type' => 'work_status', 'value' => 'penjadwalan_campaign', 'label' => 'Penjadwalan Campaign', 'icon' => 'calendar-event', 'color' => 'primary', 'sort_order' => 8],
+            ['type' => 'work_status', 'value' => 'proses_warranty', 'label' => 'Proses Warranty', 'icon' => 'shield-check', 'color' => 'warning', 'sort_order' => 9],
+            ['type' => 'work_status', 'value' => 'proses_close', 'label' => 'Proses Close', 'icon' => 'box-arrow-right', 'color' => 'secondary', 'sort_order' => 10],
+            ['type' => 'work_status', 'value' => 'menunggu_pembayaran', 'label' => 'Menunggu Pembayaran', 'icon' => 'credit-card', 'color' => 'warning', 'sort_order' => 11],
+            ['type' => 'work_status', 'value' => 'proses_invoice', 'label' => 'Proses Invoice', 'icon' => 'receipt', 'color' => 'success', 'sort_order' => 12],
 
             // Payment Type
             ['type' => 'payment_type', 'value' => 'cash', 'label' => 'Cash', 'icon' => 'cash', 'color' => 'success', 'sort_order' => 1],
