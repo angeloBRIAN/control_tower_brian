@@ -245,6 +245,11 @@
                             <i class="bi bi-person-badge"></i> SA Performance
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('reports.trends') ? 'active' : '' }}" href="{{ route('reports.trends') }}">
+                            <i class="bi bi-graph-up-arrow"></i> Trends & Comparisons
+                        </a>
+                    </li>
                     @if(Auth::user()->canEdit())
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('reports.builder') ? 'active' : '' }}" href="{{ route('reports.builder') }}">

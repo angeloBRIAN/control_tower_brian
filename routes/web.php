@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
         Route::get('needs-parts', [ReportController::class, 'needsParts'])->name('needs-parts');
         Route::get('aging', [ReportController::class, 'aging'])->name('aging');
         Route::get('sa-performance', [ReportController::class, 'saPerformance'])->name('sa-performance');
+        Route::get('trends', [\App\Http\Controllers\TrendsController::class, 'index'])->name('trends');
         Route::get('wip-conflicts', [\App\Http\Controllers\WipConflictReportController::class, 'index'])->name('wip-conflicts');
         Route::post('wip-conflicts/{job}/resolve', [\App\Http\Controllers\WipConflictReportController::class, 'resolve'])->name('wip-conflicts.resolve');
         Route::get('orphan-vehicles', [\App\Http\Controllers\OrphanVehicleReportController::class, 'index'])->name('orphan-vehicles');
