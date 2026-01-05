@@ -4,7 +4,7 @@
 
 @section('content')
 <!-- Enhanced Loading Overlay -->
-<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(13, 110, 253, 0.95) 0%, rgba(102, 16, 242, 0.95) 100%); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(13, 148, 136, 0.95) 0%, rgba(17, 94, 89, 0.95) 100%); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
     <div class="loading-container text-center">
         <!-- Animated Spinner -->
         <div class="position-relative mb-4">
