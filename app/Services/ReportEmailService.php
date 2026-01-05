@@ -170,14 +170,43 @@ class ReportEmailService
         $pcJobs = $jobs->where('franchise', 'PC');
         $cvJobs = $jobs->where('franchise', 'CV');
         
-        // Work status breakdown
-        $workStatusBreakdown = $jobs->groupBy('work_status')
-            ->map(fn($g, $status) => [
-                'name' => $status ?: 'Pending',
-                'count' => $g->count(),
-                'amount' => $g->sum('total_sales'),
-            ])
-            ->sortByDesc('count')
+        // Work status breakdown - normalize using DropdownOption definitions
+        $allWorkStatuses = DropdownOption::getOptions('work_status');
+        
+        // Create lookup map
+        $statusLookup = [];
+        foreach ($allWorkStatuses as $status) {
+            $statusLookup[strtolower(trim($status->value))] = $status;
+            $statusLookup[strtolower(trim($status->label))] = $status;
+        }
+        
+        // Aggregate by normalized status
+        $aggregatedCounts = [];
+        foreach ($jobs as $job) {
+            $rawStatus = $job->work_status;
+            if (empty($rawStatus)) continue;
+            
+            $lookupKey = strtolower(trim($rawStatus));
+            if (isset($statusLookup[$lookupKey])) {
+                $option = $statusLookup[$lookupKey];
+                $optionId = $option->id;
+                
+                if (!isset($aggregatedCounts[$optionId])) {
+                    $aggregatedCounts[$optionId] = [
+                        'name' => $option->label,
+                        'count' => 0,
+                        'amount' => 0,
+                        'sort_order' => $option->sort_order,
+                    ];
+                }
+                $aggregatedCounts[$optionId]['count']++;
+                $aggregatedCounts[$optionId]['amount'] += $job->total_sales ?? 0;
+            }
+        }
+        
+        // Sort by sort_order
+        $workStatusBreakdown = collect($aggregatedCounts)
+            ->sortBy('sort_order')
             ->values();
 
         return [

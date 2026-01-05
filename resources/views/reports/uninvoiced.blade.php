@@ -50,40 +50,64 @@
     $cvParts = (clone $allUninvoicedJobs)->where('franchise', 'CV')->sum('part_sales') ?? 0;
     $cvTotal = (clone $allUninvoicedJobs)->where('franchise', 'CV')->sum('total_sales') ?? 0;
     
-    // Work Status breakdown - get all defined statuses, merge with actual counts
-    $actualStatusCounts = (clone $allUninvoicedJobs)
-        ->selectRaw('COALESCE(work_status, "Pending") as work_status, COUNT(*) as job_count, SUM(total_sales) as total')
-        ->groupBy('work_status')
-        ->pluck('job_count', 'work_status');
-    
+    // Work Status breakdown - normalize using DropdownOption definitions
     // Get all defined work statuses from DropdownOption
     $allWorkStatuses = \App\Models\DropdownOption::getOptions('work_status');
     
-    // Build combined list with all statuses
-    $workStatusTotals = collect();
+    // Create a lookup map: both value and label map to the same option
+    $statusLookup = [];
     foreach ($allWorkStatuses as $status) {
-        $workStatusTotals->push((object)[
-            'work_status' => $status->label,
-            'job_count' => $actualStatusCounts->get($status->value, 0) ?? $actualStatusCounts->get($status->label, 0),
-            'color' => $status->color,
-            'icon' => $status->icon,
-        ]);
+        $statusLookup[strtolower(trim($status->value))] = $status;
+        $statusLookup[strtolower(trim($status->label))] = $status;
     }
     
-    // Add any statuses from data that aren't in dropdown options (e.g., "Pending")
-    foreach ($actualStatusCounts as $status => $count) {
-        if (!$workStatusTotals->where('work_status', $status)->count()) {
-            $workStatusTotals->push((object)[
-                'work_status' => $status,
-                'job_count' => $count,
-                'color' => 'secondary',
-                'icon' => null,
-            ]);
+    // Get raw counts from database
+    $rawCounts = (clone $allUninvoicedJobs)
+        ->selectRaw('work_status, COUNT(*) as job_count, SUM(total_sales) as total')
+        ->groupBy('work_status')
+        ->get()
+        ->keyBy(fn($item) => strtolower(trim($item->work_status ?? '')));
+    
+    // Aggregate counts by normalized status
+    $aggregatedCounts = [];
+    foreach ($rawCounts as $rawStatus => $data) {
+        if (empty($rawStatus)) {
+            // Skip null/empty work_status - these jobs haven't been assigned yet
+            continue;
+        }
+        
+        $lookupKey = strtolower(trim($rawStatus));
+        if (isset($statusLookup[$lookupKey])) {
+            $option = $statusLookup[$lookupKey];
+            $optionId = $option->id;
+            
+            if (!isset($aggregatedCounts[$optionId])) {
+                $aggregatedCounts[$optionId] = [
+                    'option' => $option,
+                    'job_count' => 0,
+                    'total' => 0,
+                ];
+            }
+            $aggregatedCounts[$optionId]['job_count'] += $data->job_count;
+            $aggregatedCounts[$optionId]['total'] += $data->total ?? 0;
         }
     }
     
-    // Sort by job count descending
-    $workStatusTotals = $workStatusTotals->sortByDesc('job_count')->values();
+    // Build the final list from defined statuses (maintaining order)
+    $workStatusTotals = collect();
+    foreach ($allWorkStatuses as $status) {
+        $data = $aggregatedCounts[$status->id] ?? null;
+        $workStatusTotals->push((object)[
+            'work_status' => $status->label,
+            'job_count' => $data ? $data['job_count'] : 0,
+            'color' => $status->color,
+            'icon' => $status->icon,
+            'sort_order' => $status->sort_order,
+        ]);
+    }
+    
+    // Sort by sort_order first, then by job_count for items with same order
+    $workStatusTotals = $workStatusTotals->sortBy('sort_order')->values();
 @endphp
 
 <!-- Summary Cards - Modern Glassmorphism -->
