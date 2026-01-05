@@ -353,6 +353,11 @@
 
                 <hr class="my-2">
                 <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('help.*') ? 'active' : '' }}" href="{{ route('help.index') }}">
+                        <i class="bi bi-question-circle"></i> Help Center
+                    </a>
+                </li>
+                <li class="nav-item">
                     <div class="px-3 py-2 text-muted small">
                         <i class="bi bi-person-circle me-1"></i>{{ Auth::user()->name }}
                         <span class="badge bg-secondary ms-1">{{ Auth::user()->getRoleDisplayName() }}</span>

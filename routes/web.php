@@ -36,6 +36,12 @@ Route::middleware('auth')->group(function () {
     // Global Search
     Route::get('search', [\App\Http\Controllers\SearchController::class, 'search'])->name('search');
     
+    // Help Center
+    Route::prefix('help')->name('help.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\HelpController::class, 'index'])->name('index');
+        Route::get('{slug}', [\App\Http\Controllers\HelpController::class, 'show'])->name('show');
+    });
+    
     // Notifications
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index'])->name('index');
