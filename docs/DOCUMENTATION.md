@@ -68,6 +68,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs 
 | **Admin** | Highest | Full system access including user management and data cleanup |
 | **Manager** | High | All operations, master data, audit access |
 | **Control Tower** | Medium | Job management, imports, reports, Booking/PDI/Towing |
+| **Finance** | Medium | Invoiced jobs only, payment tracking on Kanban |
 | **SA (Service Advisor)** | Limited | View assigned jobs, add remarks |
 | **Foreman** | Limited | View assigned jobs, add remarks |
 | **Sparepart** | Limited | Edit Order & Parts on jobs needing parts |
@@ -75,22 +76,25 @@ Control Tower is a workshop management system for tracking vehicle service jobs 
 
 ### Permission Matrix
 
-| Feature | Admin | Manager | Control Tower | SA | Foreman | Sparepart | Audit |
-|---------|:-----:|:-------:|:-------------:|:--:|:-------:|:---------:|:-----:|
-| View Dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| View Jobs | ✓ | ✓ | ✓ | ✓* | ✓* | ✓* | ✓ |
-| Create/Edit Jobs | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| Delete Jobs | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Add Remarks | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| Edit Order & Parts | ✓ | ✓ | ✓ | ✗ | ✗ | ✓** | ✗ |
-| Data Import | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| Report Export | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| User Management | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Backups | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Audit Logs | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Feature | Admin | Manager | Control Tower | Finance | SA | Foreman | Sparepart | Audit |
+|---------|:-----:|:-------:|:-------------:|:-------:|:--:|:-------:|:---------:|:-----:|
+| View Dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| View Jobs | ✓ | ✓ | ✓ | ✓*** | ✓* | ✓* | ✓* | ✓ |
+| Create/Edit Jobs | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Delete Jobs | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Edit Kanban | ✗ | ✗ | ✓ | ✓**** | ✗ | ✗ | ✗ | ✗ |
+| Add Remarks | ✓ | ✓ | ✓ | ✓*** | ✓ | ✓ | ✓ | ✗ |
+| Edit Order & Parts | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓** | ✗ |
+| Data Import | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Report Export | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| User Management | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Backups | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Audit Logs | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 
 *\* SA/Foreman see only jobs where they are assigned*  
-*\*\* Sparepart can only edit jobs with `need_part = true`*
+*\*\* Sparepart can only edit jobs with `need_part = true`*  
+*\*\*\* Finance can only view/remark on invoiced jobs*  
+*\*\*\*\* Finance Kanban limited to 3 columns: Proses Invoice → Menunggu Pembayaran → Sudah Dibayar*
 
 ### Dynamic Permissions
 
