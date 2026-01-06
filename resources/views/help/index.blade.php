@@ -78,7 +78,7 @@
                         <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
                             <i class="{{ $doc['icon'] }} fs-4 text-primary"></i>
                         </div>
-                        <h5 class="mb-0 text-dark">{{ $doc['title'] }}</h5>
+                        <h5 class="mb-0 text-body">{{ $doc['title'] }}</h5>
                     </div>
                     <p class="text-muted mb-0">{{ $doc['description'] }}</p>
                 </div>
