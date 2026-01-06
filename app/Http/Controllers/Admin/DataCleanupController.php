@@ -121,6 +121,10 @@ class DataCleanupController extends Controller
             // Re-enable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
+            // Clear all application cache
+            \Artisan::call('cache:clear');
+            \Artisan::call('view:clear');
+
             // Log the cleanup action
             Log::info('Data cleanup executed by ' . auth()->user()->name, [
                 'tables' => $tablesToClean,
@@ -129,7 +133,7 @@ class DataCleanupController extends Controller
 
             $totalDeleted = array_sum($results);
             return redirect()->route('admin.data-cleanup.index')
-                ->with('success', "Data cleanup completed! Deleted {$totalDeleted} records from " . count($results) . " table(s).");
+                ->with('success', "Data cleanup completed! Deleted {$totalDeleted} records from " . count($results) . " table(s). Cache cleared.");
 
         } catch (\Exception $e) {
             // Re-enable foreign key checks in case of error
