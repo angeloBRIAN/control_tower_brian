@@ -742,6 +742,7 @@ class ImportController extends Controller
                         'update remarks', 'update remark', 'update keterangan'
                     ]),
                     'status' => 'uninvoiced',
+                    'work_status' => 'belum_diproses', // Set default work_status for Kanban
                 ];
 
                 // RECONCILIATION Check
