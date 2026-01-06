@@ -206,8 +206,66 @@ class User extends Authenticatable
             'sa' => 'Service Advisor',
             'foreman' => 'Foreman',
             'audit' => 'Audit',
+            'finance' => 'Finance',
             default => 'User',
         };
+    }
+
+    /**
+     * Check if user is Finance role
+     */
+    public function isFinance(): bool
+    {
+        return $this->role === 'finance';
+    }
+
+    /**
+     * Check if user is Control Tower role
+     */
+    public function isControlTower(): bool
+    {
+        return $this->role === 'control_tower';
+    }
+
+    /**
+     * Check if user can edit Kanban (drag/drop work status)
+     */
+    public function canEditKanban(): bool
+    {
+        return $this->hasAnyRole(['admin', 'control_tower', 'finance']);
+    }
+
+    /**
+     * Check if user can add remark to a specific job
+     */
+    public function canAddRemarkToJob(Job $job): bool
+    {
+        // Admin and Control Tower can add remarks to any job
+        if ($this->hasAnyRole(['admin', 'control_tower'])) {
+            return true;
+        }
+
+        // Finance can only add remarks to invoiced jobs
+        if ($this->isFinance()) {
+            return $job->status === 'invoiced';
+        }
+
+        // Service Advisor can only add remarks to jobs they are assigned to
+        if ($this->role === 'sa') {
+            return $job->service_advisor === $this->name;
+        }
+
+        // Foreman can only add remarks to jobs they are assigned to
+        if ($this->role === 'foreman') {
+            return $job->foreman === $this->name;
+        }
+
+        // Sparepart can only add remarks to jobs that need parts
+        if ($this->role === 'sparepart') {
+            return $job->need_part === true;
+        }
+
+        return false;
     }
 
     /**

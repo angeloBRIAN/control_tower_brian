@@ -990,6 +990,13 @@ class ImportController extends Controller
                 $invPpn = $this->parseAmount($this->getColumnValue($row, $headerMap, ['inv+ppn', 'inv ppn']));
                 $invPpnMeterai = $this->parseAmount($this->getColumnValue($row, $headerMap, ['inv+ppn+meterai', 'inv ppn meterai', 'total']));
 
+                // Determine if this is a Credit Note (CN) - skip work_status update for CN
+                $isCreditNote = $typeSale && (
+                    str_contains(strtoupper($typeSale), 'CN') ||
+                    str_contains(strtolower($typeSale), 'credit note') ||
+                    str_contains(strtolower($typeSale), 'credit_note')
+                );
+
                 // Prepare invoice-specific data (fields that come from invoice report)
                 $invoiceData = array_filter([
                     'invoice_number' => $invoiceNumber,
@@ -1003,7 +1010,8 @@ class ImportController extends Controller
                     'chassis_number' => $chassisNumber,
                     'status' => 'invoiced',
                     'invoiced_at' => $invoiceDate ?? now(),
-                    'work_status' => 'proses_invoice', // Set final work status for invoiced jobs
+                    // Set work_status to menunggu_pembayaran for regular invoices, skip for CN
+                    'work_status' => $isCreditNote ? null : 'menunggu_pembayaran',
                 ], fn($v) => !is_null($v));
 
                 // Normalize job number for matching (trim whitespace, handle numeric comparisons)

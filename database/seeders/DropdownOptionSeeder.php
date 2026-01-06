@@ -28,7 +28,8 @@ class DropdownOptionSeeder extends Seeder
             ['type' => 'work_status', 'value' => 'proses_warranty', 'label' => 'Proses Warranty', 'icon' => 'shield-check', 'color' => 'warning', 'sort_order' => 9],
             ['type' => 'work_status', 'value' => 'proses_close', 'label' => 'Proses Close', 'icon' => 'box-arrow-right', 'color' => 'secondary', 'sort_order' => 10],
             ['type' => 'work_status', 'value' => 'menunggu_pembayaran', 'label' => 'Menunggu Pembayaran', 'icon' => 'credit-card', 'color' => 'warning', 'sort_order' => 11],
-            ['type' => 'work_status', 'value' => 'proses_invoice', 'label' => 'Proses Invoice', 'icon' => 'receipt', 'color' => 'success', 'sort_order' => 12],
+            ['type' => 'work_status', 'value' => 'proses_invoice', 'label' => 'Proses Invoice', 'icon' => 'receipt', 'color' => 'info', 'sort_order' => 12],
+            ['type' => 'work_status', 'value' => 'sudah_dibayar', 'label' => 'Sudah Dibayar', 'icon' => 'check-circle-fill', 'color' => 'success', 'sort_order' => 13],
 
             // Payment Type
             ['type' => 'payment_type', 'value' => 'cash', 'label' => 'Cash', 'icon' => 'cash', 'color' => 'success', 'sort_order' => 1],

@@ -45,7 +45,7 @@
     border-radius: 8px;
     padding: 0.75rem;
     margin-bottom: 0.5rem;
-    cursor: grab;
+    cursor: {{ $canEditKanban ? 'grab' : 'default' }};
     transition: transform 0.15s, box-shadow 0.15s;
 }
 .kanban-card:hover {
@@ -142,8 +142,17 @@
 
 <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
-        <h1><i class="bi bi-kanban me-2"></i>Kanban Board</h1>
+        <h1>
+            <i class="bi bi-kanban me-2"></i>Kanban Board
+            @if($isFinance)
+            <span class="badge bg-info fs-6 ms-2">Finance View</span>
+            @endif
+        </h1>
+        @if($canEditKanban)
         <p class="text-muted mb-0">Drag jobs between columns to update work status</p>
+        @else
+        <p class="text-muted mb-0"><i class="bi bi-eye me-1"></i>View-only mode - contact Control Tower or Finance to update status</p>
+        @endif
     </div>
     <div class="d-flex gap-2">
         <a href="{{ route('jobs.index', ['status' => 'uninvoiced']) }}" class="btn btn-outline-secondary">
@@ -234,44 +243,49 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
+const canEditKanban = {{ $canEditKanban ? 'true' : 'false' }};
+
 document.addEventListener('DOMContentLoaded', function() {
     const columns = document.querySelectorAll('.kanban-body');
     
-    columns.forEach(column => {
-        new Sortable(column, {
-            group: 'kanban',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            onEnd: function(evt) {
-                const jobId = evt.item.dataset.jobId;
-                const newStatus = evt.to.id.replace('column-', '');
-                
-                // AJAX update
-                fetch(`/jobs/${jobId}/work-status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ work_status: newStatus })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update column counts
-                        updateColumnCounts();
-                        showToast(data.message, 'success');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    showToast('Failed to update status', 'danger');
-                });
-            }
+    // Only enable drag-and-drop if user has edit permission
+    if (canEditKanban) {
+        columns.forEach(column => {
+            new Sortable(column, {
+                group: 'kanban',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd: function(evt) {
+                    const jobId = evt.item.dataset.jobId;
+                    const newStatus = evt.to.id.replace('column-', '');
+                    
+                    // AJAX update
+                    fetch(`/jobs/${jobId}/work-status`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ work_status: newStatus })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update column counts
+                            updateColumnCounts();
+                            showToast(data.message, 'success');
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error:', err);
+                        showToast('Failed to update status', 'danger');
+                    });
+                }
+            });
         });
-    });
+    }
     
     function updateColumnCounts() {
         document.querySelectorAll('.kanban-column').forEach(col => {

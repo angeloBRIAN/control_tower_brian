@@ -90,6 +90,9 @@ class JobController extends Controller
                 // If Foreman user has no linked Foreman record, show nothing
                 $query->whereRaw('1 = 0');
             }
+        } elseif ($user->isFinance()) {
+            // Finance role can only see invoiced jobs
+            $query->where('status', 'invoiced');
         }
 
         if ($request->filled('status')) {
@@ -344,13 +347,23 @@ class JobController extends Controller
      */
     public function addRemark(Request $request, Job $job): JsonResponse|RedirectResponse
     {
-        $this->checkAssignmentAuthorization($job);
+        $user = auth()->user();
+        
+        // Check if user can add remark to this specific job
+        if (!$user->canAddRemarkToJob($job)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to add remarks to this job.',
+                ], 403);
+            }
+            abort(403, 'You do not have permission to add remarks to this job.');
+        }
 
         $validated = $request->validate([
             'remark_text' => 'required|string',
         ]);
 
-        $user = auth()->user();
         $remark = $job->addRemark($validated['remark_text'], $user?->name, $user?->id);
         
         // Log activity
@@ -544,12 +557,25 @@ class JobController extends Controller
     public function kanban(Request $request): View
     {
         $user = auth()->user();
+        $isFinance = $user->isFinance();
         
         // Get work status options from database
         $workStatuses = \App\Models\DropdownOption::getOptions('work_status');
         
-        // Base query - only uninvoiced jobs
-        $query = Job::uninvoiced();
+        // Finance role sees only 3 payment-related columns
+        $financeStatuses = ['proses_invoice', 'menunggu_pembayaran', 'sudah_dibayar'];
+        if ($isFinance) {
+            $workStatuses = $workStatuses->filter(function($status) use ($financeStatuses) {
+                return in_array($status->value, $financeStatuses);
+            });
+        }
+        
+        // Base query - Finance sees invoiced jobs, others see uninvoiced
+        if ($isFinance) {
+            $query = Job::where('status', 'invoiced');
+        } else {
+            $query = Job::uninvoiced();
+        }
         
         // Apply role-based restrictions
         if ($user->hasRole('sa')) {
@@ -612,7 +638,10 @@ class JobController extends Controller
             'franchise' => ['PC', 'CV'],
         ];
         
-        return view('jobs.kanban', compact('workStatuses', 'jobsByStatus', 'totalsByStatus', 'filterOptions'));
+        // Check if user can edit Kanban (drag/drop)
+        $canEditKanban = $user->canEditKanban();
+        
+        return view('jobs.kanban', compact('workStatuses', 'jobsByStatus', 'totalsByStatus', 'filterOptions', 'canEditKanban', 'isFinance'));
     }
 
     /**
@@ -627,22 +656,45 @@ class JobController extends Controller
      */
     public function updateWorkStatus(Request $request, Job $job): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Check if user can edit Kanban
+        if (!$user->canEditKanban()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to update work status.',
+            ], 403);
+        }
+        
         $validated = $request->validate([
             'work_status' => 'required|string',
         ]);
         
+        $newStatus = $validated['work_status'];
+        
+        // Finance role can only change between 3 payment-related statuses
+        if ($user->isFinance()) {
+            $allowedStatuses = ['proses_invoice', 'menunggu_pembayaran', 'sudah_dibayar'];
+            if (!in_array($newStatus, $allowedStatuses)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Finance role can only change status between: ' . implode(', ', $allowedStatuses),
+                ], 403);
+            }
+        }
+        
         $oldStatus = $job->work_status;
-        $job->update(['work_status' => $validated['work_status']]);
+        $job->update(['work_status' => $newStatus]);
         
         // Log activity
         \App\Models\JobActivity::log($job, 'work_status_changed', 
-            "Work status changed from '" . ($oldStatus ?? 'None') . "' to '{$validated['work_status']}'",
-            ['old' => $oldStatus, 'new' => $validated['work_status']]
+            "Work status changed from '" . ($oldStatus ?? 'None') . "' to '{$newStatus}'",
+            ['old' => $oldStatus, 'new' => $newStatus]
         );
         
         return response()->json([
             'success' => true,
-            'message' => "Job {$job->job_number} moved to {$validated['work_status']}",
+            'message' => "Job {$job->job_number} moved to {$newStatus}",
         ]);
     }
 
