@@ -15,6 +15,7 @@ class DataCleanupController extends Controller
     protected $tableGroups = [
         'Core Data' => [
             'remarks' => 'Remarks',
+            'job_activities' => 'Job Activities',
             'job_invoices' => 'Job Invoices',
             'jobs' => 'Jobs',
             'bookings' => 'Bookings',
@@ -84,6 +85,7 @@ class DataCleanupController extends Controller
             // Define proper order to avoid FK issues (child tables first)
             $cleanOrder = [
                 'remarks',
+                'job_activities',
                 'job_invoices',
                 'customer_merge_logs',
                 'dismissed_duplicate_groups',
