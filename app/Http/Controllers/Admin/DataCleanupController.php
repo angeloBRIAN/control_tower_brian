@@ -25,6 +25,7 @@ class DataCleanupController extends Controller
             'customers' => 'Customers',
         ],
         'Customer Links' => [
+            'customer_summaries' => 'Customer Summaries (Lookup Cache)',
             'customer_vehicles' => 'Customer-Vehicle Links',
         ],
         'Merge & Duplicates' => [
@@ -96,6 +97,7 @@ class DataCleanupController extends Controller
                 'notifications',
                 'user_sessions',
                 'saved_reports',
+                'customer_summaries',
                 'customer_vehicles',
                 'customers',
                 'jobs',
