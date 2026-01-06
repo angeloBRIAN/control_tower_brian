@@ -54,6 +54,22 @@ class Kernel extends ConsoleKernel
         $schedule->command('jobs:cleanup', ['--months' => 12, '--dry-run'])
             ->monthlyOn(1, '06:00')
             ->withoutOverlapping();
+            
+        // Scheduled reports - runs every 5 minutes to check for due reports
+        $schedule->command('reports:send')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
+            
+        // Refresh customer summaries for Customer Lookup (hourly)
+        $schedule->command('customers:refresh-summaries')
+            ->hourly()
+            ->withoutOverlapping();
+            
+        // Find customer duplicates (daily at 3 AM)
+        $schedule->command('customers:find-duplicates', ['--threshold' => 85])
+            ->dailyAt('03:00')
+            ->withoutOverlapping();
     }
 
     /**
