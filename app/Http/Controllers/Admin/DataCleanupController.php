@@ -22,10 +22,10 @@ class DataCleanupController extends Controller
             'pdi_records' => 'PDI Records',
             'towing_records' => 'Towing Records',
             'vehicles' => 'Vehicles',
+            'customers' => 'Customers',
         ],
-        'Customer Portal' => [
+        'Customer Links' => [
             'customer_vehicles' => 'Customer-Vehicle Links',
-            'customers' => 'Customers (Portal)',
         ],
         'Merge & Duplicates' => [
             'duplicate_customer_groups' => 'Duplicate Customer Groups',
