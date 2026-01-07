@@ -7,6 +7,8 @@ use App\Models\ScheduledReport;
 use App\Models\DropdownOption;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Database\Eloquent\Builder;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class ReportEmailService
 {
@@ -23,17 +25,66 @@ class ReportEmailService
 
         $subject = $this->getSubject($report);
         $view = $this->getEmailView($report->type);
+        $config = $report->config ?? [];
+        $includePdf = $config['include_pdf'] ?? false;
+        
+        // Generate PDF if requested
+        $pdfContent = null;
+        $pdfFilename = null;
+        if ($includePdf) {
+            $pdfContent = $this->generatePdf($view, $data, $report);
+            $pdfFilename = $this->getPdfFilename($report);
+        }
 
         foreach ($report->recipients as $email) {
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 continue;
             }
 
-            Mail::send($view, $data, function ($message) use ($email, $subject) {
+            Mail::send($view, $data, function ($message) use ($email, $subject, $pdfContent, $pdfFilename) {
                 $message->to($email)
                         ->subject($subject);
+                
+                // Attach PDF if generated
+                if ($pdfContent && $pdfFilename) {
+                    $message->attachData($pdfContent, $pdfFilename, [
+                        'mime' => 'application/pdf',
+                    ]);
+                }
             });
         }
+    }
+
+    /**
+     * Generate PDF from email view
+     */
+    private function generatePdf(string $view, array $data, ScheduledReport $report): string
+    {
+        // Render the email view to HTML
+        $html = view($view, $data)->render();
+        
+        // Configure Dompdf
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'sans-serif');
+        
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        
+        return $dompdf->output();
+    }
+
+    /**
+     * Get PDF filename for attachment
+     */
+    private function getPdfFilename(ScheduledReport $report): string
+    {
+        $date = now()->format('Y-m-d');
+        $name = str_replace(' ', '_', strtolower($report->name));
+        return "{$name}_{$date}.pdf";
     }
 
     /**
