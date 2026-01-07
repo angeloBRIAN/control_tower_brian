@@ -17,6 +17,24 @@ services:
     depends_on:
       - db
 
+  # Scheduler - runs Laravel scheduled tasks every minute
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: control_tower_scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    entrypoint: /bin/sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
+    volumes:
+      - .:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - control_tower_network
+    depends_on:
+      - app
+      - db
+
   # Nginx Web Server
   webserver:
     image: nginx:alpine
