@@ -369,15 +369,26 @@
                                 } elseif ($user->hasRole('sparepart')) {
                                     $canAddRemark = $job->need_part;
                                 }
+                                $canAddPartOrder = $job->need_part && in_array($user->role, ['sparepart', 'admin']);
                             @endphp
-                            @if($canAddRemark)
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-add-remark" 
-                                    data-job-id="{{ $job->id }}" 
-                                    data-job-number="{{ $job->job_number }}"
-                                    title="Add Remark">
-                                <i class="bi bi-chat-text"></i>
-                            </button>
-                            @else
+                            <div class="btn-group btn-group-sm">
+                                @if($canAddRemark)
+                                <button type="button" class="btn btn-outline-primary btn-add-remark" 
+                                        data-job-id="{{ $job->id }}" 
+                                        data-job-number="{{ $job->job_number }}"
+                                        title="Add Remark">
+                                    <i class="bi bi-chat-text"></i>
+                                </button>
+                                @endif
+                                @if($canAddPartOrder)
+                                <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" 
+                                   class="btn btn-outline-warning" 
+                                   title="Add Part Order">
+                                    <i class="bi bi-box-seam"></i>
+                                </a>
+                                @endif
+                            </div>
+                            @if(!$canAddRemark && !$canAddPartOrder)
                             <span class="text-muted" title="Not authorized"><i class="bi bi-chat-text opacity-25"></i></span>
                             @endif
                         </td>
