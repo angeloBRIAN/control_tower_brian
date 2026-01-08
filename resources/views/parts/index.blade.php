@@ -70,7 +70,7 @@
                     <tr>
                         <th>Part</th>
                         <th>Job</th>
-                        <th>RQ / MBINA</th>
+                        <th>RQ / Order No.</th>
                         <th>Qty</th>
                         <th>Expected Date</th>
                         <th>Status</th>
@@ -97,10 +97,10 @@
                             @if($order->rq)
                                 <div><small class="text-muted">RQ:</small> {{ $order->rq }}</div>
                             @endif
-                            @if($order->no_order_part_mbina)
-                                <div><small class="text-muted">MBINA:</small> {{ $order->no_order_part_mbina }}</div>
+                            @if($order->no_order_part)
+                                <div><small class="text-muted">Order:</small> {{ $order->no_order_part }}</div>
                             @endif
-                            @if(!$order->rq && !$order->no_order_part_mbina)
+                            @if(!$order->rq && !$order->no_order_part)
                                 <span class="text-muted">-</span>
                             @endif
                         </td>

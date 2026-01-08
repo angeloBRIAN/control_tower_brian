@@ -113,13 +113,13 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label for="no_order_part_mbina" class="form-label">No. Order MBINA</label>
+                                    <label for="no_order_part" class="form-label">No. Order Part</label>
                                     <input type="text" 
-                                           class="form-control @error('no_order_part_mbina') is-invalid @enderror" 
-                                           id="no_order_part_mbina" 
-                                           name="no_order_part_mbina" 
-                                           value="{{ old('no_order_part_mbina', $partOrder->no_order_part_mbina ?? '') }}">
-                                    @error('no_order_part_mbina')
+                                           class="form-control @error('no_order_part') is-invalid @enderror" 
+                                           id="no_order_part" 
+                                           name="no_order_part" 
+                                           value="{{ old('no_order_part', $partOrder->no_order_part ?? '') }}">
+                                    @error('no_order_part')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>

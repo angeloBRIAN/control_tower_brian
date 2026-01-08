@@ -408,6 +408,97 @@
                 </div>
             </div>
 
+            {{-- Part Orders Section (when job needs parts) --}}
+            @if($job->need_part)
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-box-seam me-2"></i>Part Orders
+                        @if($job->partOrders->count() > 0)
+                            <span class="badge bg-primary ms-2">{{ $job->partOrders->count() }}</span>
+                        @endif
+                    </span>
+                    @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
+                        <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-plus-lg me-1"></i>Add Part Order
+                        </a>
+                    @endif
+                </div>
+                <div class="card-body p-0">
+                    @if($job->partOrders->count() > 0)
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Part</th>
+                                    <th>RQ / Order No.</th>
+                                    <th>Qty</th>
+                                    <th>Expected</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($job->partOrders as $order)
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $order->part_name }}</div>
+                                        @if($order->part_number)
+                                            <small class="text-muted">{{ $order->part_number }}</small>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($order->rq)
+                                            <div><small class="text-muted">RQ:</small> {{ $order->rq }}</div>
+                                        @endif
+                                        @if($order->no_order_part)
+                                            <div><small class="text-muted">Order:</small> {{ $order->no_order_part }}</div>
+                                        @endif
+                                        @if(!$order->rq && !$order->no_order_part)
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $order->quantity }}</td>
+                                    <td>
+                                        {{ $order->expected_date?->format('d M') }}
+                                        @if($order->is_overdue)
+                                            <span class="badge bg-danger">Overdue</span>
+                                        @elseif($order->is_due_soon)
+                                            <span class="badge bg-warning text-dark">Soon</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background-color: {{ $order->status_color }}">
+                                            {{ $order->status_label }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
+                                        <a href="{{ route('part-orders.edit', $order) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @else
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                        <p class="mb-2">No part orders yet</p>
+                        @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
+                        <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>Add First Part Order
+                        </a>
+                        @endif
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             {{-- Close main form/div before comments to avoid nested form issue --}}
             @if(auth()->user()->canEdit())
             </form>

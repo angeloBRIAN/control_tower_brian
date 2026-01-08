@@ -16,7 +16,7 @@ class PartOrder extends Model
         'part_number',
         'quantity',
         'rq',
-        'no_order_part_mbina',
+        'no_order_part',
         'notes',
         'order_date',
         'expected_date',

@@ -19,9 +19,9 @@ return new class extends Migration
             $table->string('part_name');
             $table->string('part_number')->nullable();
             $table->integer('quantity')->default(1);
-            $table->string('rq')->nullable(); // Requisition number
-            $table->string('no_order_part_mbina')->nullable(); // MBINA order number
-            $table->text('notes')->nullable(); // Notes/remarks (replaces lain_lain)
+            $table->string('rq')->nullable(); // Requisition document number
+            $table->string('no_order_part')->nullable(); // Part order number (any supplier)
+            $table->text('notes')->nullable(); // Notes/remarks
             
             // Dates
             $table->date('order_date');
