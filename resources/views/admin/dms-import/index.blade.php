@@ -161,4 +161,38 @@
         </div>
     </div>
 </div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
+     style="background: rgba(0,0,0,0.7); z-index: 9999;">
+    <div class="d-flex flex-column justify-content-center align-items-center h-100 text-white">
+        <div class="spinner-border text-light mb-3" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4 id="loadingText">Importing data...</h4>
+        <p class="text-muted">Please wait, this may take a few minutes for large files.</p>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form');
+    const overlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const fileInput = form.querySelector('input[type="file"]');
+            if (fileInput && fileInput.files.length > 0) {
+                const isCustomer = form.action.includes('customers');
+                loadingText.textContent = isCustomer ? 'Importing customers...' : 'Importing vehicles...';
+                overlay.classList.remove('d-none');
+            }
+        });
+    });
+});
+</script>
+@endpush
 @endsection
+
