@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DismissedDuplicateGroup;
 use App\Models\DropdownOption;
 use App\Models\Job;
+use App\Models\PartOrder;
 use App\Models\Vehicle;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,18 @@ class DashboardController extends Controller
                 ->get();
         });
 
+        // Parts tracking stats for sparepart role
+        $partsStats = null;
+        if (auth()->check() && in_array(auth()->user()->role, ['sparepart', 'admin'])) {
+            $partsStats = Cache::remember('dashboard_parts_stats', 120, function () {
+                return [
+                    'pending' => PartOrder::pending()->count(),
+                    'due_soon' => PartOrder::dueSoon(7)->count(),
+                    'overdue' => PartOrder::overdue()->count(),
+                ];
+            });
+        }
+
         return view('dashboard', [
             'stats' => $stats,
             'workStatusCounts' => $workStatusCounts,
@@ -99,6 +112,7 @@ class DashboardController extends Controller
             'chartData' => $chartData,
             'recentJobs' => $recentJobs,
             'needsPartsJobs' => $needsPartsJobs,
+            'partsStats' => $partsStats,
         ]);
     }
 
@@ -118,6 +132,7 @@ class DashboardController extends Controller
         Cache::forget('dashboard_chart_data');
         Cache::forget('dashboard_recent_jobs');
         Cache::forget('dashboard_needs_parts_jobs');
+        Cache::forget('dashboard_parts_stats');
     }
 
     /**
