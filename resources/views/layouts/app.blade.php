@@ -298,6 +298,11 @@
                             <i class="bi bi-database-fill"></i> Foremen
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('dms-customers.*') ? 'active' : '' }}" href="{{ route('dms-customers.index') }}">
+                            <i class="bi bi-people"></i> DMS Customers
+                        </a>
+                    </li>
                 </div>
                 @endif
 

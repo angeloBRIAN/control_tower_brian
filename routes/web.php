@@ -92,6 +92,10 @@ Route::middleware('auth')->group(function () {
     Route::get('customers/show', [\App\Http\Controllers\CustomerController::class, 'show'])->name('customers.show');
     Route::get('customers/search', [\App\Http\Controllers\CustomerController::class, 'search'])->name('customers.search');
 
+    // DMS Customers - Direct customer table (not job-based summaries)
+    Route::get('dms-customers', [\App\Http\Controllers\DmsCustomerController::class, 'index'])->name('dms-customers.index');
+    Route::get('dms-customers/{customer}', [\App\Http\Controllers\DmsCustomerController::class, 'show'])->name('dms-customers.show');
+
     // Reports - Everyone can view reports
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('uninvoiced', [ReportController::class, 'uninvoiced'])->name('uninvoiced');
