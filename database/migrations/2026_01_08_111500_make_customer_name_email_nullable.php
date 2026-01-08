@@ -8,13 +8,14 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     * Make name and email nullable for DMS imports where these fields may be empty
+     * Make name, email, and password nullable for DMS imports where these fields may be empty
      */
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
             $table->string('name')->nullable()->change();
             $table->string('email')->nullable()->change();
+            $table->string('password')->nullable()->change();
         });
     }
 
