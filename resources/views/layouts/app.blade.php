@@ -170,6 +170,30 @@
                     @endauth
                 </div>
 
+                {{-- Parts Tracking Menu (for sparepart role or admin) --}}
+                @auth
+                @if(Auth::user()->role === 'sparepart' || Auth::user()->role === 'admin')
+                @php
+                    $isPartsActive = request()->routeIs('parts.*') || request()->routeIs('part-orders.*');
+                @endphp
+                <div class="nav-section {{ $isPartsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#partsMenu" aria-expanded="{{ $isPartsActive ? 'true' : 'false' }}">
+                    <i class="bi bi-box-seam me-2"></i>Parts Tracking <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                </div>
+                <div class="collapse {{ $isPartsActive ? 'show' : '' }}" id="partsMenu">
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('parts.kanban') ? 'active' : '' }}" href="{{ route('parts.kanban') }}">
+                            <i class="bi bi-kanban"></i> Kanban Board
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('part-orders.index') ? 'active' : '' }}" href="{{ route('part-orders.index') }}">
+                            <i class="bi bi-list-ul"></i> All Orders
+                        </a>
+                    </li>
+                </div>
+                @endif
+                @endauth
+
                 @auth
                 @php
                     $recentJobs = \App\Models\RecentlyViewed::getRecentForUser(auth()->id(), 5);

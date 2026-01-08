@@ -70,6 +70,11 @@ class Kernel extends ConsoleKernel
         $schedule->command('customers:find-duplicates', ['--threshold' => 85])
             ->dailyAt('03:00')
             ->withoutOverlapping();
+            
+        // Parts fulfillment reminders (daily at 9 AM)
+        $schedule->command('parts:notify', ['--days' => 7])
+            ->dailyAt('09:00')
+            ->withoutOverlapping();
     }
 
     /**
