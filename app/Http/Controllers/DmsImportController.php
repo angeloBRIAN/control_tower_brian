@@ -8,14 +8,14 @@ use Illuminate\Support\Facades\Storage;
 
 class DmsImportController extends Controller
 {
-    public function __construct()
+    /**
+     * Check if user is admin
+     */
+    protected function authorizeAdmin(): void
     {
-        $this->middleware(function ($request, $next) {
-            if (auth()->user()->role !== 'admin') {
-                abort(403, 'Only administrators can access DMS import.');
-            }
-            return $next($request);
-        });
+        if (auth()->user()->role !== 'admin') {
+            abort(403, 'Only administrators can access DMS import.');
+        }
     }
 
     /**
@@ -23,6 +23,7 @@ class DmsImportController extends Controller
      */
     public function index()
     {
+        $this->authorizeAdmin();
         return view('admin.dms-import.index');
     }
 
@@ -31,6 +32,7 @@ class DmsImportController extends Controller
      */
     public function importCustomers(Request $request)
     {
+        $this->authorizeAdmin();
         $request->validate([
             'file' => 'required|file|mimes:xls,xlsx|max:10240',
         ]);
@@ -61,6 +63,8 @@ class DmsImportController extends Controller
      */
     public function importVehicles(Request $request)
     {
+        $this->authorizeAdmin();
+        
         $request->validate([
             'file' => 'required|file|mimes:xls,xlsx|max:10240',
         ]);
