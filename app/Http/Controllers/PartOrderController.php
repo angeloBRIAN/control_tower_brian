@@ -98,7 +98,7 @@ class PartOrderController extends Controller
             'status' => 'nullable|string',
         ]);
 
-        $validated['status'] = $validated['status'] ?? PartOrder::STATUS_ORDERED;
+        $validated['status'] = $validated['status'] ?? PartOrder::STATUS_PENDING;
         $validated['created_by'] = auth()->id();
         $validated['updated_by'] = auth()->id();
 

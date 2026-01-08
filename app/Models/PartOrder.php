@@ -33,20 +33,22 @@ class PartOrder extends Model
         'quantity' => 'integer',
     ];
 
-    // Status constants
-    const STATUS_ORDERED = 'ordered';
-    const STATUS_CONFIRMED = 'confirmed';
-    const STATUS_SHIPPED = 'shipped';
-    const STATUS_RECEIVED = 'received';
-    const STATUS_INSTALLED = 'installed';
+    // Status constants - workflow order
+    const STATUS_PENDING = 'pending';     // RQ created, waiting to order from supplier
+    const STATUS_ORDERED = 'ordered';     // Order placed with supplier (has no_order_part)
+    const STATUS_CONFIRMED = 'confirmed'; // Supplier confirmed the order
+    const STATUS_SHIPPED = 'shipped';     // Parts shipped
+    const STATUS_RECEIVED = 'received';   // Parts received at workshop
+    const STATUS_INSTALLED = 'installed'; // Parts installed on vehicle
     const STATUS_CANCELLED = 'cancelled';
 
     /**
-     * Get all available statuses
+     * Get all available statuses in workflow order
      */
     public static function getStatuses(): array
     {
         return [
+            self::STATUS_PENDING => ['label' => 'Pending', 'color' => '#f59e0b', 'icon' => 'bi-hourglass-split'],
             self::STATUS_ORDERED => ['label' => 'Ordered', 'color' => '#6b7280', 'icon' => 'bi-cart'],
             self::STATUS_CONFIRMED => ['label' => 'Confirmed', 'color' => '#3b82f6', 'icon' => 'bi-check-circle'],
             self::STATUS_SHIPPED => ['label' => 'Shipped', 'color' => '#8b5cf6', 'icon' => 'bi-truck'],

@@ -28,8 +28,8 @@ return new class extends Migration
             $table->date('expected_date');
             $table->date('received_date')->nullable();
             
-            // Status: ordered, confirmed, shipped, received, installed, cancelled
-            $table->string('status')->default('ordered');
+            // Status: pending (RQ stage), ordered, confirmed, shipped, received, installed, cancelled
+            $table->string('status')->default('pending');
             
             // Tracking
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
