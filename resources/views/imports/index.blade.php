@@ -35,7 +35,7 @@
                 <tr>
                     <td>{{ $import->created_at->format('d/m/Y H:i') }}</td>
                     <td>{{ $import->file_name }}</td>
-                    <td><span class="badge bg-info">{{ ucfirst($import->import_type) }}</span></td>
+                    <td><span class="badge bg-{{ $import->type_color }}">{{ $import->type_label }}</span></td>
                     <td class="text-center"><span class="badge bg-success">{{ $import->records_imported }}</span></td>
                     <td class="text-center"><span class="badge bg-primary">{{ $import->records_updated }}</span></td>
                     <td class="text-center">
@@ -45,7 +45,7 @@
                             <span class="badge bg-secondary">0</span>
                         @endif
                     </td>
-                    <td>{{ $import->imported_by ?? '-' }}</td>
+                    <td>{{ $import->user->name ?? '-' }}</td>
                     <td>
                         <a href="{{ route('imports.show', $import) }}" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-eye"></i> Details

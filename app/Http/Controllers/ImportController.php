@@ -24,7 +24,7 @@ class ImportController extends Controller
 
     public function index()
     {
-        $imports = Import::latest()->paginate(20);
+        $imports = Import::with('user')->latest()->paginate(20);
         return view('imports.index', compact('imports'));
     }
 

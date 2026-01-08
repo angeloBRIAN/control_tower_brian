@@ -162,6 +162,54 @@
     </div>
 </div>
 
+@if(Auth::user()->role === 'admin')
+<!-- DMS Imports - Admin Only -->
+<h5 class="mt-4 mb-3"><i class="bi bi-database me-2"></i>DMS Master Data Import <span class="badge bg-danger">Admin Only</span></h5>
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100 border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-people me-2"></i>Import DMS Customers
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Import customer master data from DMS.</p>
+                <form action="{{ route('admin.dms-import.customers') }}" method="POST" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <div class="mb-3">
+                        <input type="file" name="file" class="form-control" accept=".xls,.xlsx" required>
+                        <div class="form-text">Expected: Magic cust, Nama Customer, Address 1-5, Company, Email</div>
+                    </div>
+                    <button type="submit" class="btn btn-info w-100 text-white">
+                        <i class="bi bi-upload me-1"></i>Import Customers
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100 border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-truck me-2"></i>Import DMS Vehicles
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Import vehicle master data from DMS. Phones sync to customers.</p>
+                <form action="{{ route('admin.dms-import.vehicles') }}" method="POST" enctype="multipart/form-data" class="import-form">
+                    @csrf
+                    <div class="mb-3">
+                        <input type="file" name="file" class="form-control" accept=".xls,.xlsx" required>
+                        <div class="form-text">Expected: Magic, Reg No, Model, Chassis, Customer Magic, Phone1-4</div>
+                    </div>
+                    <button type="submit" class="btn btn-secondary w-100">
+                        <i class="bi bi-upload me-1"></i>Import Vehicles
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="card mt-4">
     <div class="card-header">
         <i class="bi bi-info-circle me-2"></i>Import Instructions

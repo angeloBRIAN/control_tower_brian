@@ -49,12 +49,12 @@ class DmsImportController extends Controller
             // Clean up temp file
             Storage::delete($path);
 
-            return redirect()->route('admin.dms-import.index')
+            return redirect()->route('imports.index')
                 ->with('success', "Customer import complete: {$results['created']} created, {$results['updated']} updated")
                 ->with('import_results', $results);
 
         } catch (\Exception $e) {
-            return redirect()->route('admin.dms-import.index')
+            return redirect()->route('imports.upload')
                 ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
@@ -82,12 +82,12 @@ class DmsImportController extends Controller
             // Clean up temp file
             Storage::delete($path);
 
-            return redirect()->route('admin.dms-import.index')
+            return redirect()->route('imports.index')
                 ->with('success', "Vehicle import complete: {$results['created']} created, {$results['updated']} updated")
                 ->with('import_results', $results);
 
         } catch (\Exception $e) {
-            return redirect()->route('admin.dms-import.index')
+            return redirect()->route('imports.upload')
                 ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
