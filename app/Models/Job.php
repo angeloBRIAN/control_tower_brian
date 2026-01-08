@@ -237,6 +237,22 @@ class Job extends Model
     }
 
     /**
+     * Get all part orders for this job
+     */
+    public function partOrders(): HasMany
+    {
+        return $this->hasMany(PartOrder::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get pending part orders count
+     */
+    public function getPendingPartOrdersCountAttribute(): int
+    {
+        return $this->partOrders()->pending()->count();
+    }
+
+    /**
      * Get total invoice amount (sum of all invoices minus credit notes)
      */
     public function getTotalInvoiceAmountAttribute(): float
