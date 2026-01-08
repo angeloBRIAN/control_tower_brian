@@ -144,7 +144,7 @@ class DmsImportService
             'address_4' => $this->getValue($row, $map, 'address 4'),
             'address_5' => $this->getValue($row, $map, 'address 5'),
             'company_name' => $this->getValue($row, $map, 'company name'),
-            'email' => $this->getValue($row, $map, 'e-mail address'),
+            'email' => $this->cleanEmail($this->getValue($row, $map, 'e-mail address')),
             'department' => $this->getValue($row, $map, 'dept'),
             'dms_created_at' => $this->parseDate($this->getValue($row, $map, 'date created')),
             'dms_imported_at' => now(),
@@ -171,6 +171,30 @@ class DmsImportService
             Customer::create($data);
             $this->created++;
         }
+    }
+
+    /**
+     * Clean email - remove placeholder values
+     */
+    protected function cleanEmail(?string $email): ?string
+    {
+        if (!$email) return null;
+        
+        $email = trim($email);
+        
+        // List of invalid placeholder emails
+        $invalidEmails = ['*', '-', 'c/s', 'n/a', 'na', 'none', 'null', '.', '..', '@', '-@-', '*@*'];
+        
+        if (in_array(strtolower($email), $invalidEmails)) {
+            return null;
+        }
+        
+        // Must contain @ to be a valid email
+        if (!str_contains($email, '@')) {
+            return null;
+        }
+        
+        return $email;
     }
 
     /**
