@@ -82,30 +82,35 @@
 <!-- Workflow Guide -->
 <div class="alert alert-light border mb-4">
     <h5 class="mb-3"><i class="bi bi-diagram-3 me-2"></i>Recommended Import Workflow</h5>
-    <div class="d-flex align-items-center flex-wrap gap-3">
+    <div class="d-flex align-items-center flex-wrap gap-2">
         <div class="d-flex align-items-center">
-            <span class="badge bg-primary rounded-pill me-2" style="width: 28px; height: 28px; line-height: 20px;">1</span>
-            <span class="text-muted">DMS Customers</span>
+            <span class="badge bg-primary rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">1</span>
+            <span class="text-muted small">DMS Customers</span>
         </div>
         <i class="bi bi-arrow-right text-muted"></i>
         <div class="d-flex align-items-center">
-            <span class="badge bg-primary rounded-pill me-2" style="width: 28px; height: 28px; line-height: 20px;">2</span>
-            <span class="text-muted">DMS Vehicles</span>
+            <span class="badge bg-primary rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">2</span>
+            <span class="text-muted small">DMS Vehicles</span>
         </div>
         <i class="bi bi-arrow-right text-muted"></i>
         <div class="d-flex align-items-center">
-            <span class="badge bg-warning text-dark rounded-pill me-2" style="width: 28px; height: 28px; line-height: 20px;">3</span>
-            <span class="text-muted">Uninvoiced Jobs</span>
+            <span class="badge bg-secondary rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">3</span>
+            <span class="text-muted small">Progress Jobs</span>
         </div>
         <i class="bi bi-arrow-right text-muted"></i>
         <div class="d-flex align-items-center">
-            <span class="badge bg-success rounded-pill me-2" style="width: 28px; height: 28px; line-height: 20px;">4</span>
-            <span class="text-muted">Invoiced Jobs</span>
+            <span class="badge bg-warning text-dark rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">4</span>
+            <span class="text-muted small">Uninvoiced</span>
+        </div>
+        <i class="bi bi-arrow-right text-muted"></i>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-success rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">5</span>
+            <span class="text-muted small">Invoiced</span>
         </div>
         <i class="bi bi-arrow-right text-muted d-none d-lg-block"></i>
         <div class="d-flex align-items-center d-none d-lg-flex">
-            <span class="badge bg-info rounded-pill me-2" style="width: 28px; height: 28px; line-height: 20px;">5</span>
-            <span class="text-muted">Refresh Summaries</span>
+            <span class="badge bg-info rounded-pill me-1" style="width: 24px; height: 24px; line-height: 18px; font-size: 11px;">6</span>
+            <span class="text-muted small">Refresh Summaries</span>
         </div>
     </div>
 </div>
@@ -168,25 +173,54 @@
     </div>
 </div>
 
-<!-- Step 3-4: Job Data -->
+<!-- Step 3-5: Job Data -->
 <div class="card mb-4">
     <div class="card-header bg-dark text-white d-flex align-items-center justify-content-between">
         <span>
-            <span class="badge bg-white text-dark me-2 rounded-pill">Step 3-4</span>
+            <span class="badge bg-white text-dark me-2 rounded-pill">Step 3-5</span>
             <i class="bi bi-briefcase me-2"></i>Job Data Import
         </span>
         <small class="opacity-75">Jobs will auto-link to DMS customers</small>
     </div>
     <div class="card-body">
         <div class="row g-4">
-            <div class="col-md-6">
+            <!-- Step 3: Progress Jobs -->
+            <div class="col-md-4">
+                <div class="card h-100 border-secondary">
+                    <div class="card-header bg-secondary text-white">
+                        <span class="badge bg-white text-secondary me-2">3</span>
+                        <i class="bi bi-clipboard-check me-2"></i>Import Progress Jobs
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-2">Import PROGRES JOB file. Creates new jobs or updates existing ones.</p>
+                        <form action="{{ route('imports.preview') }}" method="POST" enctype="multipart/form-data" class="import-form">
+                            @csrf
+                            <input type="hidden" name="import_type" value="progress">
+                            <div class="mb-3">
+                                <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.ods,.csv" required>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-secondary flex-grow-1">
+                                    <i class="bi bi-eye me-1"></i>Preview
+                                </button>
+                                <button type="button" class="btn btn-outline-dark" onclick="directImport(this.form, 'progress')" title="Skip preview">
+                                    <i class="bi bi-lightning"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Uninvoiced -->
+            <div class="col-md-4">
                 <div class="card h-100 border-warning">
                     <div class="card-header bg-warning text-dark">
-                        <span class="badge bg-dark text-warning me-2">3</span>
+                        <span class="badge bg-dark text-warning me-2">4</span>
                         <i class="bi bi-exclamation-triangle me-2"></i>Import Uninvoiced Jobs
                     </div>
                     <div class="card-body">
-                        <p class="text-muted mb-2">Import uninvoiced job report from DMS (uiws.xls). Auto-links to customers.</p>
+                        <p class="text-muted mb-2">Import uninvoiced job report from DMS (uiws.xls).</p>
                         <form action="{{ route('imports.uninvoiced') }}" method="POST" enctype="multipart/form-data" class="import-form">
                             @csrf
                             <div class="mb-3">
@@ -207,14 +241,15 @@
                 </div>
             </div>
 
-            <div class="col-md-6">
+            <!-- Step 5: Invoiced -->
+            <div class="col-md-4">
                 <div class="card h-100 border-success">
                     <div class="card-header bg-success text-white">
-                        <span class="badge bg-white text-success me-2">4</span>
+                        <span class="badge bg-white text-success me-2">5</span>
                         <i class="bi bi-check-circle me-2"></i>Import Invoiced Jobs
                     </div>
                     <div class="card-body">
-                        <p class="text-muted mb-2">Import invoiced job data (INV sheet). Marks jobs as invoiced, links to customers.</p>
+                        <p class="text-muted mb-2">Import invoiced job data (INV sheet). Marks jobs as invoiced.</p>
                         <form action="{{ route('imports.invoiced') }}" method="POST" enctype="multipart/form-data" class="import-form">
                             @csrf
                              <div class="mb-3">
@@ -238,11 +273,11 @@
     </div>
 </div>
 
-<!-- Step 5: Refresh -->
+<!-- Step 6: Refresh -->
 <div class="card mb-4">
     <div class="card-header bg-info text-white d-flex align-items-center justify-content-between">
         <span>
-            <span class="badge bg-white text-info me-2 rounded-pill">Step 5</span>
+            <span class="badge bg-white text-info me-2 rounded-pill">Step 6</span>
             <i class="bi bi-arrow-repeat me-2"></i>Refresh Customer Summaries
         </span>
         <small class="opacity-75">Run after all imports to update Customer Lookup</small>
@@ -260,39 +295,6 @@
             </div>
         </div>
     </div>
-</div>
-
-<!-- Optional: Progress Import -->
-<div class="card mb-4">
-    <div class="card-header bg-light d-flex align-items-center justify-content-between">
-        <span>
-            <i class="bi bi-clipboard-check me-2"></i>Import Progress Data
-            <span class="badge bg-secondary ms-2">Alternative</span>
-        </span>
-        <small class="text-muted">For PROGRES JOB files (creates new jobs)</small>
-    </div>
-    <div class="card-body">
-        <p class="text-muted mb-3">Import job progress data from PROGRES JOB file. This will create new jobs or update existing ones.</p>
-        <form action="{{ route('imports.preview') }}" method="POST" enctype="multipart/form-data" class="import-form">
-            @csrf
-            <input type="hidden" name="import_type" value="progress">
-            <div class="row">
-                <div class="col-md-8">
-                    <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.ods,.csv" required>
-                </div>
-                <div class="col-md-4">
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary flex-grow-1">
-                            <i class="bi bi-eye me-1"></i>Preview
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="directImport(this.form, 'progress')" title="Skip preview">
-                                <i class="bi bi-lightning"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div>
 </div>
 
 <div class="card">
