@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Helpers\CustomerNameHelper;
 use App\Models\Customer;
 use App\Models\CustomerAlias;
 use App\Models\CustomerSummary;
@@ -36,12 +37,32 @@ class RefreshCustomerSummaries extends Command
         $this->info("Found " . count($namesFromActivity) . " customers from jobs/vehicles.");
         $this->info("Found " . $dmsCustomers->count() . " DMS-imported customers.");
 
-        // Cache customer lookups for efficiency
-        $customersByName = $dmsCustomers->keyBy(fn($c) => strtoupper(trim($c->name)));
+        // Build lookup maps using NORMALIZED names for better matching
+        // Key by normalized name, value is customer
+        $customersByNormalizedName = [];
+        $customersByExactName = [];
+        foreach ($dmsCustomers as $customer) {
+            $normalized = CustomerNameHelper::normalize($customer->name);
+            $exact = strtoupper(trim($customer->name));
+            
+            // Also consider name + title for matching
+            if ($customer->title) {
+                $withTitle = strtoupper(trim($customer->title . ' ' . $customer->name));
+                $customersByExactName[$withTitle] = $customer;
+            }
+            
+            $customersByNormalizedName[$normalized] = $customer;
+            $customersByExactName[$exact] = $customer;
+        }
         
-        $aliasMap = CustomerAlias::with('customer')
-            ->get()
-            ->keyBy(fn($a) => strtoupper(trim($a->alias_name)));
+        // Build alias map with normalized keys  
+        $aliasMap = [];
+        foreach (CustomerAlias::with('customer')->get() as $alias) {
+            $normalized = CustomerNameHelper::normalize($alias->alias_name);
+            $exact = strtoupper(trim($alias->alias_name));
+            $aliasMap[$normalized] = $alias->customer;
+            $aliasMap[$exact] = $alias->customer;
+        }
 
         // Process customers with job/vehicle activity
         $processedNames = [];
@@ -58,13 +79,21 @@ class RefreshCustomerSummaries extends Command
             $totalSales = Job::where('customer_name', $name)->where('status', 'invoiced')->sum('inv_ppn_meterai') ?? 0;
             $estimatedSales = Job::where('customer_name', $name)->where('status', 'uninvoiced')->sum('total_sales') ?? 0;
 
-            // Try to find linked customer
-            $normalizedName = strtoupper(trim($name));
-            $customer = $customersByName->get($normalizedName);
+            // Try to find linked customer using multiple strategies
+            $exactName = strtoupper(trim($name));
+            $normalizedName = CustomerNameHelper::normalize($name);
             
-            // Try alias if no direct match
-            if (!$customer && $aliasMap->has($normalizedName)) {
-                $customer = $aliasMap->get($normalizedName)->customer;
+            // 1. Try exact match first
+            $customer = $customersByExactName[$exactName] ?? null;
+            
+            // 2. Try normalized match
+            if (!$customer) {
+                $customer = $customersByNormalizedName[$normalizedName] ?? null;
+            }
+            
+            // 3. Try alias match (both exact and normalized)
+            if (!$customer) {
+                $customer = $aliasMap[$exactName] ?? $aliasMap[$normalizedName] ?? null;
             }
 
             $batch[] = [

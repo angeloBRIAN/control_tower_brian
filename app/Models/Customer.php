@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Notifications\Notifiable;
 
@@ -15,6 +16,8 @@ class Customer extends Authenticatable
 
     protected $fillable = [
         'name',
+        'title',
+        'company_id',
         'email',
         'phone',
         'address',
@@ -27,7 +30,7 @@ class Customer extends Authenticatable
         'dms_magic',
         'address_1', 'address_2', 'address_3', 'address_4', 'address_5',
         'company_name', 'department',
-        'phone_1', 'phone_2', 'phone_3', 'phone_4',
+        'phone_1', 'phone_2', 'phone_3', 'phone_4', 'phone_notes',
         'dms_created_at', 'dms_imported_at',
     ];
 
@@ -40,7 +43,26 @@ class Customer extends Authenticatable
     protected $casts = [
         'verified' => 'boolean',
         'email_verified_at' => 'datetime',
+        'dms_created_at' => 'date',
+        'dms_imported_at' => 'datetime',
     ];
+
+    /**
+     * Company this customer belongs to
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Get full name with title
+     */
+    public function getFullNameAttribute(): string
+    {
+        $parts = array_filter([$this->title, $this->name]);
+        return implode(' ', $parts);
+    }
 
     /**
      * Vehicles owned by this customer (via pivot table - customer portal)

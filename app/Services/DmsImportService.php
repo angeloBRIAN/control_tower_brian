@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Vehicle;
 use App\Models\AuditLog;
@@ -16,6 +17,7 @@ class DmsImportService
     protected int $created = 0;
     protected int $updated = 0;
     protected int $errors = 0;
+    protected int $companiesCreated = 0;
     protected array $errorMessages = [];
     protected ?string $fileName = null;
 
@@ -146,17 +148,57 @@ class DmsImportService
             return; // Skip rows without magic ID
         }
 
+        // Get title field
+        $title = $this->getValue($row, $map, 'title');
+        
+        // Look up or create company if magic_comp exists
+        $magicComp = $this->getValue($row, $map, 'magic comp');
+        $companyId = null;
+        $companyName = $this->getValue($row, $map, 'company name');
+        
+        if ($magicComp && $magicComp != '0' && !empty($companyName)) {
+            $company = Company::firstOrCreate(
+                ['dms_magic' => (string) $magicComp],
+                [
+                    'name' => $companyName,
+                    'dms_imported_at' => now(),
+                ]
+            );
+            $companyId = $company->id;
+            if ($company->wasRecentlyCreated) {
+                $this->companiesCreated++;
+            }
+        }
+
+        // Sanitize phone numbers
+        $phone1 = $this->sanitizePhone($this->getValue($row, $map, 'telp 01'));
+        $phone2 = $this->sanitizePhone($this->getValue($row, $map, 'telp 02'));
+        $phone3 = $this->sanitizePhone($this->getValue($row, $map, 'telp 03'));
+        $phone4 = $this->sanitizePhone($this->getValue($row, $map, 'telp 04'));
+        
+        // Collect phone notes
+        $phoneNotes = array_filter([
+            $phone1['note'], $phone2['note'], $phone3['note'], $phone4['note']
+        ]);
+
         $data = [
             'dms_magic' => (string) $dmsMagic,
             'name' => $this->getValue($row, $map, ' nama customer') ?: $this->getValue($row, $map, 'nama customer'),
+            'title' => $title,
+            'company_id' => $companyId,
+            'company_name' => $companyName,
             'address_1' => $this->getValue($row, $map, 'address 1'),
             'address_2' => $this->getValue($row, $map, 'address 2'),
             'address_3' => $this->getValue($row, $map, 'address 3'),
             'address_4' => $this->getValue($row, $map, 'address 4'),
             'address_5' => $this->getValue($row, $map, 'address 5'),
-            'company_name' => $this->getValue($row, $map, 'company name'),
             'email' => $this->cleanEmail($this->getValue($row, $map, 'e-mail address')),
             'department' => $this->getValue($row, $map, 'dept'),
+            'phone_1' => $phone1['phone'],
+            'phone_2' => $phone2['phone'],
+            'phone_3' => $phone3['phone'],
+            'phone_4' => $phone4['phone'],
+            'phone_notes' => !empty($phoneNotes) ? implode('; ', $phoneNotes) : null,
             'dms_created_at' => $this->parseDate($this->getValue($row, $map, 'date created')),
             'dms_imported_at' => now(),
         ];
@@ -182,6 +224,29 @@ class DmsImportService
             Customer::create($data);
             $this->created++;
         }
+    }
+
+    /**
+     * Sanitize phone number - extract valid phone, store notes separately
+     */
+    protected function sanitizePhone($value): array
+    {
+        if (empty($value) || in_array(strtolower(trim($value)), ['-', '0', 'n/a', 'na', '.', '..'])) {
+            return ['phone' => null, 'note' => null];
+        }
+
+        $original = trim($value);
+        
+        // Extract digits and leading +
+        $clean = preg_replace('/[^0-9+]/', '', $original);
+        
+        // Must be at least 8 digits to be a valid phone
+        if (strlen(preg_replace('/[^0-9]/', '', $clean)) >= 8) {
+            return ['phone' => $clean, 'note' => null];
+        }
+        
+        // Not a valid phone - store as note if it has content
+        return ['phone' => null, 'note' => strlen($original) > 1 ? $original : null];
     }
 
     /**

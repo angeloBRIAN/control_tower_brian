@@ -32,22 +32,46 @@ class CustomerAlias extends Model
     }
 
     /**
-     * Find customer by name or alias
+     * Find customer by name or alias - uses normalized matching
      */
     public static function findCustomerByName(string $name): ?Customer
     {
-        $normalizedName = strtoupper(trim($name));
+        $exactName = strtoupper(trim($name));
+        $normalizedName = \App\Helpers\CustomerNameHelper::normalize($name);
         
-        // First try exact match on customers table
-        $customer = Customer::whereRaw('UPPER(name) = ?', [$normalizedName])->first();
+        // 1. Try exact match on customers table
+        $customer = Customer::whereRaw('UPPER(name) = ?', [$exactName])->first();
         if ($customer) {
             return $customer;
         }
         
-        // Then try alias table
-        $alias = self::whereRaw('UPPER(alias_name) = ?', [$normalizedName])->first();
+        // 2. Try normalized match (e.g., "PT ABC" matches "ABC" with title="PT")
+        $allCustomers = Customer::whereNotNull('name')->get();
+        foreach ($allCustomers as $c) {
+            if (\App\Helpers\CustomerNameHelper::normalize($c->name) === $normalizedName) {
+                return $c;
+            }
+            // Also try with title + name
+            if ($c->title) {
+                $fullName = strtoupper(trim($c->title . ' ' . $c->name));
+                if ($fullName === $exactName) {
+                    return $c;
+                }
+            }
+        }
+        
+        // 3. Try alias table (exact first, then normalized)
+        $alias = self::whereRaw('UPPER(alias_name) = ?', [$exactName])->first();
         if ($alias) {
             return $alias->customer;
+        }
+        
+        // Normalized alias match
+        $allAliases = self::with('customer')->get();
+        foreach ($allAliases as $a) {
+            if (\App\Helpers\CustomerNameHelper::normalize($a->alias_name) === $normalizedName) {
+                return $a->customer;
+            }
         }
         
         return null;
