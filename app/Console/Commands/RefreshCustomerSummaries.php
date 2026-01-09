@@ -68,8 +68,8 @@ class RefreshCustomerSummaries extends Command
         $this->info("Found " . count($namesFromActivity) . " unique names from jobs/vehicles.");
 
         // Build aggregated data by customer_id
-        // Key: customer_id (or 'unlinked_' + name for unlinked)
         $aggregated = [];
+        $unlinkedNames = []; // Track unlinked for reporting
         
         $bar = $this->output->createProgressBar(count($namesFromActivity));
         $bar->start();
@@ -123,23 +123,10 @@ class RefreshCustomerSummaries extends Command
                 $aggregated[$key]['estimated_sales'] += $estimatedSales;
                 $aggregated[$key]['name_variations'][] = $name;
             } else {
-                // Unlinked - keep separate entry
-                $key = 'unlinked_' . md5($name);
-                $aggregated[$key] = [
-                    'name' => $name,
-                    'customer_id' => null,
-                    'dms_magic' => null,
-                    'email' => null,
-                    'phone' => null,
-                    'company_name' => null,
-                    'vehicle_count' => $vehicleCount,
-                    'job_count' => $uninvoicedCount + $invoicedCount,
-                    'uninvoiced_count' => $uninvoicedCount,
-                    'invoiced_count' => $invoicedCount,
-                    'total_sales' => $totalSales,
-                    'estimated_sales' => $estimatedSales,
-                    'name_variations' => [$name],
-                ];
+                // Unlinked - skip (don't create separate entry)
+                // Track for reporting only
+                $unlinkedNames[] = $name;
+                continue;
             }
 
             $bar->advance();
@@ -202,11 +189,21 @@ class RefreshCustomerSummaries extends Command
         }
 
         $totalCount = CustomerSummary::count();
-        $linkedCount = CustomerSummary::whereNotNull('customer_id')->count();
-        $unlinkedCount = CustomerSummary::whereNull('customer_id')->count();
         
         $this->info("Customer summaries refreshed!");
-        $this->info("Total: {$totalCount} | DMS Linked: {$linkedCount} | Unlinked: {$unlinkedCount} | DMS-only: {$dmsOnlyCount}");
+        $this->info("DMS Customers: {$totalCount} | With Activity: " . ($totalCount - $dmsOnlyCount) . " | DMS-only: {$dmsOnlyCount}");
+        
+        if (count($unlinkedNames) > 0) {
+            $this->warn("Unlinked job names skipped: " . count($unlinkedNames) . " (names from jobs/vehicles not matched to any DMS customer)");
+            // Show first 10 unlinked names as examples
+            $examples = array_slice($unlinkedNames, 0, 10);
+            foreach ($examples as $name) {
+                $this->line("  - " . $name);
+            }
+            if (count($unlinkedNames) > 10) {
+                $this->line("  ... and " . (count($unlinkedNames) - 10) . " more");
+            }
+        }
 
         return Command::SUCCESS;
     }
