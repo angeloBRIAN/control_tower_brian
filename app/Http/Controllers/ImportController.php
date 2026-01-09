@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CustomerAlias;
 use App\Models\Import;
 use App\Models\Job;
 use App\Models\JobActivity;
@@ -617,6 +618,8 @@ class ImportController extends Controller
         $imported = 0;
         $updated = 0;
         $failed = 0;
+        $customersLinked = 0;
+        $customersUnlinked = [];
         $importedJobIds = [];
         $failedRows = [];
         $conflictRows = [];
@@ -669,6 +672,19 @@ class ImportController extends Controller
                     ? implode("\n", $addressParts) 
                     : $this->getColumnValue($row, $headerMap, ['customer address', 'alamat', 'address', 'alamat customer']);
                 
+                // Find linked DMS customer
+                $linkedCustomer = null;
+                $customerId = null;
+                if (!empty($customerName)) {
+                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName);
+                    if ($linkedCustomer) {
+                        $customerId = $linkedCustomer->id;
+                        $customersLinked++;
+                    } else {
+                        $customersUnlinked[$customerName] = ($customersUnlinked[$customerName] ?? 0) + 1;
+                    }
+                }
+
                 $jobData = [
                     'franchise' => $franchise,
                     'job_card' => $this->getColumnValue($row, $headerMap, [
@@ -676,6 +692,7 @@ class ImportController extends Controller
                     ]),
                     'plate_number' => $plateNumber,
                     'customer_name' => $customerName,
+                    'customer_id' => $customerId,
                     'customer_address' => $customerAddress,
                     'unit_type' => $this->getColumnValue($row, $headerMap, [
                         'type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit'
@@ -864,6 +881,7 @@ class ImportController extends Controller
                             'is_in_workshop' => true,
                             'model' => $unitType,
                             'customer_name' => $customerName ?? null,
+                            'customer_id' => $customerId ?? null,
                         ], fn($v) => !is_null($v))
                     );
                 }
@@ -888,10 +906,17 @@ class ImportController extends Controller
             'records_failed' => $failed,
             'failed_rows' => $failedRows,
             'conflict_rows' => $conflictRows,
+            'customers_linked' => $customersLinked,
+            'customers_unlinked' => array_keys($customersUnlinked),
         ]);
 
+        $unlinkedCount = count($customersUnlinked);
+        $linkingMsg = $customersLinked > 0 || $unlinkedCount > 0 
+            ? " Customer linking: {$customersLinked} linked, {$unlinkedCount} unlinked."
+            : "";
+
         return redirect()->route('imports.show', $import)
-            ->with('success', "Import completed: {$imported} new, {$updated} updated, {$failed} failed.");
+            ->with('success', "Import completed: {$imported} new, {$updated} updated, {$failed} failed.{$linkingMsg}");
     }
 
     public function importInvoiced(Request $request)
@@ -930,6 +955,8 @@ class ImportController extends Controller
         $imported = 0;
         $updated = 0;
         $failed = 0;
+        $customersLinked = 0;
+        $customersUnlinked = [];
         $failedRows = [];
         $conflictRows = [];
         $maxFailedRows = 100;
@@ -979,6 +1006,20 @@ class ImportController extends Controller
                 // Get other fields from the invoice report
                 $plateNumber = $this->getColumnValue($row, $headerMap, ['reg no', 'vehicle no', 'no polisi', 'nopol']);
                 $customerName = $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama customer']);
+                
+                // Find linked DMS customer
+                $linkedCustomer = null;
+                $customerId = null;
+                if (!empty($customerName)) {
+                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName);
+                    if ($linkedCustomer) {
+                        $customerId = $linkedCustomer->id;
+                        $customersLinked++;
+                    } else {
+                        $customersUnlinked[$customerName] = ($customersUnlinked[$customerName] ?? 0) + 1;
+                    }
+                }
+
                 $chassisNumber = $this->getColumnValue($row, $headerMap, ['chassis number', 'chassis', 'no rangka']);
                 $accountNo = $this->getColumnValue($row, $headerMap, ['account', 'account no', 'akun']);
                 $typeSale = $this->getColumnValue($row, $headerMap, ['type sale', 'tipe sale', 'jenis']);
@@ -1009,6 +1050,7 @@ class ImportController extends Controller
                     'date_in' => $dateIn,
                     'date_out' => $dateOut,
                     'chassis_number' => $chassisNumber,
+                    'customer_id' => $customerId,
                     'status' => 'invoiced',
                     'invoiced_at' => $invoiceDate ?? now(),
                     // Set work_status to menunggu_pembayaran for regular invoices, skip for CN
@@ -1198,6 +1240,7 @@ class ImportController extends Controller
                         ['plate_number' => $plateNumber],
                         array_filter([
                             'customer_name' => $customerName,
+                            'customer_id' => $customerId,
                             'vin' => $chassisNumber, // Add chassis number as VIN
                             'import_id' => $importId,
                             // Don't set is_in_workshop - user should update manually after invoice
@@ -1227,10 +1270,17 @@ class ImportController extends Controller
             'records_failed' => $failed,
             'failed_rows' => $failedRows,
             'conflict_rows' => $conflictRows,
+            'customers_linked' => $customersLinked,
+            'customers_unlinked' => array_keys($customersUnlinked),
         ]);
 
+        $unlinkedCount = count($customersUnlinked);
+        $linkingMsg = $customersLinked > 0 || $unlinkedCount > 0 
+            ? " Customer linking: {$customersLinked} linked, {$unlinkedCount} unlinked."
+            : "";
+
         return redirect()->route('imports.show', $import)
-            ->with('success', "Import completed: {$imported} new, {$updated} updated as invoiced, {$failed} failed.");
+            ->with('success', "Import completed: {$imported} new, {$updated} updated as invoiced, {$failed} failed.{$linkingMsg}");
     }
 
     private function getColumnValue(array $row, array $headerMap, array $possibleNames): ?string
