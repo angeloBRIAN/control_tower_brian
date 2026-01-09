@@ -6,7 +6,7 @@
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
         <h1><i class="bi bi-people me-2"></i>Customer Lookup</h1>
-        <p class="text-muted">{{ number_format($totalCustomers) }} unique customers found</p>
+        <p class="text-muted mb-0">{{ number_format($totalCustomers) }} customers @if($dmsLinkedCount > 0)<span class="badge bg-info">{{ $dmsLinkedCount }} DMS linked</span>@endif</p>
     </div>
     <a href="{{ route('customers.duplicates') }}" class="btn btn-warning">
         <i class="bi bi-arrow-left-right me-1"></i>Merge Duplicates
@@ -25,6 +25,8 @@
                     <option value="with_uninvoiced" {{ request('filter') == 'with_uninvoiced' ? 'selected' : '' }}>With Uninvoiced</option>
                     <option value="with_sales" {{ request('filter') == 'with_sales' ? 'selected' : '' }}>With Sales</option>
                     <option value="multi_vehicle" {{ request('filter') == 'multi_vehicle' ? 'selected' : '' }}>Multi Vehicles</option>
+                    <option value="dms_linked" {{ request('filter') == 'dms_linked' ? 'selected' : '' }}>DMS Linked</option>
+                    <option value="not_linked" {{ request('filter') == 'not_linked' ? 'selected' : '' }}>Not Linked</option>
                 </select>
             </div>
             <div class="col-md-4 d-flex gap-1">
@@ -72,6 +74,8 @@
                         <th data-col="no">#</th>
                         @foreach([
                             'name' => 'Customer Name',
+                            'dms' => 'DMS',
+                            'contact' => 'Contact',
                             'vehicles' => 'Vehicles',
                             'jobs' => 'Total Jobs',
                             'uninvoiced' => 'Uninvoiced',
@@ -109,6 +113,30 @@
                             <a href="{{ route('customers.show', ['name' => $customer->name]) }}" class="fw-bold text-primary">
                                 {{ $customer->name }}
                             </a>
+                            @if($customer->is_dms_linked)
+                            <span class="badge bg-info ms-1" title="DMS Linked"><i class="bi bi-link-45deg"></i></span>
+                            @endif
+                            @if($customer->company_name)
+                            <div class="small text-muted">{{ Str::limit($customer->company_name, 30) }}</div>
+                            @endif
+                        </td>
+                        <td data-col="dms">
+                            @if($customer->dms_magic)
+                            <span class="badge bg-secondary">{{ $customer->dms_magic }}</span>
+                            @else
+                            <span class="text-muted">-</span>
+                            @endif
+                        </td>
+                        <td data-col="contact">
+                            @if($customer->email)
+                            <div class="small text-truncate" style="max-width: 150px;" title="{{ $customer->email }}"><i class="bi bi-envelope me-1"></i>{{ $customer->email }}</div>
+                            @endif
+                            @if($customer->phone)
+                            <div class="small"><i class="bi bi-phone me-1"></i>{{ $customer->phone }}</div>
+                            @endif
+                            @if(!$customer->email && !$customer->phone)
+                            <span class="text-muted">-</span>
+                            @endif
                         </td>
                         <td data-col="vehicles" class="text-center">
                             <span class="badge bg-info">{{ $customer->vehicle_count }}</span>
@@ -169,8 +197,8 @@
 @push('scripts')
 @php
     $defaultPrefs = [
-        'columns' => ['no' => true, 'name' => true, 'vehicles' => true, 'jobs' => true, 'uninvoiced' => true, 'sales' => true, 'actions' => true],
-        'order' => ['no', 'name', 'vehicles', 'jobs', 'uninvoiced', 'sales', 'actions'],
+        'columns' => ['no' => true, 'name' => true, 'dms' => true, 'contact' => true, 'vehicles' => true, 'jobs' => true, 'uninvoiced' => true, 'sales' => true, 'actions' => true],
+        'order' => ['no', 'name', 'dms', 'contact', 'vehicles', 'jobs', 'uninvoiced', 'sales', 'actions'],
         'widths' => [],
         'sort' => 'name',
         'dir' => 'asc'
@@ -190,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const userSort = @json($userSort);
     const userDir = @json($userDir);
     const columnLabels = {
-        'no': '#', 'name': 'Customer Name', 'vehicles': 'Vehicles', 'jobs': 'Total Jobs',
+        'no': '#', 'name': 'Customer Name', 'dms': 'DMS', 'contact': 'Contact', 'vehicles': 'Vehicles', 'jobs': 'Total Jobs',
         'uninvoiced': 'Uninvoiced', 'sales': 'Sales Amount', 'actions': 'Actions'
     };
     const container = document.getElementById('columnToggles');

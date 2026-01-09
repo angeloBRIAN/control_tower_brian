@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Customer;
+use App\Models\CustomerAlias;
 use App\Models\CustomerSummary;
 use App\Models\Job;
 use App\Models\Vehicle;
@@ -34,6 +36,15 @@ class RefreshCustomerSummaries extends Command
         $batch = [];
         $batchSize = 100;
 
+        // Cache customer lookups for efficiency
+        $customersByName = Customer::whereNotNull('name')
+            ->get()
+            ->keyBy(fn($c) => strtoupper(trim($c->name)));
+        
+        $aliasMap = CustomerAlias::with('customer')
+            ->get()
+            ->keyBy(fn($a) => strtoupper(trim($a->alias_name)));
+
         foreach ($names as $name) {
             $vehicleCount = Vehicle::where('customer_name', $name)->count();
             $uninvoicedCount = Job::where('customer_name', $name)->where('status', 'uninvoiced')->count();
@@ -41,8 +52,22 @@ class RefreshCustomerSummaries extends Command
             $totalSales = Job::where('customer_name', $name)->where('status', 'invoiced')->sum('inv_ppn_meterai') ?? 0;
             $estimatedSales = Job::where('customer_name', $name)->where('status', 'uninvoiced')->sum('total_sales') ?? 0;
 
+            // Try to find linked customer
+            $normalizedName = strtoupper(trim($name));
+            $customer = $customersByName->get($normalizedName);
+            
+            // Try alias if no direct match
+            if (!$customer && $aliasMap->has($normalizedName)) {
+                $customer = $aliasMap->get($normalizedName)->customer;
+            }
+
             $batch[] = [
                 'name' => $name,
+                'customer_id' => $customer?->id,
+                'dms_magic' => $customer?->dms_magic,
+                'email' => $customer?->email,
+                'phone' => $customer?->phone ?? $customer?->phone_1,
+                'company_name' => $customer?->company_name,
                 'vehicle_count' => $vehicleCount,
                 'job_count' => $uninvoicedCount + $invoicedCount,
                 'uninvoiced_count' => $uninvoicedCount,
@@ -68,7 +93,9 @@ class RefreshCustomerSummaries extends Command
 
         $bar->finish();
         $this->newLine();
-        $this->info('Customer summaries refreshed!');
+        
+        $linkedCount = CustomerSummary::whereNotNull('customer_id')->count();
+        $this->info("Customer summaries refreshed! {$linkedCount} linked to DMS.");
 
         return Command::SUCCESS;
     }
@@ -83,3 +110,4 @@ class RefreshCustomerSummaries extends Command
         }
     }
 }
+

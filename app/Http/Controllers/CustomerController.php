@@ -26,7 +26,13 @@ class CustomerController extends Controller
         $query = CustomerSummary::query();
 
         if ($search) {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('dms_magic', 'like', "%{$search}%")
+                  ->orWhere('company_name', 'like', "%{$search}%");
+            });
         }
 
         // Apply filters
@@ -36,6 +42,10 @@ class CustomerController extends Controller
             $query->where('total_sales', '>', 0);
         } elseif ($filter === 'multi_vehicle') {
             $query->where('vehicle_count', '>=', 2);
+        } elseif ($filter === 'dms_linked') {
+            $query->whereNotNull('customer_id');
+        } elseif ($filter === 'not_linked') {
+            $query->whereNull('customer_id');
         }
 
         // Map sort field
@@ -49,17 +59,26 @@ class CustomerController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        // Convert to expected format
+        // Convert to expected format with DMS fields
         $customerData = $customers->map(function ($c) {
             return (object)[
                 'name' => $c->name,
+                'customer_id' => $c->customer_id,
+                'dms_magic' => $c->dms_magic,
+                'email' => $c->email,
+                'phone' => $c->phone,
+                'company_name' => $c->company_name,
                 'vehicle_count' => $c->vehicle_count,
                 'job_count' => $c->job_count,
                 'uninvoiced_count' => $c->uninvoiced_count,
                 'sales_amount' => $c->total_sales,
                 'estimated_sales' => $c->estimated_sales,
+                'is_dms_linked' => $c->customer_id !== null,
             ];
         })->toArray();
+
+        // Stats
+        $dmsLinkedCount = CustomerSummary::whereNotNull('customer_id')->count();
 
         return view('customers.index', [
             'customers' => $customers,
@@ -68,6 +87,7 @@ class CustomerController extends Controller
             'sortField' => $sortField,
             'sortDir' => $sortDir,
             'totalCustomers' => CustomerSummary::count(),
+            'dmsLinkedCount' => $dmsLinkedCount,
         ]);
     }
 
