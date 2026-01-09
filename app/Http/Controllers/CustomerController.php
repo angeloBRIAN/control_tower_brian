@@ -102,6 +102,25 @@ class CustomerController extends Controller
             return redirect()->route('customers.index')->with('error', 'Customer name is required');
         }
 
+        // Try to find linked DMS customer
+        $summary = CustomerSummary::where('name', $customerName)->first();
+        $dmsCustomer = null;
+        
+        if ($summary && $summary->customer_id) {
+            $dmsCustomer = \App\Models\Customer::find($summary->customer_id);
+        } else {
+            // Try direct name match
+            $dmsCustomer = \App\Models\Customer::whereRaw('UPPER(name) = ?', [strtoupper($customerName)])->first();
+            
+            // Try alias match
+            if (!$dmsCustomer) {
+                $alias = \App\Models\CustomerAlias::whereRaw('UPPER(alias_name) = ?', [strtoupper($customerName)])->first();
+                if ($alias) {
+                    $dmsCustomer = $alias->customer;
+                }
+            }
+        }
+
         // Get related vehicles
         $vehicles = Vehicle::where('customer_name', $customerName)
             ->withCount('jobs')
@@ -126,6 +145,7 @@ class CustomerController extends Controller
 
         return view('customers.show', [
             'customerName' => $customerName,
+            'dmsCustomer' => $dmsCustomer,
             'vehicles' => $vehicles,
             'jobs' => $jobs,
             'stats' => $stats,

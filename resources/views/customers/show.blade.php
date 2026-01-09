@@ -69,6 +69,93 @@
 
 
 <div class="row g-4">
+    @if($dmsCustomer)
+    <!-- DMS Customer Info -->
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-link-45deg me-2"></i>DMS Customer Data</span>
+                <span class="badge bg-white text-info">{{ $dmsCustomer->dms_magic }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Full Name</h6>
+                        <p class="mb-2 fw-bold">{{ $dmsCustomer->name ?: '-' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Company</h6>
+                        <p class="mb-2">{{ $dmsCustomer->company_name ?: '-' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Department</h6>
+                        <p class="mb-2">{{ $dmsCustomer->department ?: '-' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Email</h6>
+                        <p class="mb-2">
+                            @if($dmsCustomer->email)
+                            <a href="mailto:{{ $dmsCustomer->email }}"><i class="bi bi-envelope me-1"></i>{{ $dmsCustomer->email }}</a>
+                            @else
+                            -
+                            @endif
+                        </p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Phone 1</h6>
+                        <p class="mb-2">
+                            @if($dmsCustomer->phone ?? $dmsCustomer->phone_1)
+                            <i class="bi bi-phone me-1"></i>{{ $dmsCustomer->phone ?? $dmsCustomer->phone_1 }}
+                            @else
+                            -
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Phone 2</h6>
+                        <p class="mb-2">
+                            @if($dmsCustomer->phone_2)
+                            <i class="bi bi-phone me-1"></i>{{ $dmsCustomer->phone_2 }}
+                            @else
+                            -
+                            @endif
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted small mb-1">Address</h6>
+                        <p class="mb-2">
+                            @php
+                                $addressParts = array_filter([
+                                    $dmsCustomer->address ?? $dmsCustomer->address_1,
+                                    $dmsCustomer->address_2,
+                                    $dmsCustomer->address_3,
+                                    $dmsCustomer->address_4,
+                                    $dmsCustomer->address_5,
+                                ]);
+                            @endphp
+                            {{ !empty($addressParts) ? implode(', ', $addressParts) : '-' }}
+                        </p>
+                    </div>
+                </div>
+                @if($dmsCustomer->phone_3 || $dmsCustomer->phone_4)
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Phone 3</h6>
+                        <p class="mb-0">{{ $dmsCustomer->phone_3 ?: '-' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted small mb-1">Phone 4</h6>
+                        <p class="mb-0">{{ $dmsCustomer->phone_4 ?: '-' }}</p>
+                    </div>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Vehicles Card -->
     <div class="col-md-4">
         <div class="card">
