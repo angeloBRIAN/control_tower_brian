@@ -672,11 +672,11 @@ class ImportController extends Controller
                     ? implode("\n", $addressParts) 
                     : $this->getColumnValue($row, $headerMap, ['customer address', 'alamat', 'address', 'alamat customer']);
                 
-                // Find linked DMS customer
+                // Find linked DMS customer (uses vehicle fallback if name doesn't match)
                 $linkedCustomer = null;
                 $customerId = null;
                 if (!empty($customerName)) {
-                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName);
+                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName, $plateNumber);
                     if ($linkedCustomer) {
                         $customerId = $linkedCustomer->id;
                         $customersLinked++;
@@ -1006,12 +1006,13 @@ class ImportController extends Controller
                 // Get other fields from the invoice report
                 $plateNumber = $this->getColumnValue($row, $headerMap, ['reg no', 'vehicle no', 'no polisi', 'nopol']);
                 $customerName = $this->getColumnValue($row, $headerMap, ['customer name', 'customer', 'nama customer']);
+                $chassisNumber = $this->getColumnValue($row, $headerMap, ['chassis number', 'chassis', 'no rangka']);
                 
-                // Find linked DMS customer
+                // Find linked DMS customer (uses vehicle fallback if name doesn't match)
                 $linkedCustomer = null;
                 $customerId = null;
                 if (!empty($customerName)) {
-                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName);
+                    $linkedCustomer = CustomerAlias::findCustomerByName($customerName, $plateNumber, $chassisNumber);
                     if ($linkedCustomer) {
                         $customerId = $linkedCustomer->id;
                         $customersLinked++;
@@ -1019,8 +1020,6 @@ class ImportController extends Controller
                         $customersUnlinked[$customerName] = ($customersUnlinked[$customerName] ?? 0) + 1;
                     }
                 }
-
-                $chassisNumber = $this->getColumnValue($row, $headerMap, ['chassis number', 'chassis', 'no rangka']);
                 $accountNo = $this->getColumnValue($row, $headerMap, ['account', 'account no', 'akun']);
                 $typeSale = $this->getColumnValue($row, $headerMap, ['type sale', 'tipe sale', 'jenis']);
                 $department = $this->getColumnValue($row, $headerMap, ['dept', 'd', 'department']);

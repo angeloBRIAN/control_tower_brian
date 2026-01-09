@@ -33,8 +33,9 @@ class CustomerAlias extends Model
 
     /**
      * Find customer by name or alias - uses normalized matching
+     * Optionally falls back to vehicle lookup if plate_number/chassis provided
      */
-    public static function findCustomerByName(string $name): ?Customer
+    public static function findCustomerByName(string $name, ?string $plateNumber = null, ?string $chassis = null): ?Customer
     {
         $exactName = strtoupper(trim($name));
         $normalizedName = \App\Helpers\CustomerNameHelper::normalize($name);
@@ -72,6 +73,43 @@ class CustomerAlias extends Model
             if (\App\Helpers\CustomerNameHelper::normalize($a->alias_name) === $normalizedName) {
                 return $a->customer;
             }
+        }
+        
+        // 4. Vehicle-based fallback - look up customer via vehicle
+        if ($plateNumber || $chassis) {
+            $vehicleCustomer = self::findCustomerByVehicle($plateNumber, $chassis);
+            if ($vehicleCustomer) {
+                return $vehicleCustomer;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Find customer by vehicle plate number or chassis
+     * Useful when customer name from invoice doesn't match DMS but vehicle does
+     */
+    public static function findCustomerByVehicle(?string $plateNumber, ?string $chassis = null): ?Customer
+    {
+        $vehicle = null;
+        
+        // Try plate number first
+        if ($plateNumber && trim($plateNumber) !== '') {
+            $vehicle = Vehicle::where('plate_number', $plateNumber)
+                ->whereNotNull('customer_id')
+                ->first();
+        }
+        
+        // Fallback to chassis/VIN
+        if (!$vehicle && $chassis && trim($chassis) !== '') {
+            $vehicle = Vehicle::where('vin', $chassis)
+                ->whereNotNull('customer_id')
+                ->first();
+        }
+        
+        if ($vehicle && $vehicle->customer_id) {
+            return Customer::find($vehicle->customer_id);
         }
         
         return null;

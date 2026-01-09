@@ -84,6 +84,16 @@ class RefreshCustomerSummaries extends Command
                 ?? $aliasMap[$exactName] 
                 ?? $aliasMap[$normalizedName] 
                 ?? null;
+            
+            // Vehicle-based fallback: if name not matched, try to find via vehicle
+            if (!$customer) {
+                $vehicleWithCustomer = Vehicle::where('customer_name', $name)
+                    ->whereNotNull('customer_id')
+                    ->first();
+                if ($vehicleWithCustomer && $vehicleWithCustomer->customer_id) {
+                    $customer = $dmsCustomers->get($vehicleWithCustomer->customer_id);
+                }
+            }
 
             // Get stats for this name
             $vehicleCount = Vehicle::where('customer_name', $name)->count();
