@@ -356,10 +356,19 @@ class Job extends Model
         ]);
 
         // Notify assigned SA/Foreman about new remark (if different from creator)
-        $this->notifyAssignedUsers($remarkText, $createdBy, $userId);
+        // Wrapped to prevent notification failures from bubbling up
+        try {
+            $this->notifyAssignedUsers($remarkText, $createdBy, $userId);
+        } catch (\Exception $e) {
+            \Log::debug("Notification failed for job {$this->job_number}: " . $e->getMessage());
+        }
 
-        // Broadcast real-time update
-        event(new RemarkAdded($this, $remark));
+        // Broadcast real-time update (wrapped to prevent Pusher failures)
+        try {
+            event(new RemarkAdded($this, $remark));
+        } catch (\Exception $e) {
+            \Log::debug("Broadcast failed for job {$this->job_number}: " . $e->getMessage());
+        }
 
         return $remark;
     }
@@ -414,7 +423,11 @@ class Job extends Model
             'invoiced_at' => now(),
         ]);
 
-        // Broadcast real-time update
-        event(new JobStatusUpdated($this, 'invoiced', auth()->user()?->name));
+        // Broadcast real-time update (wrapped to prevent Pusher failures)
+        try {
+            event(new JobStatusUpdated($this, 'invoiced', auth()->user()?->name));
+        } catch (\Exception $e) {
+            \Log::debug("Broadcast failed for job {$this->job_number} status update: " . $e->getMessage());
+        }
     }
 }
