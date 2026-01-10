@@ -953,6 +953,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (badge) {
                     badge.textContent = parseInt(badge.textContent) + 1;
                 }
+                
+                // Update activity timeline
+                const timelineContainer = document.querySelector('.timeline-container');
+                if (timelineContainer) {
+                    const activityType = replyToId ? 'Reply added' : 'Remark added';
+                    const activityHtml = `
+                        <div class="timeline-item d-flex p-2 border-bottom" style="background-color: #f8f9fa;">
+                            <div class="timeline-icon me-3">
+                                <span class="badge bg-secondary rounded-circle p-2">
+                                    <i class="bi bi-chat-dots"></i>
+                                </span>
+                            </div>
+                            <div class="timeline-content flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong class="text-secondary">${activityType}</strong>
+                                        <p class="mb-0 small text-muted">${activityType}: "${data.remark.text.substring(0, 50)}${data.remark.text.length > 50 ? '...' : ''}"</p>
+                                    </div>
+                                    <small class="text-muted text-nowrap">just now</small>
+                                </div>
+                                <small class="text-muted">by ${data.remark.commenter_name}</small>
+                            </div>
+                        </div>
+                    `;
+                    timelineContainer.insertAdjacentHTML('afterbegin', activityHtml);
+                    
+                    // Update activity count badge
+                    const activityBadge = document.querySelector('.activity-timeline-card .badge.bg-secondary');
+                    if (activityBadge) {
+                        activityBadge.textContent = parseInt(activityBadge.textContent) + 1;
+                    }
+                }
 
                 // Clear textarea and image input
                 textarea.value = '';
