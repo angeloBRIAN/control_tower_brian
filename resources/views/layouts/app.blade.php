@@ -173,9 +173,9 @@
                     @endauth
                 </div>
 
-                {{-- Parts Tracking Menu (for sparepart role or admin) --}}
+                {{-- Parts Tracking Menu (for sparepart, control_tower, manager, or admin) --}}
                 @auth
-                @if(Auth::user()->role === 'sparepart' || Auth::user()->role === 'admin')
+                @if(in_array(Auth::user()->role, ['sparepart', 'control_tower', 'manager', 'admin']))
                 @php
                     $isPartsActive = request()->routeIs('parts.*') || request()->routeIs('part-orders.*');
                 @endphp
@@ -191,6 +191,25 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('part-orders.index') ? 'active' : '' }}" href="{{ route('part-orders.index') }}">
                             <i class="bi bi-list-ul"></i> All Orders
+                        </a>
+                    </li>
+                </div>
+                @endif
+                @endauth
+
+                {{-- Finance Kanban Menu (for finance, control_tower, manager, or admin) --}}
+                @auth
+                @if(in_array(Auth::user()->role, ['finance', 'control_tower', 'manager', 'admin']))
+                @php
+                    $isFinanceActive = request()->routeIs('finance.*');
+                @endphp
+                <div class="nav-section {{ $isFinanceActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#financeMenu" aria-expanded="{{ $isFinanceActive ? 'true' : 'false' }}">
+                    <i class="bi bi-cash-coin me-2"></i>Finance <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                </div>
+                <div class="collapse {{ $isFinanceActive ? 'show' : '' }}" id="financeMenu">
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('finance.kanban') ? 'active' : '' }}" href="{{ route('finance.kanban') }}">
+                            <i class="bi bi-kanban"></i> Invoice Kanban
                         </a>
                     </li>
                 </div>
