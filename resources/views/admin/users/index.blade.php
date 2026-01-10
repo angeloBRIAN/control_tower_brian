@@ -8,6 +8,9 @@
         <h1><i class="bi bi-people me-2"></i>User Management</h1>
         <p class="text-muted mb-0">Manage user roles and permissions</p>
     </div>
+    <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Create Local User
+    </a>
 </div>
 
 <div class="row">

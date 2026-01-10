@@ -49,6 +49,39 @@ class UserController extends Controller
     }
 
     /**
+     * Show form to create a new local user
+     */
+    public function create()
+    {
+        $roles = $this->roles;
+        return view('admin.users.create', compact('roles'));
+    }
+
+    /**
+     * Store a new local user
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6|confirmed',
+            'role' => 'required|in:' . implode(',', array_keys($this->roles)),
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => bcrypt($validated['password']),
+            'role' => $validated['role'],
+            'auth_source' => 'local',
+        ]);
+
+        return redirect()->route('admin.users.index')
+            ->with('success', "User '{$user->name}' created with role '{$this->roles[$validated['role']]}'");
+    }
+
+    /**
      * Show form to edit user role
      */
     public function edit(User $user)
