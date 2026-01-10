@@ -13,21 +13,57 @@ class FinanceController extends Controller
     /**
      * Display Finance Kanban board (Invoice-based)
      */
-    public function kanban()
+    public function kanban(Request $request)
     {
         // Define columns - regular statuses + Credit Notes
         $statuses = JobInvoice::STATUSES;
         
+        // Build base query with job relationship
+        $query = JobInvoice::with('job')
+            ->join('jobs', 'job_invoices.job_id', '=', 'jobs.id')
+            ->select('job_invoices.*');
+        
+        // Apply filters
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('job_invoices.invoice_number', 'like', "%{$search}%")
+                  ->orWhere('jobs.job_number', 'like', "%{$search}%")
+                  ->orWhere('jobs.plate_number', 'like', "%{$search}%")
+                  ->orWhere('jobs.customer_name', 'like', "%{$search}%");
+            });
+        }
+        
+        if ($request->filled('service_advisor')) {
+            $query->where('jobs.service_advisor', $request->input('service_advisor'));
+        }
+        
+        if ($request->filled('foreman')) {
+            $query->where('jobs.foreman', $request->input('foreman'));
+        }
+        
+        if ($request->filled('date_from')) {
+            $query->whereDate('job_invoices.invoice_date', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->whereDate('job_invoices.invoice_date', '<=', $request->input('date_to'));
+        }
+        
+        if ($request->filled('invoice_status')) {
+            $query->where('job_invoices.status', $request->input('invoice_status'));
+        }
+        
         // Fetch all non-cancelled invoices
-        $invoices = JobInvoice::with('job')
-            ->where('status', '!=', JobInvoice::STATUS_CANCELLED)
-            ->orderBy('updated_at', 'desc')
+        $invoices = (clone $query)
+            ->where('job_invoices.status', '!=', JobInvoice::STATUS_CANCELLED)
+            ->orderBy('job_invoices.updated_at', 'desc')
             ->get();
 
         // Fetch credit notes separately
-        $creditNotes = JobInvoice::with('job')
-            ->where('invoice_type', 'credit_note')
-            ->orderBy('updated_at', 'desc')
+        $creditNotes = (clone $query)
+            ->where('job_invoices.invoice_type', 'credit_note')
+            ->orderBy('job_invoices.updated_at', 'desc')
             ->get();
 
         // Group by status
@@ -39,8 +75,24 @@ class FinanceController extends Controller
         
         // Add Credit Notes as separate column
         $invoicesByStatus['credit_note'] = $creditNotes;
+        
+        // Get filter options for dropdowns
+        $filterOptions = [
+            'service_advisors' => Job::whereHas('invoices')
+                ->distinct()
+                ->whereNotNull('service_advisor')
+                ->pluck('service_advisor')
+                ->sort()
+                ->values(),
+            'foremen' => Job::whereHas('invoices')
+                ->distinct()
+                ->whereNotNull('foreman')
+                ->pluck('foreman')
+                ->sort()
+                ->values(),
+        ];
 
-        return view('finance.kanban', compact('statuses', 'invoicesByStatus', 'creditNotes'));
+        return view('finance.kanban', compact('statuses', 'invoicesByStatus', 'creditNotes', 'filterOptions'));
     }
 
     /**

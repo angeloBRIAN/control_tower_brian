@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h1 class="h3 mb-1">
                 <i class="bi bi-cash-coin me-2"></i>Finance Kanban
@@ -16,6 +16,113 @@
             <a href="{{ route('jobs.kanban') }}" class="btn btn-outline-primary">
                 <i class="bi bi-kanban me-1"></i> View Job Kanban
             </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body py-3">
+            <form method="GET" action="{{ route('finance.kanban') }}" class="row g-2 align-items-end">
+                <!-- Search -->
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Search</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" name="search" class="form-control" 
+                               value="{{ request('search') }}" placeholder="WIP, Invoice#, Plate, Customer...">
+                    </div>
+                </div>
+                
+                <!-- Service Advisor -->
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Service Advisor</label>
+                    <select name="service_advisor" class="form-select form-select-sm">
+                        <option value="">All SA</option>
+                        @foreach($filterOptions['service_advisors'] ?? [] as $sa)
+                            <option value="{{ $sa }}" {{ request('service_advisor') == $sa ? 'selected' : '' }}>{{ $sa }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <!-- Foreman -->
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Foreman</label>
+                    <select name="foreman" class="form-select form-select-sm">
+                        <option value="">All Foreman</option>
+                        @foreach($filterOptions['foremen'] ?? [] as $fm)
+                            <option value="{{ $fm }}" {{ request('foreman') == $fm ? 'selected' : '' }}>{{ $fm }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <!-- Date Range -->
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Date From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Date To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
+                </div>
+                
+                <!-- Buttons -->
+                <div class="col-md-1">
+                    <div class="btn-group btn-group-sm w-100">
+                        <button type="submit" class="btn btn-primary" title="Filter">
+                            <i class="bi bi-funnel"></i>
+                        </button>
+                        <a href="{{ route('finance.kanban') }}" class="btn btn-outline-secondary" title="Reset">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    @php
+        $totalInvoices = collect($invoicesByStatus)->flatten()->count();
+        $totalAmount = collect($invoicesByStatus)->flatten()->sum('inv_ppn_meterai');
+        $paidAmount = ($invoicesByStatus['paid'] ?? collect())->sum('inv_ppn_meterai');
+        $pendingAmount = ($invoicesByStatus['pending'] ?? collect())->sum('inv_ppn_meterai');
+    @endphp
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="d-flex align-items-center bg-light rounded p-3">
+                <i class="bi bi-receipt fs-4 text-primary me-3"></i>
+                <div>
+                    <div class="fw-bold">{{ $totalInvoices }}</div>
+                    <small class="text-muted">Total Invoices</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex align-items-center bg-light rounded p-3">
+                <i class="bi bi-currency-exchange fs-4 text-secondary me-3"></i>
+                <div>
+                    <div class="fw-bold">Rp {{ number_format($totalAmount, 0, ',', '.') }}</div>
+                    <small class="text-muted">Total Value</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex align-items-center bg-light rounded p-3">
+                <i class="bi bi-hourglass fs-4 text-warning me-3"></i>
+                <div>
+                    <div class="fw-bold">Rp {{ number_format($pendingAmount, 0, ',', '.') }}</div>
+                    <small class="text-muted">Pending Payment</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex align-items-center bg-light rounded p-3">
+                <i class="bi bi-check-circle fs-4 text-success me-3"></i>
+                <div>
+                    <div class="fw-bold">Rp {{ number_format($paidAmount, 0, ',', '.') }}</div>
+                    <small class="text-muted">Paid</small>
+                </div>
+            </div>
         </div>
     </div>
 
