@@ -501,8 +501,8 @@ class JobController extends Controller
 
     public function deleteRemark(Remark $remark): RedirectResponse|JsonResponse
     {
-        // Authorization: Admin, Manager, or Record Owner
-        if (auth()->id() !== $remark->user_id && !auth()->user()->hasAnyRole(['admin', 'manager'])) {
+        // Authorization: Admin only
+        if (!auth()->user()->hasRole('admin')) {
             if (request()->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }

@@ -558,7 +558,7 @@
                                         <i class="bi bi-reply"></i> Reply
                                     </button>
                                     @endif
-                                    @if(auth()->id() == $remark->user_id || auth()->user()->hasAnyRole(['admin', 'manager']))
+                                    @if(auth()->user()->hasRole('admin'))
                                     <form action="{{ route('remarks.destroy', $remark) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this comment?');">
                                         @csrf
                                         @method('DELETE')
@@ -599,7 +599,7 @@
                                                     <i class="bi bi-reply"></i> Reply
                                                 </button>
                                                 @endif
-                                                @if(auth()->id() == $reply->user_id || auth()->user()->hasAnyRole(['admin', 'manager']))
+                                                @if(auth()->user()->hasRole('admin'))
                                                 <form action="{{ route('remarks.destroy', $reply) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this comment?');">
                                                     @csrf
                                                     @method('DELETE')

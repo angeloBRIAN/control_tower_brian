@@ -37,8 +37,11 @@ class ImageService
         $storagePath = "public/{$directory}";
         $fullPath = storage_path("app/{$storagePath}/{$filename}");
         
-        // Ensure directory exists
-        Storage::makeDirectory($storagePath);
+        // Ensure directory exists with correct permissions
+        if (!Storage::exists($storagePath)) {
+            Storage::makeDirectory($storagePath);
+            @chmod(storage_path("app/{$storagePath}"), 0775);
+        }
         
         // Try to use Intervention Image for compression
         if ($this->canUseIntervention()) {
@@ -161,6 +164,9 @@ class ImageService
             
             // Save as JPEG with quality
             \imagejpeg($destination, $destPath, $this->quality);
+            
+            // Fix permissions
+            @chmod($destPath, 0664);
             
             // Free memory
             \imagedestroy($source);
