@@ -1171,6 +1171,9 @@ class ImportController extends Controller
                     $updated++;
                     \Log::info("INVOICE import: Updated existing job {$normalizedJobNumber} (ID: {$job->id}, Franchise: {$job->franchise})");
                     
+                    // Log activity for timeline
+                    JobActivity::log($job, 'invoice_import_updated', 'Job updated via invoice import');
+                    
                     // Track and cleanup if plate changed
                     if ($oldPlateBeforeUpdate && $plateNumber && $this->sanitizeText($oldPlateBeforeUpdate) !== $this->sanitizeText($plateNumber)) {
                         // Track plate correction for report
@@ -1200,6 +1203,9 @@ class ImportController extends Controller
                     $job = Job::create($newJobData);
                     $imported++;
                     \Log::info("INVOICE import: Created NEW job {$normalizedJobNumber} (no existing match found)");
+                    
+                    // Log activity for timeline
+                    JobActivity::log($job, 'invoice_import_created', 'Job created via invoice import');
                 }
 
                 // Detect credit note by negative amount

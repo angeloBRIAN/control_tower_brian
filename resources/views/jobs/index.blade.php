@@ -592,26 +592,34 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 @endpush
 
-<!-- Add Remark Modal -->
+<!-- Add Comment Modal -->
 <div class="modal fade" id="addRemarkModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="addRemarkForm" method="POST">
+            <form id="addRemarkForm" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-chat-plus me-2"></i>Add Remark for WIP <span id="remarkJobNumber" class="fw-bold"></span></h5>
+                    <h5 class="modal-title"><i class="bi bi-chat-plus me-2"></i>Add Comment for WIP <span id="remarkJobNumber" class="fw-bold"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="job_id" id="remarkJobId">
                     <div class="mb-3">
-                        <label class="form-label">Remark <span class="text-danger">*</span></label>
-                        <textarea name="remark_text" id="remarkText" class="form-control" rows="3" required placeholder="Enter your remark..."></textarea>
+                        <label class="form-label">Comment <span class="text-danger">*</span></label>
+                        <textarea name="remark_text" id="remarkText" class="form-control" rows="3" required placeholder="Enter your comment..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="btn btn-outline-secondary btn-sm" for="modalCommentImages">
+                            <i class="bi bi-image me-1"></i> Add Images
+                        </label>
+                        <input type="file" id="modalCommentImages" name="images[]" accept="image/*" multiple class="d-none">
+                        <small class="text-muted ms-2">Max 3 images, 10MB each</small>
+                        <div id="modalImagePreviewContainer" class="mt-2 d-flex flex-wrap gap-2"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus me-1"></i>Add Remark</button>
+                    <button type="submit" class="btn btn-primary" id="submitRemarkBtn"><i class="bi bi-plus me-1"></i>Add Comment</button>
                 </div>
             </form>
         </div>
@@ -619,13 +627,85 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-document.getElementById('addRemarkForm').addEventListener('submit', function(e) {
+// Image preview for modal
+const modalImageInput = document.getElementById('modalCommentImages');
+const modalPreviewContainer = document.getElementById('modalImagePreviewContainer');
+
+if (modalImageInput) {
+    modalImageInput.addEventListener('change', function() {
+        modalPreviewContainer.innerHTML = '';
+        const files = Array.from(this.files).slice(0, 3);
+        
+        files.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.createElement('div');
+                preview.className = 'position-relative';
+                preview.innerHTML = `
+                    <img src="${e.target.result}" class="rounded" style="height: 50px; width: 50px; object-fit: cover; border: 2px solid #dee2e6;">
+                `;
+                modalPreviewContainer.appendChild(preview);
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+}
+
+// Form submission with FormData
+document.getElementById('addRemarkForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const jobId = document.getElementById('remarkJobId').value;
-    const form = this;
-    form.action = '/jobs/' + jobId + '/remark';
-    form.submit();
+    const submitBtn = document.getElementById('submitRemarkBtn');
+    const remarkText = document.getElementById('remarkText').value;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding...';
+    
+    const formData = new FormData();
+    formData.append('remark_text', remarkText);
+    
+    // Add images
+    if (modalImageInput && modalImageInput.files.length > 0) {
+        Array.from(modalImageInput.files).slice(0, 3).forEach(file => {
+            formData.append('images[]', file);
+        });
+    }
+    
+    try {
+        const response = await fetch('/jobs/' + jobId + '/remark', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json'
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Close modal and reload page
+            bootstrap.Modal.getInstance(document.getElementById('addRemarkModal')).hide();
+            location.reload();
+        } else {
+            alert(data.message || 'Failed to add comment');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus me-1"></i>Add Comment';
+    }
+});
+
+// Reset form when modal is hidden
+document.getElementById('addRemarkModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('remarkText').value = '';
+    if (modalImageInput) modalImageInput.value = '';
+    if (modalPreviewContainer) modalPreviewContainer.innerHTML = '';
 });
 </script>
 
 @endsection
+
