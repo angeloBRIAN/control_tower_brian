@@ -59,6 +59,9 @@
                             <button type="submit" class="btn btn-link btn-sm p-0 text-muted">Mark all read</button>
                         </form>
                         @endif
+                        <button id="enablePushBtn" class="btn btn-link btn-sm p-0 text-primary d-none" onclick="enablePushNotifications()">
+                            <i class="bi bi-bell-fill me-1"></i>Enable Push
+                        </button>
                     </div>
                     <div class="dropdown-divider m-0"></div>
                     <div id="notificationList">
@@ -968,41 +971,38 @@
         }
     })();
     
-    // Push Notification Subscription
-    (async function() {
-        // Check if push notifications are supported
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.log('[Push] Push notifications not supported');
-            return;
-        }
+    // Push Notification Logic
+    window.enablePushNotifications = async function() {
+        const btn = document.getElementById('enablePushBtn');
         
-        // Wait for service worker to be ready
-        const registration = await navigator.serviceWorker.ready;
-        
-        // Check current subscription status
-        let subscription = await registration.pushManager.getSubscription();
-        
-        if (subscription) {
-            console.log('[Push] Already subscribed');
-            return;
-        }
-        
-        // Check permission
-        if (Notification.permission === 'denied') {
-            console.log('[Push] Notification permission denied');
-            return;
-        }
-        
-        // Request permission if not granted
-        if (Notification.permission === 'default') {
+        try {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enabling...';
+            }
+
+            // Check if push notifications are supported
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                console.log('[Push] Push notifications not supported');
+                alert('Push notifications are not supported by your browser.');
+                return;
+            }
+            
+            // Wait for service worker to be ready
+            const registration = await navigator.serviceWorker.ready;
+
+            // Request permission
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
                 console.log('[Push] Permission not granted');
+                alert('You need to allow notifications to receive updates.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-bell-fill me-1"></i>Enable Push';
+                }
                 return;
             }
-        }
-        
-        try {
+            
             // Get VAPID public key from server
             const response = await fetch('/push/vapid-public-key');
             const { publicKey } = await response.json();
@@ -1016,7 +1016,7 @@
             const vapidKey = urlBase64ToUint8Array(publicKey);
             
             // Subscribe to push
-            subscription = await registration.pushManager.subscribe({
+            const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: vapidKey,
             });
@@ -1035,20 +1035,58 @@
             
             console.log('[Push] Subscription saved to server');
             
+            // Hide button on success
+            if (btn) btn.style.display = 'none';
+            
+            // Show success toast
+            showNotificationToast({
+                title: 'Notifications Enabled',
+                message: 'You will now receive push notifications.',
+                icon: 'bell-fill',
+                color: 'success'
+            });
+            
         } catch (err) {
             console.warn('[Push] Subscription failed:', err.message);
+            alert('Failed to enable notifications: ' + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-bell-fill me-1"></i>Enable Push';
+            }
         }
+    };
+
+    // Check status on load
+    (async function() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
         
-        // Helper function to convert base64 to Uint8Array
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding)
-                .replace(/-/g, '+')
-                .replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            
+            // If permissions allow but not subscribed, or permission is default
+            // We verify permission status to decide whether to show button
+            if (!subscription && Notification.permission === 'default') {
+                const btn = document.getElementById('enablePushBtn');
+                if (btn) btn.classList.remove('d-none');
+            } else if (!subscription && Notification.permission === 'granted') {
+                 // Try to silently subscribe if permission is already granted
+                 enablePushNotifications();
+            }
+        } catch (e) {
+            console.warn('[Push] Status check failed', e);
         }
     })();
+        
+    // Helper function to convert base64 to Uint8Array
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+    }
     </script>
     @endauth
     
