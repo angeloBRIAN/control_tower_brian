@@ -954,6 +954,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="comment-text">${data.remark.formatted_text || data.remark.text}</div>
                             ${imagesHtml}
+                            <div class="mt-1 d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none reply-btn" 
+                                    data-comment-id="${data.remark.id}" data-author="${data.remark.commenter_name}">
+                                    <i class="bi bi-reply-fill"></i> Reply
+                                </button>
+                                
+                                ${ data.remark.can_delete ? `
+                                <form action="/remarks/${data.remark.id}" method="POST" class="d-inline" onsubmit="return confirm('Delete this comment?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="_method" value="DELETE">
+                                    <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Delete comment">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                ` : '' }
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1037,10 +1053,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Reply button handler
-    document.querySelectorAll('.reply-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            replyToId = this.dataset.commentId;
-            const authorName = this.dataset.author;
+    // Reply button handler (Event Delegation)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.reply-btn');
+        if (btn) {
+            e.preventDefault();
+            replyToId = btn.dataset.commentId;
+            const authorName = btn.dataset.author;
             textarea.value = `@${authorName} `;
             textarea.focus();
             textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1054,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ind.innerHTML = `<small><i class="bi bi-reply me-1"></i>Replying to <strong>${authorName}</strong></small>
                 <button type="button" class="btn-close btn-close-sm ms-auto" onclick="cancelReply()"></button>`;
             textarea.parentElement.insertBefore(ind, textarea);
-        });
+        }
     });
     
     // Cancel reply

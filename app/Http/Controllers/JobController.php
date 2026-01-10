@@ -492,6 +492,7 @@ class JobController extends Controller
                     'role_color' => $roleColor,
                     'time_ago' => 'just now',
                     'images' => $remark->image_urls,
+                    'can_delete' => $user?->hasRole('admin'),
                 ],
             ]);
         }
