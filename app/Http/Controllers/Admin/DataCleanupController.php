@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class DataCleanupController extends Controller
 {
@@ -126,6 +127,17 @@ class DataCleanupController extends Controller
 
             // Re-enable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            
+            // Clean up storage if remarks were cleaned
+            if (in_array('remarks', $results)) {
+                try {
+                    Storage::deleteDirectory('public/remarks');
+                    Storage::makeDirectory('public/remarks'); // Recreate empty directory
+                    Log::info('Deleted remarks images from storage.');
+                } catch (\Exception $e) {
+                    Log::warning('Failed to delete remarks images: ' . $e->getMessage());
+                }
+            }
 
             // Clear all application cache
             \Artisan::call('cache:clear');

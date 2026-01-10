@@ -381,10 +381,20 @@ class JobController extends Controller
         // Parse @mentions from text
         $mentionedUserIds = Remark::parseMentions($validated['remark_text']);
         
+        // Handle nested replies - force max 1 level of nesting
+        $parentId = $validated['parent_id'] ?? null;
+        if ($parentId) {
+            $parentRemark = Remark::find($parentId);
+            // If parent is already a reply, use its parent instead
+            if ($parentRemark && $parentRemark->parent_id) {
+                $parentId = $parentRemark->parent_id;
+            }
+        }
+        
         // Create the remark
         $remark = $job->remarks()->create([
             'remark_text' => $validated['remark_text'],
-            'parent_id' => $validated['parent_id'] ?? null,
+            'parent_id' => $parentId,
             'user_id' => $user?->id,
             'created_by' => $user?->name,
             'images' => !empty($imagePaths) ? $imagePaths : null,
