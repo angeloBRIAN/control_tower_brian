@@ -951,7 +951,6 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.innerHTML = '<i class="bi bi-send"></i>';
         }
     });
-    });
     
     // Reply button handler
     let replyToId = null;
