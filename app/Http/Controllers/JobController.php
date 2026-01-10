@@ -399,42 +399,43 @@ class JobController extends Controller
             ]);
         }
         
-        // Send notifications for @mentions
-        foreach ($mentionedUserIds as $mentionedUserId) {
-            if ($mentionedUserId != $user?->id) { // Don't notify self
-                Notification::notify(
-                    $mentionedUserId,
-                    Notification::TYPE_MENTION,
-                    "You were mentioned in WIP {$job->job_number}",
-                    "@{$user->name}: " . \Illuminate\Support\Str::limit($validated['remark_text'], 80),
-                    route('jobs.show', $job) . "#comment-{$remark->id}",
-                    'at',
-                    'primary'
-                );
-            }
-        }
-        
-        // Send notification for reply (to parent comment author)
-        if ($remark->parent_id) {
-            $parentRemark = Remark::find($remark->parent_id);
-            if ($parentRemark && $parentRemark->user_id && $parentRemark->user_id != $user?->id) {
-                Notification::notify(
-                    $parentRemark->user_id,
-                    Notification::TYPE_REPLY,
-                    "Someone replied to your comment on WIP {$job->job_number}",
-                    "@{$user->name}: " . \Illuminate\Support\Str::limit($validated['remark_text'], 80),
-                    route('jobs.show', $job) . "#comment-{$remark->id}",
-                    'reply-fill',
-                    'info'
-                );
-            }
-        }
-        
-        // Notify assigned SA/Foreman (existing behavior, wrapped for safety)
+        // Send notifications (all wrapped to prevent broadcast failures from breaking response)
         try {
+            // Notify @mentions
+            foreach ($mentionedUserIds as $mentionedUserId) {
+                if ($mentionedUserId != $user?->id) {
+                    Notification::notify(
+                        $mentionedUserId,
+                        Notification::TYPE_MENTION,
+                        "You were mentioned in WIP {$job->job_number}",
+                        "@{$user->name}: " . \Illuminate\Support\Str::limit($validated['remark_text'], 80),
+                        route('jobs.show', $job) . "#comment-{$remark->id}",
+                        'at',
+                        'primary'
+                    );
+                }
+            }
+            
+            // Notify reply parent author
+            if ($remark->parent_id) {
+                $parentRemark = Remark::find($remark->parent_id);
+                if ($parentRemark && $parentRemark->user_id && $parentRemark->user_id != $user?->id) {
+                    Notification::notify(
+                        $parentRemark->user_id,
+                        Notification::TYPE_REPLY,
+                        "Someone replied to your comment on WIP {$job->job_number}",
+                        "@{$user->name}: " . \Illuminate\Support\Str::limit($validated['remark_text'], 80),
+                        route('jobs.show', $job) . "#comment-{$remark->id}",
+                        'reply-fill',
+                        'info'
+                    );
+                }
+            }
+            
+            // Notify assigned SA/Foreman
             $job->notifyAssignedUsersPublic($validated['remark_text'], $user?->name, $user?->id);
         } catch (\Exception $e) {
-            \Log::debug("Notification failed: " . $e->getMessage());
+            \Log::debug("Notification failed for remark {$remark->id}: " . $e->getMessage());
         }
         
         // Log activity
