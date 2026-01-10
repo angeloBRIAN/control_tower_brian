@@ -214,6 +214,45 @@ class Job extends Model
         '13. Sudah Dibayar' => ['label' => '13. Lunas', 'icon' => 'cash-coin', 'color' => 'success'],
     ];
 
+    // Legacy status mapping - maps old database values to new status values
+    // Used for counting jobs with old status values in dashboard/reports
+    const LEGACY_STATUS_MAP = [
+        'belum_diproses' => '1. Belum diproses (Tunggu Antrian)',
+        'pending' => '1. Belum diproses (Tunggu Antrian)',
+        'keluhan_awal' => '2. Pengerjaan Diagnosa Awal',
+        'diagnosa' => '2. Pengerjaan Diagnosa Awal',
+        'estimasi' => '3. Estimasi (Proses Warranty -> Tips case, Eskulab, Xsp)',
+        'acc_customer' => '4. Acc Customer/Warranty',
+        'order_parts' => '5. Buka RQ (Qrder Parts)',
+        'parts_received' => '6. Parts Datang (Parts Received)',
+        'penjadwalan' => '7. Penjadwalan (Unit dibawa customer)',
+        'pengerjaan' => '8. Pengerjaan',
+        'in_progress' => '8. Pengerjaan',
+        'pemberkasan' => '9. Pemberkasan (Body Paint/Cash/Warranty)',
+        'proses_close' => '10. Proses Close Job (Pengerjaan selesai)',
+        'close_job' => '10. Proses Close Job (Pengerjaan selesai)',
+        'proses_invoice' => '11. Proses Invoice',
+        'menunggu_pembayaran' => '12. Menunggu Pembayaran',
+        'sudah_dibayar' => '13. Sudah Dibayar',
+        'completed' => '13. Sudah Dibayar',
+    ];
+
+    /**
+     * Normalize a work status value - maps legacy values to current standards
+     */
+    public static function normalizeWorkStatus(?string $status): ?string
+    {
+        if (empty($status)) {
+            return null;
+        }
+        // If already in new format, return as-is
+        if (in_array($status, self::WORK_STATUSES)) {
+            return $status;
+        }
+        // Try legacy mapping
+        return self::LEGACY_STATUS_MAP[$status] ?? $status;
+    }
+
     /**
      * Get work status options for dropdowns/views (replaces DropdownOption::getOptions('work_status'))
      * Returns a collection of objects with value, label, icon, color properties

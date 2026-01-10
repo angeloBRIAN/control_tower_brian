@@ -112,16 +112,35 @@
 @endif
 
 @php
-    // Work Status breakdown for uninvoiced jobs - using dynamic options from database
-    // Count NULL work_status separately to add to first option
-    $workStatusCounts = \App\Models\Job::uninvoiced()
+    // Work Status breakdown for uninvoiced jobs - using Job model constants
+    // Fetch raw work_status values and normalize using Job::normalizeWorkStatus()
+    $rawWorkStatusCounts = \App\Models\Job::uninvoiced()
         ->selectRaw('work_status, COUNT(*) as count')
         ->groupBy('work_status')
-        ->get()
-        ->keyBy('work_status');
+        ->get();
     
-    // Count of jobs with NULL work_status
-    $nullCount = $workStatusCounts->get(null)?->count ?? $workStatusCounts->get('')?->count ?? 0;
+    // Normalize and aggregate counts
+    $workStatusCounts = collect();
+    foreach ($rawWorkStatusCounts as $item) {
+        $normalizedStatus = \App\Models\Job::normalizeWorkStatus($item->work_status);
+        $key = $normalizedStatus ?? '__null__';
+        
+        if ($workStatusCounts->has($key)) {
+            $current = $workStatusCounts->get($key);
+            $workStatusCounts->put($key, (object)[
+                'work_status' => $normalizedStatus,
+                'count' => $current->count + $item->count
+            ]);
+        } else {
+            $workStatusCounts->put($key, (object)[
+                'work_status' => $normalizedStatus,
+                'count' => $item->count
+            ]);
+        }
+    }
+    
+    // Count of jobs with NULL/empty/unmapped work_status
+    $nullCount = $workStatusCounts->get('__null__')?->count ?? 0;
     
     // Get configured work statuses from Job model (hardcoded)
     $workStatusOptions = \App\Models\Job::getWorkStatusOptions();
@@ -139,7 +158,7 @@
             @forelse($workStatusOptions as $option)
             @php
                 $count = $workStatusCounts->get($option->value)?->count ?? 0;
-                // Add NULL count to first option (like Kanban does)
+                // Add NULL/unmapped count to first option (like Kanban does)
                 if ($option->value === $firstStatusValue) {
                     $count += $nullCount;
                 }
