@@ -314,6 +314,7 @@ class DmsImportService
             'registration_date' => $this->parseDate($this->getValue($row, $map, 'reg. date')),
             'last_service_date' => $this->parseDate($this->getValue($row, $map, 'last service date')),
             'dms_imported_at' => now(),
+            'source' => 'dms', // Mark as DMS-imported
         ];
 
         // Get customer name from linked customer or from row
