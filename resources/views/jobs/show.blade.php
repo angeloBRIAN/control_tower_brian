@@ -856,9 +856,12 @@ document.addEventListener('DOMContentLoaded', function() {
         imageInput.files = dt.files;
         imageInput.dispatchEvent(new Event('change'));
     };
-
+    // Reply state
+    let replyToId = null;
+    
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
+        e.stopPropagation();
         
         const remarkText = textarea.value.trim();
         if (!remarkText) return;
@@ -871,6 +874,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use FormData for file uploads
             const formData = new FormData();
             formData.append('remark_text', remarkText);
+            
+            // Add parent_id if replying
+            if (replyToId) {
+                formData.append('parent_id', replyToId);
+            }
             
             // Add images if selected
             if (imageInput && imageInput.files.length > 0) {
@@ -908,7 +916,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Create new comment element
                 const commentHtml = `
-                    <div class="comment-item comment-own">
+                    <div class="comment-item comment-own" id="comment-${data.remark.id}">
                         <div class="comment-avatar" style="background-color: ${data.remark.avatar_color}">
                             ${data.remark.initials}
                         </div>
@@ -918,14 +926,27 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="badge bg-${data.remark.role_color} badge-sm">${data.remark.role_display}</span>
                                 <span class="comment-time">just now</span>
                             </div>
-                            <div class="comment-text">${data.remark.text}</div>
+                            <div class="comment-text">${data.remark.formatted_text || data.remark.text}</div>
                             ${imagesHtml}
                         </div>
                     </div>
                 `;
 
-                // Prepend to container (newest first)
-                container.insertAdjacentHTML('afterbegin', commentHtml);
+                // If replying, add to parent's replies; otherwise prepend to container
+                if (replyToId) {
+                    const parentComment = document.getElementById('comment-' + replyToId);
+                    if (parentComment) {
+                        let repliesContainer = parentComment.querySelector('.replies-container');
+                        if (!repliesContainer) {
+                            repliesContainer = document.createElement('div');
+                            repliesContainer.className = 'replies-container mt-2 ms-3 ps-3 border-start border-2';
+                            parentComment.querySelector('.comment-content').appendChild(repliesContainer);
+                        }
+                        repliesContainer.insertAdjacentHTML('beforeend', commentHtml);
+                    }
+                } else {
+                    container.insertAdjacentHTML('afterbegin', commentHtml);
+                }
 
                 // Update comment count badge
                 const badge = document.querySelector('.card-header .badge.bg-secondary');
@@ -940,6 +961,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     imagePreviewContainer.innerHTML = '';
                     imagePreviewContainer.style.display = 'none';
                 }
+                
+                // Reset reply state
+                replyToId = null;
+                const indicator = document.getElementById('replyIndicator');
+                if (indicator) indicator.remove();
             } else {
                 alert(data.message || 'Failed to add comment');
             }
@@ -953,7 +979,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Reply button handler
-    let replyToId = null;
     document.querySelectorAll('.reply-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             replyToId = this.dataset.commentId;
@@ -963,15 +988,14 @@ document.addEventListener('DOMContentLoaded', function() {
             textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
             
             // Show reply indicator
-            const indicator = document.getElementById('replyIndicator');
-            if (!indicator) {
-                const ind = document.createElement('div');
-                ind.id = 'replyIndicator';
-                ind.className = 'alert alert-info py-1 px-2 mb-2 d-flex align-items-center';
-                ind.innerHTML = `<small><i class="bi bi-reply me-1"></i>Replying to <strong>${authorName}</strong></small>
-                    <button type="button" class="btn-close btn-close-sm ms-auto" onclick="cancelReply()"></button>`;
-                textarea.parentElement.insertBefore(ind, textarea);
-            }
+            let indicator = document.getElementById('replyIndicator');
+            if (indicator) indicator.remove();
+            const ind = document.createElement('div');
+            ind.id = 'replyIndicator';
+            ind.className = 'alert alert-info py-1 px-2 mb-2 d-flex align-items-center';
+            ind.innerHTML = `<small><i class="bi bi-reply me-1"></i>Replying to <strong>${authorName}</strong></small>
+                <button type="button" class="btn-close btn-close-sm ms-auto" onclick="cancelReply()"></button>`;
+            textarea.parentElement.insertBefore(ind, textarea);
         });
     });
     
@@ -981,26 +1005,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const indicator = document.getElementById('replyIndicator');
         if (indicator) indicator.remove();
     };
-    
-    // Update form submit to include parent_id
-    const originalSubmit = form.onsubmit;
-    form.addEventListener('submit', function(e) {
-        if (replyToId) {
-            // Add hidden input for parent_id
-            let parentInput = form.querySelector('input[name="parent_id"]');
-            if (!parentInput) {
-                parentInput = document.createElement('input');
-                parentInput.type = 'hidden';
-                parentInput.name = 'parent_id';
-                form.appendChild(parentInput);
-            }
-            parentInput.value = replyToId;
-        }
-    }, true);
-    
-    // After successful submit, reset reply state
-    const origFormSubmit = form.submit;
-    form.addEventListener('submit', async function(e) {}, { capture: false });
     
     // @Mention autocomplete
     let mentionDropdown = null;
