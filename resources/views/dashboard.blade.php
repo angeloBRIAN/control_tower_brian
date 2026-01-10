@@ -123,8 +123,8 @@
     // Count of jobs with NULL work_status
     $nullCount = $workStatusCounts->get(null)?->count ?? $workStatusCounts->get('')?->count ?? 0;
     
-    // Get configured work statuses from database
-    $workStatusOptions = \App\Models\DropdownOption::getOptions('work_status');
+    // Get configured work statuses from Job model (hardcoded)
+    $workStatusOptions = \App\Models\Job::getWorkStatusOptions();
     $firstStatusValue = $workStatusOptions->first()?->value;
 @endphp
 

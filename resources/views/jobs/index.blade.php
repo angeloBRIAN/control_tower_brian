@@ -71,7 +71,7 @@
             <div class="col-md-2">
                 <select name="filter_work_status" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">All Work Status</option>
-                    @foreach(\App\Models\DropdownOption::getOptions('work_status') as $opt)
+                    @foreach(\App\Models\Job::getWorkStatusOptions() as $opt)
                     <option value="{{ $opt->value }}" {{ request('filter_work_status') == $opt->value ? 'selected' : '' }}>{{ $opt->label }}</option>
                     @endforeach
                 </select>

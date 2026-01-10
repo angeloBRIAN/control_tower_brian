@@ -126,7 +126,7 @@ class ScheduledReportController extends Controller
                 ->values()
                 ->toArray(),
             
-            'work_status' => DropdownOption::getOptions('work_status')
+            'work_status' => Job::getWorkStatusOptions()
                 ->pluck('value')
                 ->toArray(),
             

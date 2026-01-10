@@ -89,7 +89,7 @@
                     <label class="form-label">Work Status</label>
                     <select name="work_status" class="form-select">
                         <option value="">-- Select Status --</option>
-                        @foreach(\App\Models\DropdownOption::getOptions('work_status') as $opt)
+                        @foreach(\App\Models\Job::getWorkStatusOptions() as $opt)
                         <option value="{{ $opt->value }}" {{ old('work_status', $job->work_status) == $opt->value ? 'selected' : '' }}>{{ $opt->label }}</option>
                         @endforeach
                     </select>

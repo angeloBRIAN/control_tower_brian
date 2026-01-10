@@ -50,9 +50,9 @@
     $cvParts = (clone $allUninvoicedJobs)->where('franchise', 'CV')->sum('part_sales') ?? 0;
     $cvTotal = (clone $allUninvoicedJobs)->where('franchise', 'CV')->sum('total_sales') ?? 0;
     
-    // Work Status breakdown - normalize using DropdownOption definitions
-    // Get all defined work statuses from DropdownOption
-    $allWorkStatuses = \App\Models\DropdownOption::getOptions('work_status');
+    // Work Status breakdown - normalize using Job model definitions
+    // Get all defined work statuses from Job model
+    $allWorkStatuses = \App\Models\Job::getWorkStatusOptions();
     
     // Create a lookup map: both value and label map to the same option
     $statusLookup = [];
@@ -361,7 +361,7 @@
             <div class="col-md-2">
                 <select name="work_status" class="form-select">
                     <option value="">All Status</option>
-                    @foreach(\App\Models\DropdownOption::getOptions('work_status') as $ws)
+                    @foreach(\App\Models\Job::getWorkStatusOptions() as $ws)
                         <option value="{{ $ws->value }}" {{ request('work_status') == $ws->value ? 'selected' : '' }}>{{ $ws->label }}</option>
                     @endforeach
                 </select>

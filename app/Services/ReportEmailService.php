@@ -223,8 +223,8 @@ class ReportEmailService
         $pcJobs = $jobs->where('franchise', 'PC');
         $cvJobs = $jobs->where('franchise', 'CV');
         
-        // Work status breakdown - normalize using DropdownOption definitions
-        $allWorkStatuses = DropdownOption::getOptions('work_status');
+        // Work status breakdown - normalize using Job model definitions
+        $allWorkStatuses = Job::getWorkStatusOptions();
         
         // Create lookup map
         $statusLookup = [];

@@ -157,7 +157,7 @@ class JobController extends Controller
         // Special handling for work_status: first status includes NULL (like Kanban)
         if ($request->filled('filter_work_status')) {
             $workStatusValue = $request->input('filter_work_status');
-            $firstStatus = \App\Models\DropdownOption::getOptions('work_status')->first()?->value;
+            $firstStatus = Job::getWorkStatusOptions()->first()?->value;
             
             if ($workStatusValue === $firstStatus) {
                 // First status includes jobs with NULL or empty work_status
@@ -689,8 +689,8 @@ class JobController extends Controller
         $user = auth()->user();
         $isFinance = $user->isFinance();
         
-        // Get work status options from database
-        $workStatuses = \App\Models\DropdownOption::getOptions('work_status');
+        // Get work status options from Job model (hardcoded)
+        $workStatuses = Job::getWorkStatusOptions();
         
         // Finance role sees only 3 payment-related columns
         $financeStatuses = ['proses_invoice', 'menunggu_pembayaran', 'sudah_dibayar'];

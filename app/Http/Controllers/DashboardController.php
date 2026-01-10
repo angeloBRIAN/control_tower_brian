@@ -59,7 +59,7 @@ class DashboardController extends Controller
                 ->keyBy('work_status');
         });
 
-        $workStatusOptions = DropdownOption::getOptions('work_status');
+        $workStatusOptions = Job::getWorkStatusOptions();
 
         // Count pending duplicate groups
         $duplicateCustomerCount = Cache::remember('dashboard_duplicate_count', self::CACHE_TTL, function () {
