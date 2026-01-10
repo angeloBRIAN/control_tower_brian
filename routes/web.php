@@ -317,10 +317,11 @@ Route::middleware('auth')->group(function () {
     });
 
 
-    // Finance Kanban (Steps 10-13) - Finance, Control Tower, Manager, Admin
+    // Finance Kanban (Invoice-based) - Finance, Control Tower, Manager, Admin
     Route::middleware('role:finance,control_tower,manager,admin')->group(function () {
         Route::get('finance/kanban', [\App\Http\Controllers\FinanceController::class, 'kanban'])->name('finance.kanban');
-        Route::post('finance/jobs/{job}/status', [\App\Http\Controllers\FinanceController::class, 'updateStatus'])->name('finance.update-status');
+        Route::post('finance/invoices/{invoice}/status', [\App\Http\Controllers\FinanceController::class, 'updateStatus'])->name('finance.invoice.update-status');
+        Route::post('finance/invoices/{invoice}/payment', [\App\Http\Controllers\FinanceController::class, 'recordPayment'])->name('finance.invoice.payment');
     });
 
     // Audit - Admin and Audit role

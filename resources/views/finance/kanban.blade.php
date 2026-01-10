@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Finance Process - Kanban')
+@section('title', 'Finance Kanban - Invoices')
 
 @section('content')
 <div class="container-fluid">
@@ -8,63 +8,106 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-1">
-                <i class="bi bi-cash-coin me-2"></i>Finance Process
+                <i class="bi bi-cash-coin me-2"></i>Finance Kanban
             </h1>
-            <p class="text-muted mb-0">Manage invoicing and payments (Steps 10-13)</p>
+            <p class="text-muted mb-0">Track invoice payments (Drag to update status)</p>
         </div>
         <div>
-            <!-- Filters if needed -->
+            <a href="{{ route('jobs.kanban') }}" class="btn btn-outline-primary">
+                <i class="bi bi-kanban me-1"></i> View Job Kanban
+            </a>
         </div>
     </div>
 
     <!-- Kanban Board -->
     <div class="kanban-board">
         <div class="row flex-nowrap overflow-auto pb-3" style="min-height: 500px;">
-            @foreach($statuses as $status)
-                <div class="col-kanban" style="min-width: 300px; max-width: 350px;">
+            @php
+                $columns = [
+                    'draft' => ['label' => 'Draft', 'color' => 'secondary', 'icon' => 'file-earmark'],
+                    'pending' => ['label' => 'Pending Payment', 'color' => 'warning', 'icon' => 'hourglass'],
+                    'partially_paid' => ['label' => 'Partially Paid', 'color' => 'info', 'icon' => 'pie-chart'],
+                    'paid' => ['label' => 'Paid', 'color' => 'success', 'icon' => 'check-circle'],
+                    'credit_note' => ['label' => 'Credit Notes', 'color' => 'danger', 'icon' => 'dash-circle'],
+                ];
+            @endphp
+
+            @foreach($columns as $statusKey => $col)
+                <div class="col-kanban" style="min-width: 280px; max-width: 320px;">
                     <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-3">
+                        <div class="card-header bg-{{ $col['color'] }} bg-opacity-10 border-0 d-flex align-items-center justify-content-between py-3">
                             <div class="d-flex align-items-center">
-                                <span class="badge rounded-pill me-2 bg-primary">
-                                    {{ $jobsByStatus[$status]->count() }}
+                                <i class="bi bi-{{ $col['icon'] }} me-2 text-{{ $col['color'] }}"></i>
+                                <span class="fw-semibold">{{ $col['label'] }}</span>
+                                <span class="badge bg-{{ $col['color'] }} ms-2">
+                                    {{ isset($invoicesByStatus[$statusKey]) ? $invoicesByStatus[$statusKey]->count() : 0 }}
                                 </span>
-                                <span class="fw-semibold">{{ $status }}</span>
                             </div>
                         </div>
                         <div class="card-body kanban-column p-2 bg-light" 
-                             data-status="{{ $status }}"
-                             style="min-height: 400px; border-radius: 0.5rem;">
+                             data-status="{{ $statusKey }}"
+                             style="min-height: 400px; border-radius: 0 0 0.5rem 0.5rem; overflow-y: auto; max-height: 600px;">
                              
-                            @forelse($jobsByStatus[$status] as $job)
-                                <div class="kanban-card card border-0 shadow-sm mb-2 cursor-grab" 
-                                     data-job-id="{{ $job->id }}"
-                                     draggable="true">
+                            @forelse($invoicesByStatus[$statusKey] ?? [] as $invoice)
+                                <div class="kanban-card card border-0 shadow-sm mb-2 cursor-grab {{ $statusKey === 'credit_note' ? 'border-start border-danger border-3' : '' }}" 
+                                     data-invoice-id="{{ $invoice->id }}"
+                                     data-amount="{{ $invoice->inv_ppn_meterai }}"
+                                     data-paid="{{ $invoice->paid_amount }}"
+                                     draggable="{{ $statusKey !== 'credit_note' ? 'true' : 'false' }}">
                                     <div class="card-body p-3">
+                                        <!-- Invoice Number -->
                                         <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="mb-0 fw-semibold">
-                                                <a href="{{ route('jobs.show', $job->id) }}" class="text-decoration-none text-dark">
-                                                    {{ $job->job_number }}
-                                                </a>
+                                            <h6 class="mb-0 fw-bold text-primary">
+                                                {{ $invoice->invoice_number ?: 'No Invoice #' }}
                                             </h6>
-                                            <span class="badge bg-secondary">{{ $job->plate_number }}</span>
+                                            <span class="badge bg-{{ $invoice->isCreditNote() ? 'danger' : 'secondary' }}">
+                                                {{ $invoice->type_sale_label }}
+                                            </span>
                                         </div>
+                                        
+                                        <!-- Job Reference -->
+                                        @if($invoice->job)
                                         <div class="small text-muted mb-2">
-                                            <i class="bi bi-person me-1"></i>{{ $job->customer_name }}
+                                            <a href="{{ route('jobs.show', $invoice->job->id) }}" class="text-decoration-none">
+                                                <i class="bi bi-briefcase me-1"></i>{{ $invoice->job->job_number }}
+                                            </a>
+                                            <span class="ms-1">{{ Str::limit($invoice->job->customer_name, 20) }}</span>
                                         </div>
-                                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                        @endif
+                                        
+                                        <!-- Amount -->
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="fw-bold {{ $invoice->isCreditNote() ? 'text-danger' : 'text-dark' }}">
+                                                    {{ $invoice->isCreditNote() ? '-' : '' }}Rp {{ number_format($invoice->inv_ppn_meterai, 0, ',', '.') }}
+                                                </span>
+                                                @if($invoice->status === 'partially_paid' && $invoice->paid_amount > 0)
+                                                    <br>
+                                                    <small class="text-success">
+                                                        Paid: Rp {{ number_format($invoice->paid_amount, 0, ',', '.') }}
+                                                    </small>
+                                                @endif
+                                            </div>
+                                            @if($invoice->invoice_date)
                                             <small class="text-muted">
-                                                {{ $job->updated_at->diffForHumans() }}
+                                                {{ $invoice->invoice_date->format('d M') }}
                                             </small>
-                                            <small class="fw-bold">
-                                                {{ number_format($job->total_sales, 0, ',', '.') }}
-                                            </small>
+                                            @endif
                                         </div>
+                                        
+                                        <!-- Payment Progress for partially paid -->
+                                        @if($invoice->status === 'partially_paid' && $invoice->inv_ppn_meterai > 0)
+                                            @php $pct = min(100, ($invoice->paid_amount / $invoice->inv_ppn_meterai) * 100); @endphp
+                                            <div class="progress mt-2" style="height: 4px;">
+                                                <div class="progress-bar bg-success" style="width: {{ $pct }}%"></div>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             @empty
                                 <div class="text-center text-muted py-4 opacity-50">
                                     <i class="bi bi-inbox fs-1"></i>
-                                    <p class="small mt-2 mb-0">No jobs</p>
+                                    <p class="small mt-2 mb-0">No invoices</p>
                                 </div>
                             @endforelse
                             
@@ -75,31 +118,78 @@
         </div>
     </div>
     
-    <!-- Remark Modal -->
-    <div class="modal fade" id="remarkModal" tabindex="-1">
+    <!-- Status Change Modal (with Remark) -->
+    <div class="modal fade" id="statusModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Confirm Status Change</h5>
+                    <h5 class="modal-title">Update Invoice Status</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="remarkForm">
-                        <input type="hidden" name="job_id" id="rm_job_id">
-                        <input type="hidden" name="status" id="rm_status">
+                    <form id="statusForm">
+                        <input type="hidden" name="invoice_id" id="sm_invoice_id">
+                        <input type="hidden" name="status" id="sm_status">
                         
-                        <p>Change status to: <strong id="rm_status_display" class="text-primary"></strong></p>
+                        <p>Move invoice to: <strong id="sm_status_display" class="text-primary"></strong></p>
                         
                         <div class="mb-3">
-                            <label class="form-label">Remark (Mandatory)</label>
-                            <textarea class="form-control" name="remark" id="rm_remark" rows="3" placeholder="Enter reason or details..." required minlength="3"></textarea>
-                            <div class="invalid-feedback">Remark is required (min 3 chars).</div>
+                            <label class="form-label">Comment (Required)</label>
+                            <textarea class="form-control" name="remark" id="sm_remark" rows="3" 
+                                      placeholder="Enter reason or notes for this change..." required minlength="3"></textarea>
+                            <div class="form-text">This will be logged in the Job's activity timeline</div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveRemark">Confirm & Move</button>
+                    <button type="button" class="btn btn-primary" id="saveStatus">
+                        <i class="bi bi-check me-1"></i> Confirm & Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Record Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="paymentForm">
+                        <input type="hidden" name="invoice_id" id="pm_invoice_id">
+                        
+                        <div class="alert alert-info">
+                            <strong>Invoice Total:</strong> Rp <span id="pm_total">0</span><br>
+                            <strong>Already Paid:</strong> Rp <span id="pm_paid">0</span><br>
+                            <strong>Remaining:</strong> Rp <span id="pm_remaining">0</span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Payment Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" class="form-control" name="amount" id="pm_amount" 
+                                       required min="1" step="1" placeholder="Enter amount">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notes (Required)</label>
+                            <textarea class="form-control" name="remark" id="pm_remark" rows="2" 
+                                      placeholder="Payment reference, bank transfer info, etc." required minlength="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="savePayment">
+                        <i class="bi bi-check me-1"></i> Record Payment
+                    </button>
                 </div>
             </div>
         </div>
@@ -121,15 +211,32 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.kanban-card');
+    const cards = document.querySelectorAll('.kanban-card[draggable="true"]');
     const columns = document.querySelectorAll('.kanban-column');
-    const remarkModal = new bootstrap.Modal(document.getElementById('remarkModal'));
+    const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+    const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
     let draggedCard = null;
     let originalParent = null;
+
+    // Status labels
+    const statusLabels = {
+        'draft': 'Draft',
+        'pending': 'Pending Payment',
+        'partially_paid': 'Partially Paid',
+        'paid': 'Paid'
+    };
 
     cards.forEach(card => {
         card.addEventListener('dragstart', handleDragStart);
         card.addEventListener('dragend', handleDragEnd);
+        
+        // Double-click to record payment
+        card.addEventListener('dblclick', function() {
+            const invoiceId = this.dataset.invoiceId;
+            const total = parseFloat(this.dataset.amount) || 0;
+            const paid = parseFloat(this.dataset.paid) || 0;
+            showPaymentModal(invoiceId, total, paid);
+        });
     });
 
     columns.forEach(column => {
@@ -144,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
         originalParent = this.parentNode;
         this.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', this.dataset.jobId);
+        e.dataTransfer.setData('text/plain', this.dataset.invoiceId);
     }
 
     function handleDragEnd(e) {
@@ -160,54 +267,106 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         this.classList.remove('drag-over');
         
-        // Prevent drop in same column
-        if (originalParent === this) return;
+        // Prevent drop in same column or credit_note column
+        if (originalParent === this || this.dataset.status === 'credit_note') return;
         
-        const jobId = e.dataTransfer.getData('text/plain');
+        const invoiceId = e.dataTransfer.getData('text/plain');
         const newStatus = this.dataset.status;
 
-        // Show Modal
-        document.getElementById('rm_job_id').value = jobId;
-        document.getElementById('rm_status').value = newStatus;
-        document.getElementById('rm_status_display').textContent = newStatus;
-        document.getElementById('rm_remark').value = ''; // Reset remark
+        // Show status modal
+        document.getElementById('sm_invoice_id').value = invoiceId;
+        document.getElementById('sm_status').value = newStatus;
+        document.getElementById('sm_status_display').textContent = statusLabels[newStatus] || newStatus;
+        document.getElementById('sm_remark').value = '';
         
-        remarkModal.show();
+        statusModal.show();
     }
-    
-    document.getElementById('saveRemark').addEventListener('click', function() {
-        const form = document.getElementById('remarkForm');
+
+    function showPaymentModal(invoiceId, total, paid) {
+        document.getElementById('pm_invoice_id').value = invoiceId;
+        document.getElementById('pm_total').textContent = formatNumber(total);
+        document.getElementById('pm_paid').textContent = formatNumber(paid);
+        document.getElementById('pm_remaining').textContent = formatNumber(total - paid);
+        document.getElementById('pm_amount').value = '';
+        document.getElementById('pm_amount').max = total - paid;
+        document.getElementById('pm_remark').value = '';
+        
+        paymentModal.show();
+    }
+
+    function formatNumber(num) {
+        return new Intl.NumberFormat('id-ID').format(num);
+    }
+
+    // Save status change
+    document.getElementById('saveStatus').addEventListener('click', function() {
+        const form = document.getElementById('statusForm');
         if (!form.checkValidity()) {
             form.reportValidity();
             return;
         }
         
-        const jobId = document.getElementById('rm_job_id').value;
-        const status = document.getElementById('rm_status').value;
-        const remark = document.getElementById('rm_remark').value;
+        const invoiceId = document.getElementById('sm_invoice_id').value;
+        const status = document.getElementById('sm_status').value;
+        const remark = document.getElementById('sm_remark').value;
         
-        // AJAX Submit
-        fetch(`/finance/jobs/${jobId}/status`, {
+        fetch(`/finance/invoices/${invoiceId}/status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({ work_status: status, remark: remark })
+            body: JSON.stringify({ status, remark })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                remarkModal.hide();
+                statusModal.hide();
                 location.reload();
             } else {
-                alert('Update failed: ' + (data.message || 'Unknown error'));
+                alert('Error: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(err => {
             console.error(err);
             alert('Error updating status');
+        });
+    });
+
+    // Save payment
+    document.getElementById('savePayment').addEventListener('click', function() {
+        const form = document.getElementById('paymentForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        const invoiceId = document.getElementById('pm_invoice_id').value;
+        const amount = document.getElementById('pm_amount').value;
+        const remark = document.getElementById('pm_remark').value;
+        
+        fetch(`/finance/invoices/${invoiceId}/payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ amount, remark })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                paymentModal.hide();
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error recording payment');
         });
     });
 });
