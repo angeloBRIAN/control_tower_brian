@@ -528,6 +528,15 @@
                                     <span class="comment-time">{{ $remark->time_ago }}</span>
                                 </div>
                                 <div class="comment-text">{{ $remark->remark_text }}</div>
+                                @if($remark->hasImages())
+                                <div class="comment-images mt-2 d-flex flex-wrap gap-2">
+                                    @foreach($remark->image_urls as $imageUrl)
+                                    <a href="{{ $imageUrl }}" target="_blank" class="comment-image-thumb" data-bs-toggle="tooltip" title="Click to view full size">
+                                        <img src="{{ $imageUrl }}" alt="Comment image" class="rounded" style="max-height: 80px; max-width: 120px; object-fit: cover; cursor: pointer; border: 1px solid #dee2e6;">
+                                    </a>
+                                    @endforeach
+                                </div>
+                                @endif
                             </div>
                         </div>
                         @empty
@@ -569,13 +578,21 @@
                     
                     @if($canComment)
                     <div class="comment-form-container">
-                        <form id="inlineCommentForm" class="d-flex gap-2 align-items-start">
+                        <form id="inlineCommentForm" class="d-flex gap-2 align-items-start" enctype="multipart/form-data">
                             @csrf
                             <div class="comment-avatar comment-avatar-sm" style="background-color: {{ sprintf('#%06X', crc32(auth()->user()->name) & 0xFFFFFF) }}">
                                 {{ auth()->user()->initials }}
                             </div>
                             <div class="flex-grow-1">
                                 <textarea name="remark_text" class="form-control form-control-sm" rows="2" placeholder="Write a comment..." required id="remarkTextInput"></textarea>
+                                <div class="mt-2 d-flex align-items-center gap-2">
+                                    <label class="btn btn-outline-secondary btn-sm mb-0" for="commentImages" data-bs-toggle="tooltip" title="Attach images (max 3)">
+                                        <i class="bi bi-image"></i> <span class="d-none d-md-inline">Add Images</span>
+                                    </label>
+                                    <input type="file" id="commentImages" name="images[]" accept="image/*" multiple class="d-none" max="3">
+                                    <small class="text-muted d-none d-md-inline">Max 3 images, 10MB each</small>
+                                </div>
+                                <div id="imagePreviewContainer" class="mt-2 d-flex flex-wrap gap-2" style="display: none;"></div>
                             </div>
                             <button type="submit" class="btn btn-primary btn-sm" id="submitCommentBtn">
                                 <i class="bi bi-send"></i>
@@ -761,6 +778,48 @@ document.addEventListener('DOMContentLoaded', function() {
     const textarea = document.getElementById('remarkTextInput');
     const container = document.getElementById('commentContainer');
     const noCommentsMsg = document.getElementById('noCommentsMessage');
+    const imageInput = document.getElementById('commentImages');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+
+    // Image preview handling
+    if (imageInput) {
+        imageInput.addEventListener('change', function() {
+            imagePreviewContainer.innerHTML = '';
+            const files = Array.from(this.files).slice(0, 3); // Max 3 images
+            
+            if (files.length > 0) {
+                imagePreviewContainer.style.display = 'flex';
+                files.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const preview = document.createElement('div');
+                        preview.className = 'position-relative';
+                        preview.innerHTML = `
+                            <img src="${e.target.result}" class="rounded" style="height: 60px; width: 60px; object-fit: cover; border: 2px solid #dee2e6;">
+                            <button type="button" class="btn btn-danger btn-sm position-absolute" 
+                                style="top: -5px; right: -5px; padding: 0 4px; font-size: 10px; line-height: 1.2;"
+                                onclick="removeImagePreview(${index})">×</button>
+                        `;
+                        imagePreviewContainer.appendChild(preview);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                imagePreviewContainer.style.display = 'none';
+            }
+        });
+    }
+
+    // Function to remove image from preview
+    window.removeImagePreview = function(index) {
+        const dt = new DataTransfer();
+        const files = Array.from(imageInput.files);
+        files.forEach((file, i) => {
+            if (i !== index) dt.items.add(file);
+        });
+        imageInput.files = dt.files;
+        imageInput.dispatchEvent(new Event('change'));
+    };
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -773,14 +832,24 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
         try {
+            // Use FormData for file uploads
+            const formData = new FormData();
+            formData.append('remark_text', remarkText);
+            
+            // Add images if selected
+            if (imageInput && imageInput.files.length > 0) {
+                Array.from(imageInput.files).slice(0, 3).forEach(file => {
+                    formData.append('images[]', file);
+                });
+            }
+            
             const response = await fetch('{{ route("jobs.add-remark", $job) }}', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({ remark_text: remarkText })
+                body: formData
             });
 
             const data = await response.json();
@@ -788,6 +857,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // Remove "no comments" message if present
                 if (noCommentsMsg) noCommentsMsg.remove();
+
+                // Build images HTML if present
+                let imagesHtml = '';
+                if (data.remark.images && data.remark.images.length > 0) {
+                    imagesHtml = '<div class="comment-images mt-2 d-flex flex-wrap gap-2">';
+                    data.remark.images.forEach(url => {
+                        imagesHtml += `<a href="${url}" target="_blank" class="comment-image-thumb">
+                            <img src="${url}" alt="Comment image" class="rounded" style="max-height: 80px; max-width: 120px; object-fit: cover; border: 1px solid #dee2e6;">
+                        </a>`;
+                    });
+                    imagesHtml += '</div>';
+                }
 
                 // Create new comment element
                 const commentHtml = `
@@ -802,6 +883,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="comment-time">just now</span>
                             </div>
                             <div class="comment-text">${data.remark.text}</div>
+                            ${imagesHtml}
                         </div>
                     </div>
                 `;
@@ -815,8 +897,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     badge.textContent = parseInt(badge.textContent) + 1;
                 }
 
-                // Clear textarea
+                // Clear textarea and image input
                 textarea.value = '';
+                if (imageInput) {
+                    imageInput.value = '';
+                    imagePreviewContainer.innerHTML = '';
+                    imagePreviewContainer.style.display = 'none';
+                }
             } else {
                 alert(data.message || 'Failed to add comment');
             }

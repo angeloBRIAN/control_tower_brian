@@ -16,8 +16,33 @@ class Remark extends Model
         'job_id',
         'user_id',
         'remark_text',
+        'images',
         'created_by',
     ];
+
+    protected $casts = [
+        'images' => 'array',
+    ];
+
+    /**
+     * Check if this remark has images attached
+     */
+    public function hasImages(): bool
+    {
+        return !empty($this->images) && is_array($this->images);
+    }
+
+    /**
+     * Get full URLs for all images
+     */
+    public function getImageUrlsAttribute(): array
+    {
+        if (!$this->hasImages()) {
+            return [];
+        }
+
+        return array_map(fn($path) => asset("storage/{$path}"), $this->images);
+    }
 
     public function job(): BelongsTo
     {

@@ -362,14 +362,32 @@ class JobController extends Controller
 
         $validated = $request->validate([
             'remark_text' => 'required|string',
+            'images' => 'nullable|array|max:3',
+            'images.*' => 'image|mimes:jpeg,png,gif,webp|max:10240', // 10MB max per image
         ]);
+
+        // Process and store images if uploaded
+        $imagePaths = [];
+        if ($request->hasFile('images')) {
+            $imageService = new \App\Services\ImageService();
+            foreach ($request->file('images') as $image) {
+                $imagePaths[] = $imageService->processAndStore($image, "remarks/{$job->id}");
+            }
+        }
 
         $remark = $job->addRemark($validated['remark_text'], $user?->name, $user?->id);
         
+        // Save images to the remark
+        if (!empty($imagePaths)) {
+            $remark->update(['images' => $imagePaths]);
+        }
+        
         // Log activity
-        \App\Models\JobActivity::log($job, 'remark_added', 
-            "Comment added: \"" . \Illuminate\Support\Str::limit($validated['remark_text'], 50) . "\""
-        );
+        $activityMessage = "Comment added: \"" . \Illuminate\Support\Str::limit($validated['remark_text'], 50) . "\"";
+        if (!empty($imagePaths)) {
+            $activityMessage .= " (with " . count($imagePaths) . " image(s))";
+        }
+        \App\Models\JobActivity::log($job, 'remark_added', $activityMessage);
         
         // Load the user relationship for the response
         $remark->load('user');
@@ -396,6 +414,7 @@ class JobController extends Controller
                     'role_display' => $user?->getRoleDisplayName() ?? 'User',
                     'role_color' => $roleColor,
                     'time_ago' => 'just now',
+                    'images' => $remark->image_urls,
                 ],
             ]);
         }
