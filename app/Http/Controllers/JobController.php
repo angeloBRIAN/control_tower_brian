@@ -480,6 +480,7 @@ class JobController extends Controller
 
             return response()->json([
                 'success' => true,
+                'unread_count' => $user->unreadNotifications()->count(),
                 'remark' => [
                     'id' => $remark->id,
                     'parent_id' => $remark->parent_id,

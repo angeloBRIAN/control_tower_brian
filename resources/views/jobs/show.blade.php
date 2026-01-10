@@ -1040,6 +1040,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 replyToId = null;
                 const indicator = document.getElementById('replyIndicator');
                 if (indicator) indicator.remove();
+                
+                // Update notification badge if count provided (fallback for websocket issues)
+                if (data.unread_count !== undefined) {
+                    const badge = document.querySelector('#notificationDropdown .badge');
+                    if (badge) {
+                        badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+                        if (data.unread_count > 0) {
+                            badge.style.display = 'inline-block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    } else if (data.unread_count > 0) {
+                        const btn = document.getElementById('notificationDropdown');
+                        if (btn) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger';
+                            newBadge.style.fontSize = '0.6rem';
+                            newBadge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+                            btn.appendChild(newBadge);
+                        }
+                    }
+                }
             } else {
                 alert(data.message || 'Failed to add comment');
             }
