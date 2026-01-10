@@ -512,6 +512,33 @@
                     <span><i class="bi bi-chat-dots me-2"></i>Comments <span class="badge bg-secondary ms-1">{{ $job->remarks->count() }}</span></span>
                 </div>
                 <div class="card-body p-0">
+                    @php
+                        $canComment = false;
+                        $commentBlockReason = '';
+                        $commentUser = auth()->user();
+                        
+                        if ($commentUser->hasAnyRole(['admin', 'manager', 'control_tower'])) {
+                            $canComment = true;
+                        } elseif ($commentUser->hasRole('sa')) {
+                            if ($commentUser->serviceAdvisor?->name === $job->service_advisor) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
+                            }
+                        } elseif ($commentUser->hasRole('foreman')) {
+                            if ($commentUser->foreman?->name === $job->foreman) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
+                            }
+                        } elseif ($commentUser->hasRole('sparepart')) {
+                            if ($job->need_part) {
+                                $canComment = true;
+                            } else {
+                                $commentBlockReason = 'You can only add remarks on jobs that need parts.';
+                            }
+                        }
+                    @endphp
                     <!-- Comment List -->
                     <div class="comment-container" id="commentContainer">
                         @forelse($job->remarks->where('parent_id', null) as $remark)
@@ -585,34 +612,6 @@
                     </div>
 
                     <!-- Add Comment Form (Inline) -->
-                    @php
-                        $canComment = false;
-                        $commentBlockReason = '';
-                        $user = auth()->user();
-                        
-                        if ($user->hasAnyRole(['admin', 'manager', 'control_tower'])) {
-                            $canComment = true;
-                        } elseif ($user->hasRole('sa')) {
-                            if ($user->serviceAdvisor?->name === $job->service_advisor) {
-                                $canComment = true;
-                            } else {
-                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
-                            }
-                        } elseif ($user->hasRole('foreman')) {
-                            if ($user->foreman?->name === $job->foreman) {
-                                $canComment = true;
-                            } else {
-                                $commentBlockReason = 'You can only add remarks on jobs assigned to you.';
-                            }
-                        } elseif ($user->hasRole('sparepart')) {
-                            if ($job->need_part) {
-                                $canComment = true;
-                            } else {
-                                $commentBlockReason = 'You can only add remarks on jobs that need parts.';
-                            }
-                        }
-                    @endphp
-                    
                     @if($canComment)
                     <div class="comment-form-container">
                         <form id="inlineCommentForm" class="d-flex gap-2 align-items-start" enctype="multipart/form-data">
