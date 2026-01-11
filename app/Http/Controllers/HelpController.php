@@ -29,6 +29,24 @@ class HelpController extends Controller
             'icon' => 'bi-megaphone-fill',
             'description' => 'Send broadcast messages to all users',
         ],
+        'remarks' => [
+            'file' => 'REMARKS_SYSTEM.md',
+            'title' => 'Remarks & Comments',
+            'icon' => 'bi-chat-text-fill',
+            'description' => 'Add comments with images, replies, and @mentions',
+        ],
+        'kanban' => [
+            'file' => 'KANBAN_BOARDS.md',
+            'title' => 'Kanban Boards',
+            'icon' => 'bi-kanban-fill',
+            'description' => 'Visual workflow boards for jobs, finance, and parts',
+        ],
+        'parts-tracking' => [
+            'file' => 'PARTS_TRACKING.md',
+            'title' => 'Parts Tracking',
+            'icon' => 'bi-box-seam-fill',
+            'description' => 'Manage spare parts orders and deliveries',
+        ],
         'workflows' => [
             'file' => 'WORKFLOW_GUIDE.md',
             'title' => 'Workflow Guide',
