@@ -17,6 +17,18 @@ class HelpController extends Controller
             'icon' => 'bi-book',
             'description' => 'Complete feature reference and system overview',
         ],
+        'dashboard-widgets' => [
+            'file' => 'DASHBOARD_WIDGETS.md',
+            'title' => 'Dashboard & Widgets',
+            'icon' => 'bi-grid-1x2-fill',
+            'description' => 'Customize your dashboard with 28 available widgets',
+        ],
+        'announcements' => [
+            'file' => 'ANNOUNCEMENTS.md',
+            'title' => 'Announcements & Broadcasts',
+            'icon' => 'bi-megaphone-fill',
+            'description' => 'Send broadcast messages to all users',
+        ],
         'workflows' => [
             'file' => 'WORKFLOW_GUIDE.md',
             'title' => 'Workflow Guide',
