@@ -59,10 +59,13 @@
                     <label class="form-label">Job Type</label>
                     <select name="job_type" class="form-select">
                         <option value="">-- Select Type --</option>
-                        <option value="regular" {{ old('job_type', $job->job_type) == 'regular' ? 'selected' : '' }}>Regular Service</option>
-                        <option value="pdi" {{ old('job_type', $job->job_type) == 'pdi' ? 'selected' : '' }}>PDI</option>
-                        <option value="booking" {{ old('job_type', $job->job_type) == 'booking' ? 'selected' : '' }}>Booking</option>
-                        <option value="towing" {{ old('job_type', $job->job_type) == 'towing' ? 'selected' : '' }}>Towing</option>
+                        <option value="quick_service" {{ old('job_type', $job->job_type) == 'quick_service' ? 'selected' : '' }}>Quick Service</option>
+                        <option value="warranty" {{ old('job_type', $job->job_type) == 'warranty' ? 'selected' : '' }}>Warranty</option>
+                        <option value="isp" {{ old('job_type', $job->job_type) == 'isp' ? 'selected' : '' }}>ISP</option>
+                        <option value="campaign" {{ old('job_type', $job->job_type) == 'campaign' ? 'selected' : '' }}>Campaign</option>
+                        <option value="cash" {{ old('job_type', $job->job_type) == 'cash' ? 'selected' : '' }}>Cash</option>
+                        <option value="booking_service" {{ old('job_type', $job->job_type) == 'booking_service' ? 'selected' : '' }}>Booking Service</option>
+                        <option value="pdi" {{ old('job_type', $job->job_type) == 'pdi' ? 'selected' : '' }}>Pre Delivery Inspection</option>
                     </select>
                 </div>
                 <div class="col-md-6">

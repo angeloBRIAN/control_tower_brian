@@ -121,18 +121,23 @@
                 </li>
                 
                 @php
-                    $isOperationsActive = request()->routeIs('jobs.*') || request()->routeIs('vehicles.*') || request()->routeIs('customers.*') || request()->routeIs('bookings.*') || request()->routeIs('pdi-records.*') || request()->routeIs('towing-records.*');
+                    $isJobsActive = request()->routeIs('jobs.*');
+                    $isBookingsActive = request()->routeIs('bookings.*') || request()->routeIs('pdi-records.*') || request()->routeIs('towing-records.*');
                     $isReportsActive = request()->routeIs('reports.*');
                     $isImportActive = request()->routeIs('imports.*');
                     $isAdminActive = request()->routeIs('admin.*');
-                    $isMasterDataActive = request()->routeIs('service-advisors.*') || request()->routeIs('foremen.*');
+                    $isMasterDataActive = request()->routeIs('service-advisors.*') || request()->routeIs('foremen.*') || request()->routeIs('vehicles.*') || request()->routeIs('customers.*');
                 @endphp
 
-                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#operationsMenu" aria-expanded="{{ $isOperationsActive ? 'true' : 'false' }}">
-                    Operations <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                {{-- Jobs Menu --}}
+                @php
+                    $isJobsActive = request()->routeIs('jobs.*');
+                @endphp
+                <div class="nav-section {{ $isJobsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#jobsMenu" aria-expanded="{{ $isJobsActive ? 'true' : 'false' }}">
+                    <i class="bi bi-briefcase-fill me-2"></i>Jobs <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
                 </div>
-                <div class="collapse {{ $isOperationsActive ? 'show' : '' }}" id="operationsMenu">
-                <li class="nav-item">
+                <div class="collapse {{ $isJobsActive ? 'show' : '' }}" id="jobsMenu">
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('jobs.index') || request()->routeIs('jobs.show') ? 'active' : '' }}" href="{{ route('jobs.index') }}">
                             <i class="bi bi-card-list"></i> Job Progress
                         </a>
@@ -142,21 +147,18 @@
                             <i class="bi bi-kanban"></i> Kanban Board
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('vehicles.*') ? 'active' : '' }}" href="{{ route('vehicles.index') }}">
-                            <i class="bi bi-car-front-fill"></i> Vehicles
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}">
-                            <i class="bi bi-people-fill"></i> Customers
-                        </a>
-                    </li>
-                    @auth
-                    @if(Auth::user()->canManageMasterData())
+                </div>
+
+                {{-- Bookings Menu --}}
+                @auth
+                @if(Auth::user()->canManageMasterData())
+                <div class="nav-section {{ $isBookingsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#bookingsMenu" aria-expanded="{{ $isBookingsActive ? 'true' : 'false' }}">
+                    <i class="bi bi-calendar-check me-2"></i>Bookings <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                </div>
+                <div class="collapse {{ $isBookingsActive ? 'show' : '' }}" id="bookingsMenu">
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('bookings.*') ? 'active' : '' }}" href="{{ route('bookings.index') }}">
-                            <i class="bi bi-calendar-check"></i> Bookings
+                            <i class="bi bi-calendar-event"></i> Booking List
                         </a>
                     </li>
                     <li class="nav-item">
@@ -169,9 +171,9 @@
                             <i class="bi bi-truck"></i> Towing Records
                         </a>
                     </li>
-                    @endif
-                    @endauth
                 </div>
+                @endif
+                @endauth
 
                 {{-- Parts Tracking Menu (for sparepart, control_tower, manager, or admin) --}}
                 @auth
@@ -216,19 +218,20 @@
                 @endif
                 @endauth
 
+                {{-- Recently Viewed --}}
                 @auth
                 @php
                     $recentJobs = \App\Models\RecentlyViewed::getRecentForUser(auth()->id(), 5);
                 @endphp
                 @if($recentJobs->count() > 0)
-                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#recentMenu" aria-expanded="false">
-                    Recently Viewed <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                <div class="nav-section collapsed" data-bs-toggle="collapse" data-bs-target="#recentMenu" aria-expanded="false">
+                    <i class="bi bi-clock-history me-2"></i>Recently Viewed <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
                 </div>
                 <div class="collapse" id="recentMenu">
                     @foreach($recentJobs as $recentJob)
                     <li class="nav-item">
                         <a class="nav-link py-2" href="{{ route('jobs.show', $recentJob) }}" title="{{ $recentJob->customer_name }}">
-                            <i class="bi bi-clock-history text-muted"></i>
+                            <i class="bi bi-file-text text-muted"></i>
                             <span class="d-flex flex-column lh-sm">
                                 <span class="small fw-semibold">{{ $recentJob->job_number }}</span>
                                 <span class="text-muted" style="font-size: 0.75rem;">{{ Str::limit($recentJob->plate_number, 12) }}</span>
@@ -243,10 +246,42 @@
                 @endif
                 @endauth
 
+                {{-- Master Data Menu (MOVED ABOVE IMPORT DATA) --}}
                 @auth
                 @if(Auth::user()->canManageMasterData())
-                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#importMenu" aria-expanded="{{ $isImportActive ? 'true' : 'false' }}">
-                    Import Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                <div class="nav-section {{ $isMasterDataActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#masterDataMenu" aria-expanded="{{ $isMasterDataActive ? 'true' : 'false' }}">
+                    <i class="bi bi-database-fill me-2"></i>Master Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                </div>
+                <div class="collapse {{ $isMasterDataActive ? 'show' : '' }}" id="masterDataMenu">
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}">
+                            <i class="bi bi-people-fill"></i> Customers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('vehicles.*') ? 'active' : '' }}" href="{{ route('vehicles.index') }}">
+                            <i class="bi bi-car-front-fill"></i> Vehicles
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('service-advisors.*') ? 'active' : '' }}" href="{{ route('service-advisors.index') }}">
+                            <i class="bi bi-person-badge"></i> Service Advisors
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('foremen.*') ? 'active' : '' }}" href="{{ route('foremen.index') }}">
+                            <i class="bi bi-person-gear"></i> Foremen
+                        </a>
+                    </li>
+                </div>
+                @endif
+                @endauth
+
+                {{-- Import Data Menu --}}
+                @auth
+                @if(Auth::user()->canManageMasterData())
+                <div class="nav-section {{ $isImportActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#importMenu" aria-expanded="{{ $isImportActive ? 'true' : 'false' }}">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>Import Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
                 </div>
                 <div class="collapse {{ $isImportActive ? 'show' : '' }}" id="importMenu">
                     <li class="nav-item">
@@ -262,8 +297,9 @@
                 </div>
                 @endif
 
-                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#reportsMenu" aria-expanded="{{ $isReportsActive ? 'true' : 'false' }}">
-                    Reports <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                {{-- Reports Menu --}}
+                <div class="nav-section {{ $isReportsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#reportsMenu" aria-expanded="{{ $isReportsActive ? 'true' : 'false' }}">
+                    <i class="bi bi-bar-chart-fill me-2"></i>Reports <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
                 </div>
                 <div class="collapse {{ $isReportsActive ? 'show' : '' }}" id="reportsMenu">
                     <li class="nav-item">
@@ -304,24 +340,6 @@
                     </li>
                     @endif
                 </div>
-
-                @if(Auth::user()->canManageMasterData())
-                <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#masterDataMenu" aria-expanded="{{ $isMasterDataActive ? 'true' : 'false' }}">
-                    Master Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
-                </div>
-                <div class="collapse {{ $isMasterDataActive ? 'show' : '' }}" id="masterDataMenu">
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('service-advisors.*') ? 'active' : '' }}" href="{{ route('service-advisors.index') }}">
-                            <i class="bi bi-database-fill"></i> Service Advisors
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('foremen.*') ? 'active' : '' }}" href="{{ route('foremen.index') }}">
-                            <i class="bi bi-database-fill"></i> Foremen
-                        </a>
-                    </li>
-                </div>
-                @endif
 
                 @if(Auth::user()->hasRole('admin'))
                 <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#adminMenu" aria-expanded="{{ $isAdminActive ? 'true' : 'false' }}">
