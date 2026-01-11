@@ -83,8 +83,13 @@ body {
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 0;
     transition: color 0.2s;
+}
+
+.sidebar .nav-section .menu-text {
+    flex: 1;
 }
 
 .sidebar .nav-section:hover {
@@ -93,6 +98,7 @@ body {
 
 .sidebar .nav-section .arr {
     transition: transform 0.2s;
+    margin-left: auto;
 }
 
 .sidebar .nav-section[aria-expanded="true"] .arr {

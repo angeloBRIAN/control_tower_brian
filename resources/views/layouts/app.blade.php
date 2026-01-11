@@ -134,7 +134,8 @@
                     $isJobsActive = request()->routeIs('jobs.*');
                 @endphp
                 <div class="nav-section {{ $isJobsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#jobsMenu" aria-expanded="{{ $isJobsActive ? 'true' : 'false' }}">
-                    <i class="bi bi-briefcase-fill me-2"></i>Jobs <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-briefcase-fill me-2"></i>Jobs</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isJobsActive ? 'show' : '' }}" id="jobsMenu">
                     <li class="nav-item">
@@ -153,7 +154,8 @@
                 @auth
                 @if(Auth::user()->canManageMasterData())
                 <div class="nav-section {{ $isBookingsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#bookingsMenu" aria-expanded="{{ $isBookingsActive ? 'true' : 'false' }}">
-                    <i class="bi bi-calendar-check me-2"></i>Bookings <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-calendar-check me-2"></i>Bookings</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isBookingsActive ? 'show' : '' }}" id="bookingsMenu">
                     <li class="nav-item">
@@ -182,7 +184,8 @@
                     $isPartsActive = request()->routeIs('parts.*') || request()->routeIs('part-orders.*');
                 @endphp
                 <div class="nav-section {{ $isPartsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#partsMenu" aria-expanded="{{ $isPartsActive ? 'true' : 'false' }}">
-                    <i class="bi bi-box-seam me-2"></i>Parts Tracking <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-box-seam me-2"></i>Parts Tracking</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isPartsActive ? 'show' : '' }}" id="partsMenu">
                     <li class="nav-item">
@@ -206,7 +209,8 @@
                     $isFinanceActive = request()->routeIs('finance.*');
                 @endphp
                 <div class="nav-section {{ $isFinanceActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#financeMenu" aria-expanded="{{ $isFinanceActive ? 'true' : 'false' }}">
-                    <i class="bi bi-cash-coin me-2"></i>Finance <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-cash-coin me-2"></i>Finance</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isFinanceActive ? 'show' : '' }}" id="financeMenu">
                     <li class="nav-item">
@@ -225,7 +229,8 @@
                 @endphp
                 @if($recentJobs->count() > 0)
                 <div class="nav-section collapsed" data-bs-toggle="collapse" data-bs-target="#recentMenu" aria-expanded="false">
-                    <i class="bi bi-clock-history me-2"></i>Recently Viewed <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-clock-history me-2"></i>Recently Viewed</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse" id="recentMenu">
                     @foreach($recentJobs as $recentJob)
@@ -250,7 +255,8 @@
                 @auth
                 @if(Auth::user()->canManageMasterData())
                 <div class="nav-section {{ $isMasterDataActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#masterDataMenu" aria-expanded="{{ $isMasterDataActive ? 'true' : 'false' }}">
-                    <i class="bi bi-database-fill me-2"></i>Master Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-database-fill me-2"></i>Master Data</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isMasterDataActive ? 'show' : '' }}" id="masterDataMenu">
                     <li class="nav-item">
@@ -281,7 +287,8 @@
                 @auth
                 @if(Auth::user()->canManageMasterData())
                 <div class="nav-section {{ $isImportActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#importMenu" aria-expanded="{{ $isImportActive ? 'true' : 'false' }}">
-                    <i class="bi bi-cloud-arrow-up me-2"></i>Import Data <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-cloud-arrow-up me-2"></i>Import Data</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isImportActive ? 'show' : '' }}" id="importMenu">
                     <li class="nav-item">
@@ -299,7 +306,8 @@
 
                 {{-- Reports Menu --}}
                 <div class="nav-section {{ $isReportsActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#reportsMenu" aria-expanded="{{ $isReportsActive ? 'true' : 'false' }}">
-                    <i class="bi bi-bar-chart-fill me-2"></i>Reports <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-bar-chart-fill me-2"></i>Reports</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isReportsActive ? 'show' : '' }}" id="reportsMenu">
                     <li class="nav-item">
@@ -343,7 +351,8 @@
 
                 @if(Auth::user()->hasRole('admin'))
                 <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#adminMenu" aria-expanded="{{ $isAdminActive ? 'true' : 'false' }}">
-                    Administration <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-gear-fill me-2"></i>Administration</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                  <div class="collapse {{ $isAdminActive ? 'show' : '' }}" id="adminMenu">
                     <li class="nav-item">
@@ -404,7 +413,8 @@
                     $isAuditActive = request()->routeIs('admin.audit-logs.*') || request()->routeIs('tracker.*');
                 @endphp
                 <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#auditMenu" aria-expanded="{{ $isAuditActive ? 'true' : 'false' }}">
-                    Audit <i class="bi bi-chevron-down arr" style="font-size: 0.8em;"></i>
+                    <span class="menu-text"><i class="bi bi-shield-check me-2"></i>Audit</span>
+                    <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                 <div class="collapse {{ $isAuditActive ? 'show' : '' }}" id="auditMenu">
                     <li class="nav-item">
