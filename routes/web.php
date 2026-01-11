@@ -59,6 +59,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/', [\App\Http\Controllers\NotificationController::class, 'clearAll'])->name('clear-all');
     });
     
+    // Announcement Dismiss (for all users)
+    Route::post('announcements/{announcement}/dismiss', [\App\Http\Controllers\AnnouncementController::class, 'dismissAjax'])->name('announcements.dismiss');
+    
     // Push Subscriptions (PWA)
     Route::prefix('push')->name('push.')->group(function () {
         Route::post('subscribe', [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('subscribe');
@@ -261,6 +264,15 @@ Route::middleware('auth')->group(function () {
         Route::post('report-settings/{report}/recipients/remove', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'removeRecipient'])->name('report-settings.remove-recipient');
         Route::post('report-settings/{report}/send', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'sendNow'])->name('report-settings.send-now');
         Route::put('report-settings/smtp', [\App\Http\Controllers\Admin\ReportSettingsController::class, 'updateSmtp'])->name('report-settings.smtp');
+
+        // Announcements (Broadcast)
+        Route::get('announcements', [\App\Http\Controllers\AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('announcements/create', [\App\Http\Controllers\AnnouncementController::class, 'create'])->name('announcements.create');
+        Route::post('announcements', [\App\Http\Controllers\AnnouncementController::class, 'store'])->name('announcements.store');
+        Route::get('announcements/{announcement}/edit', [\App\Http\Controllers\AnnouncementController::class, 'edit'])->name('announcements.edit');
+        Route::put('announcements/{announcement}', [\App\Http\Controllers\AnnouncementController::class, 'update'])->name('announcements.update');
+        Route::delete('announcements/{announcement}', [\App\Http\Controllers\AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+        Route::post('announcements/{announcement}/resend', [\App\Http\Controllers\AnnouncementController::class, 'resend'])->name('announcements.resend');
 
         // Scheduled Reports
         Route::resource('scheduled-reports', \App\Http\Controllers\Admin\ScheduledReportController::class);
