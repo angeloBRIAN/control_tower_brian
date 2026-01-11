@@ -74,11 +74,11 @@ body {
 }
 
 .sidebar .nav-section {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    padding: 1.5rem 1.5rem 0.5rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    padding: 1rem 1.5rem 0.5rem;
     font-weight: 600;
     cursor: pointer;
     display: flex;
