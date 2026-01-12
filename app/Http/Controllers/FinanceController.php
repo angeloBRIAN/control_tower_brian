@@ -133,6 +133,25 @@ class FinanceController extends Controller
 
         $invoice->update($updateData);
 
+        // Sync job work_status based on invoice status
+        if ($job) {
+            $workStatusMap = [
+                JobInvoice::STATUS_DRAFT => '11. Proses Invoice',
+                JobInvoice::STATUS_PENDING => '12. Menunggu Pembayaran',
+                JobInvoice::STATUS_PARTIALLY_PAID => '12. Menunggu Pembayaran',
+                JobInvoice::STATUS_PAID => '13. Sudah Dibayar',
+            ];
+            
+            if (isset($workStatusMap[$newStatus])) {
+                $newWorkStatus = $workStatusMap[$newStatus];
+                $oldWorkStatus = $job->work_status;
+                
+                if ($oldWorkStatus !== $newWorkStatus) {
+                    $job->update(['work_status' => $newWorkStatus]);
+                }
+            }
+        }
+
         // Log to Job Activity Timeline
         if ($job) {
             JobActivity::log(
@@ -194,6 +213,18 @@ class FinanceController extends Controller
 
         // Log activity
         $job = $invoice->job;
+        
+        // Sync job work_status based on payment status
+        if ($job) {
+            $newWorkStatus = $newStatus === JobInvoice::STATUS_PAID 
+                ? '13. Sudah Dibayar' 
+                : '12. Menunggu Pembayaran';
+            
+            if ($job->work_status !== $newWorkStatus) {
+                $job->update(['work_status' => $newWorkStatus]);
+            }
+        }
+        
         if ($job) {
             JobActivity::log(
                 $job,

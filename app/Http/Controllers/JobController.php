@@ -833,6 +833,15 @@ class JobController extends Controller
         $newStatus = $validated['work_status'];
         $remark = $validated['remark'] ?? null;
         
+        // Check if the target status is protected (auto-updated by other systems)
+        if (Job::isProtectedWorkStatus($newStatus)) {
+            $reason = Job::getProtectedStatusReason($newStatus);
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot manually change to this status. {$reason}",
+            ], 403);
+        }
+        
         // Finance role can only change between 3 payment-related statuses
         if ($user->isFinance()) {
             $allowedStatuses = ['proses_invoice', 'menunggu_pembayaran', 'sudah_dibayar'];

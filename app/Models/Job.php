@@ -214,6 +214,32 @@ class Job extends Model
         '13. Sudah Dibayar' => ['label' => '13. Lunas', 'icon' => 'cash-coin', 'color' => 'success'],
     ];
 
+    // Work statuses that are auto-updated from other systems (cannot be manually changed on Kanban)
+    // These statuses are controlled by: Part Tracking (5, 6) and Finance Kanban (11, 12, 13)
+    const PROTECTED_WORK_STATUSES = [
+        '5. Buka RQ (Qrder Parts)' => 'Auto-updated from Part Tracking when parts are ordered.',
+        '6. Parts Datang (Parts Received)' => 'Auto-updated from Part Tracking when parts are received.',
+        '11. Proses Invoice' => 'Auto-updated from Finance Kanban when invoice is created.',
+        '12. Menunggu Pembayaran' => 'Auto-updated from Finance Kanban when invoice is pending payment.',
+        '13. Sudah Dibayar' => 'Auto-updated from Finance Kanban when invoice is paid.',
+    ];
+
+    /**
+     * Check if a work status is protected (auto-updated by other systems)
+     */
+    public static function isProtectedWorkStatus(string $status): bool
+    {
+        return array_key_exists($status, self::PROTECTED_WORK_STATUSES);
+    }
+
+    /**
+     * Get the reason why a status is protected
+     */
+    public static function getProtectedStatusReason(string $status): ?string
+    {
+        return self::PROTECTED_WORK_STATUSES[$status] ?? null;
+    }
+
     // Legacy status mapping - maps old database values to new status values
     // Used for counting jobs with old status values in dashboard/reports
     const LEGACY_STATUS_MAP = [
