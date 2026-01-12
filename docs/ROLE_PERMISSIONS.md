@@ -7,6 +7,7 @@ This application uses an ERPNext-style dynamic role permission system.
 - **Roles** - Customizable roles (admin can create new ones)
 - **DocType Permissions** - Read/Write/Create/Delete per model
 - **Field Permissions** - Control which fields each role can edit
+- **Kanban Permissions** - Control which statuses each role can change to
 
 ## Adding a New DocType
 
@@ -112,32 +113,130 @@ From there you can:
 
 ## System Roles
 
-### Finance Role
+### Administrator
 
-The **Finance** role has specific restrictions for payment tracking:
+Full access to all features, user management, data cleanup.
 
-| Permission | Description |
-|------------|-------------|
+### Manager
+
+All operations, master data, audit. Cannot manage users.
+
+### Control Tower
+
+| Feature | Permission |
+|---------|------------|
+| View Jobs | All jobs |
+| Job Kanban | Can change to statuses 1, 2, 3, 4, 7, 8, 9, 10 |
+| Restricted Statuses | Cannot change to 5, 6, 11, 12, 13 |
+| Part Tracking | Can open RQ (Pending → Buka RQ) |
+| Add Remarks | All jobs |
+
+### Service Advisor (SA)
+
+| Feature | Permission |
+|---------|------------|
+| View Jobs | All jobs |
+| Job Kanban | Own assigned jobs only, statuses 1-4, 7-8 |
+| Restricted Statuses | Cannot change to 5, 6, 9, 10, 11, 12, 13 |
+| Part Tracking | View only (filtered to own jobs) |
+| Add Remarks | Own assigned jobs |
+
+### Foreman
+
+| Feature | Permission |
+|---------|------------|
+| View Jobs | All jobs |
+| Job Kanban | Own assigned jobs only, statuses 1-4, 7-8 |
+| Restricted Statuses | Cannot change to 5, 6, 9, 10, 11, 12, 13 |
+| Part Tracking | Can open RQ for own assigned jobs |
+| Add Remarks | Own assigned jobs |
+
+### Sparepart
+
+| Feature | Permission |
+|---------|------------|
+| View Jobs | All jobs |
+| Job Kanban | Cannot use (use Part Tracking instead) |
+| Part Tracking | All status changes (Buka RQ → Received) |
+| Cannot Do | Open RQ (Pending → Buka RQ) |
+| Add Remarks | Jobs with need_part only |
+
+### Finance
+
+| Feature | Permission |
+|---------|------------|
 | View Jobs | Invoiced jobs only |
-| Kanban Columns | Only 3 columns: Proses Invoice → Menunggu Pembayaran → Sudah Dibayar |
-| Edit Kanban | ✅ Can drag jobs between payment columns |
-| Add Remarks | Only on invoiced jobs |
-| View Reports | ✅ Full access |
-| Export | ✅ Allowed |
+| Job Kanban | Cannot use (use Finance Kanban) |
+| Finance Kanban | Full access (3 columns) |
+| Add Remarks | Invoiced jobs only |
 
-**To assign Finance role:**
+---
+
+## Kanban Permission Details
+
+### Job Kanban Work Status Restrictions
+
+| Role | Cannot Change To |
+|------|-----------------|
+| Admin | None (full access) |
+| Manager | None (full access) |
+| Control Tower | 5, 6, 11, 12, 13 |
+| Foreman | 5, 6, 9, 10, 11, 12, 13 |
+| SA | 5, 6, 9, 10, 11, 12, 13 |
+| Sparepart | All (use Part Tracking) |
+| Finance | All (use Finance Kanban) |
+
+**Status Reference:**
+- 5 = Buka RQ (auto from Part Tracking)
+- 6 = Parts Datang (auto from Part Tracking)
+- 9 = Pemberkasan
+- 10 = Proses Close Job
+- 11-13 = Finance statuses (auto from Finance Kanban)
+
+### Part Tracking Kanban Permissions
+
+| Action | Allowed Roles |
+|--------|--------------|
+| Open RQ (Pending → Buka RQ) | Admin, Control Tower, Foreman (own jobs) |
+| Update Status (Buka RQ → Received) | Admin, Sparepart |
+| View Only | SA, Finance |
+
+### Default Filters by Role
+
+| Role | Part Tracking Default View |
+|------|---------------------------|
+| SA | Own assigned jobs |
+| Foreman | Own assigned jobs |
+| Sparepart | All jobs with need_part |
+| Others | All jobs with need_part |
+
+---
+
+## Role Comparison Matrix
+
+| Role | Job Kanban | Finance Kanban | Part Tracking | Add Remarks |
+|------|-----------|----------------|---------------|-------------|
+| Admin | ✅ All | ✅ All | ✅ All | ✅ All |
+| Manager | ✅ All | ✅ All | ✅ All | ✅ All |
+| Control Tower | ✅ (not 5,6,11-13) | ❌ | ✅ Open RQ | ✅ All |
+| SA | ✅ Own (1-4,7,8) | ❌ | 👁 View | ✅ Own |
+| Foreman | ✅ Own (1-4,7,8) | ❌ | ✅ Open RQ (own) | ✅ Own |
+| Sparepart | ❌ | ❌ | ✅ All except Open RQ | ✅ need_part |
+| Finance | ❌ | ✅ All | ❌ | ✅ Invoiced |
+
+**Legend:**
+- ✅ = Full access
+- ❌ = No access
+- 👁 = View only
+- Own = Own assigned jobs only
+
+---
+
+## Assigning Roles
+
 1. Go to **Admin → Users**
 2. Edit user or create new
-3. Set role to `finance`
+3. Set role from dropdown
+4. Save
 
-### Role Comparison Table
-
-| Role | View Jobs | Edit Kanban | Add Remarks |
-|------|-----------|-------------|-------------|
-| Administrator | All | ❌ | All |
-| Control Tower | All | ✅ | All |
-| Service Advisor | All | ❌ | Assigned only |
-| Foreman | All | ❌ | Assigned only |
-| Sparepart | All | ❌ | need_part jobs only |
-| Finance | Invoiced only | ✅ (3 cols) | Invoiced only |
-| Viewer | All | ❌ | ❌ |
+**Important:** For SA and Foreman roles, also link the user to a Service Advisor or Foreman record in Master Data to enable the "own jobs" filtering.

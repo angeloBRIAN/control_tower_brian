@@ -1,7 +1,7 @@
 # Control Tower Application Documentation
 
-**Version:** 1.0  
-**Last Updated:** December 2024
+**Version:** 1.1  
+**Last Updated:** January 2026
 
 ---
 
@@ -22,6 +22,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 | Job List | View all uninvoiced/invoiced jobs with filters |
 | Job Detail | Complete job info with timeline, remarks, invoice history |
 | Status Tracking | Uninvoiced → Invoiced workflow |
+| Work Status Kanban | 13-step workflow tracking with drag-and-drop |
 | Remarks System | Add timestamped remarks with role tracking |
 | Need Parts Flag | Mark jobs requiring spare parts |
 
@@ -33,9 +34,113 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 - Department (W=Workshop, B=Body Paint)
 - Type Sale (INT=Internal, WAR=Warranty, CASH=Cash)
 
+**Work Status Steps:**
+1. Belum diproses (Tunggu Antrian)
+2. ACC Pengerjaan
+3. Check di Bengkel
+4. Pengerjaan
+5. Buka RQ (Order Parts) - *Auto-updated from Part Tracking*
+6. Parts Datang (Parts Received) - *Auto-updated from Part Tracking*
+7. Body Paint
+8. Wrapping/Acc Tambahan
+9. Pemberkasan
+10. Proses Close Job
+11. Proses Invoice - *Auto-updated from Finance Kanban*
+12. Menunggu Pembayaran - *Auto-updated from Finance Kanban*
+13. Sudah Dibayar - *Auto-updated from Finance Kanban*
+
 ---
 
-### 2. Vehicle Management
+### 2. Job Kanban Board
+
+**Purpose:** Visual workflow management for job work status.
+
+**Access:** Jobs → Kanban View
+
+| Feature | Description |
+|---------|-------------|
+| Drag & Drop | Move jobs between status columns |
+| Role-Based Restrictions | Each role can only change to specific statuses |
+| Remark Prompt | Add optional remark when changing status |
+| Auto-Updated Statuses | 5, 6, 11, 12, 13 are controlled by other systems |
+
+**Role Permissions:**
+
+| Role | Can Change To |
+|------|--------------|
+| Admin/Manager | All statuses |
+| Control Tower | 1, 2, 3, 4, 7, 8, 9, 10 |
+| Foreman/SA | 1, 2, 3, 4, 7, 8 (own assigned jobs only) |
+| Sparepart | Only via Part Tracking Kanban |
+| Finance | Only via Finance Kanban |
+
+---
+
+### 3. Part Tracking Kanban
+
+**Purpose:** Track parts requisition (RQ) from order to receipt.
+
+**Access:** Operations → Part Tracking → Kanban View
+
+**Workflow:**
+```
+┌───────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐
+│  PENDING  │ → │  BUKA RQ  │ → │  ORDERED  │ → │ CONFIRMED │ → │  SHIPPED  │ → │ RECEIVED  │
+│  (Jobs)   │   │(PartOrder)│   │(PartOrder)│   │(PartOrder)│   │(PartOrder)│   │(PartOrder)│
+└───────────┘   └───────────┘   └───────────┘   └───────────┘   └───────────┘   └───────────┘
+```
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| Pending = Jobs | Shows jobs with need_part=true, not yet RQ opened |
+| Multi-RQ per Job | One job can have multiple RQ entries |
+| 1-Step Movement | Can only drag to adjacent column |
+| RQ Number Prompt | Enter RQ number when moving Pending → Buka RQ |
+| Order Details Modal | Enter order #, dates when Buka RQ → Ordered |
+| Work Status Sync | Job updates to "6. Parts Datang" when ALL RQs received |
+
+**Role Permissions:**
+
+| Role | Can Do |
+|------|--------|
+| Admin | All actions |
+| Control Tower | Open RQ (Pending → Buka RQ) |
+| Foreman | Open RQ for own assigned jobs only |
+| Sparepart | All status changes (Buka RQ → Received) |
+| SA | View only, filtered to own jobs |
+
+**Default Filters by Role:**
+
+| Role | Default View |
+|------|-------------|
+| SA | Own assigned jobs |
+| Foreman | Own assigned jobs |
+| Sparepart | All jobs with need_part |
+| Others | All jobs with need_part |
+
+---
+
+### 4. Finance Kanban
+
+**Purpose:** Track invoice and payment status.
+
+**Access:** Operations → Finance Kanban
+
+**Workflow:**
+```
+Open Invoice → Sent to Customer → Paid (Partial) → Paid (Full)
+```
+
+**Auto-Updates Job Work Status:**
+- Invoice created → "11. Proses Invoice"
+- Invoice pending → "12. Menunggu Pembayaran"
+- Invoice paid → "13. Sudah Dibayar"
+
+---
+
+### 5. Vehicle Management
 
 **Purpose:** Track vehicles and their service history.
 
@@ -50,7 +155,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 3. Customer Lookup
+### 6. Customer Lookup
 
 **Purpose:** View customers aggregated from jobs and vehicles.
 
@@ -63,7 +168,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 4. Data Import
+### 7. Data Import
 
 **Purpose:** Import data from Excel/ODS files exported from DMS.
 
@@ -87,7 +192,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 5. Invoice History
+### 8. Invoice History
 
 **Purpose:** Track multiple invoice events per job (invoices, credit notes).
 
@@ -102,7 +207,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 6. Customer Duplicate Management
+### 9. Customer Duplicate Management
 
 **Purpose:** Detect and merge similar customer names to maintain data quality.
 
@@ -130,7 +235,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 7. Reports
+### 10. Reports
 
 | Report | Purpose | Filters |
 |--------|---------|---------|
@@ -144,7 +249,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 8. Data Tracker
+### 11. Data Tracker
 
 **Purpose:** Track any record by WIP, plate number, or customer name across all data sources.
 
@@ -154,7 +259,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 9. Master Data
+### 12. Master Data
 
 | Entity | Purpose |
 |--------|---------|
@@ -165,7 +270,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 10. Administration
+### 13. Administration
 
 | Feature | Purpose | Access |
 |---------|---------|--------|
@@ -175,13 +280,13 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 
 ---
 
-### 11. Audit System
+### 14. Audit System
 
 **Purpose:** Track all data changes for accountability.
 
 **Audited Models:**
 - Job, Vehicle, Booking, PdiRecord, TowingRecord
-- CustomerMergeLog, JobInvoice
+- CustomerMergeLog, JobInvoice, PartOrder
 
 **Logged Data:**
 - User who made change
@@ -199,10 +304,11 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 |------|-------------|
 | **Admin** | Full access, user management, data cleanup |
 | **Manager** | All operations, master data, audit |
-| **Control Tower** | Job management, remarks, imports |
-| **SA (Service Advisor)** | View jobs, add remarks |
-| **Foreman** | View jobs, add remarks |
-| **Sparepart** | View jobs, edit Order & Parts fields |
+| **Control Tower** | Job management, remarks, imports, Kanban (except 5,6,11,12,13) |
+| **SA (Service Advisor)** | View jobs, add remarks, Kanban (1-4, 7-8 for own jobs) |
+| **Foreman** | View jobs, add remarks, Kanban (1-4, 7-8 for own jobs), Open RQ |
+| **Sparepart** | Part Tracking Kanban management |
+| **Finance** | Finance Kanban, invoice management |
 
 ---
 
@@ -222,6 +328,16 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 2. Import → Invoiced type
 3. Job status → invoiced
 4. Invoice record created in job_invoices
+```
+
+### Part Tracking Flow
+```
+1. Mark job as "Needs Parts" (job list or detail)
+2. Job appears in Part Tracking Kanban → Pending column
+3. Drag to "Buka RQ" → Enter RQ number → PartOrder created
+4. Drag to "Ordered" → Enter order#, dates (Sparepart role)
+5. Continue: Confirmed → Shipped → Received
+6. When ALL RQs received → Job work_status = "6. Parts Datang"
 ```
 
 ### Handle Duplicate Customers
@@ -251,6 +367,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 | `jobs` | Main job records |
 | `vehicles` | Vehicle master |
 | `job_invoices` | Invoice history per job |
+| `part_orders` | Part requisitions (RQs) |
 | `imports` | Import history |
 | `customer_merge_logs` | Merge audit trail |
 | `bookings` | Booking records |
@@ -259,6 +376,7 @@ Control Tower is a workshop management system for tracking vehicle service jobs,
 | `audit_logs` | Change audit trail |
 | `users` | User accounts |
 | `remarks` | Job remarks |
+| `job_activities` | Job activity timeline |
 
 ---
 

@@ -8,18 +8,28 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-1">
-                <i class="bi bi-box-seam me-2"></i>Part Orders
+                <i class="bi bi-box-seam me-2"></i>Part Orders (RQ Tracking)
             </h1>
-            <p class="text-muted mb-0">List of all part orders</p>
+            <p class="text-muted mb-0">List of all part orders / requisitions</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('parts.kanban') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('parts.kanban') }}" class="btn btn-primary">
                 <i class="bi bi-kanban me-1"></i>Kanban View
             </a>
-            <a href="{{ route('part-orders.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>Add Part Order
-            </a>
         </div>
+    </div>
+
+    <!-- Workflow Info -->
+    <div class="alert alert-info mb-4">
+        <h6 class="alert-heading mb-2"><i class="bi bi-info-circle me-1"></i>Part Tracking Workflow</h6>
+        <p class="mb-0 small">
+            <strong>Pending</strong> (Job needs parts) → 
+            <strong>Buka RQ</strong> (RQ opened) → 
+            <strong>Ordered</strong> (Order placed) → 
+            <strong>Confirmed</strong> → 
+            <strong>Shipped</strong> → 
+            <strong>Received</strong> (Parts arrived, job work_status updates to "6. Parts Datang")
+        </p>
     </div>
 
     <!-- Filters -->
@@ -27,15 +37,17 @@
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
-                    <input type="text" class="form-control" name="search" placeholder="Search part name, number, job..." value="{{ request('search') }}">
+                    <input type="text" class="form-control" name="search" placeholder="Search RQ, order no, job..." value="{{ request('search') }}">
                 </div>
                 <div class="col-md-2">
                     <select name="status" class="form-select">
                         <option value="">All Statuses</option>
                         @foreach($statuses as $key => $info)
+                            @if($key !== 'pending')
                             <option value="{{ $key }}" {{ request('status') === $key ? 'selected' : '' }}>
                                 {{ $info['label'] }}
                             </option>
+                            @endif
                         @endforeach
                     </select>
                 </div>
@@ -68,12 +80,13 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Part</th>
                         <th>Job</th>
-                        <th>RQ / Order No.</th>
-                        <th>Qty</th>
+                        <th>RQ Number</th>
+                        <th>Order Number</th>
+                        <th>Order Date</th>
                         <th>Expected Date</th>
                         <th>Status</th>
+                        <th>Notes</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -81,13 +94,7 @@
                     @forelse($partOrders as $order)
                     <tr>
                         <td>
-                            <div class="fw-semibold">{{ $order->part_name }}</div>
-                            @if($order->part_number)
-                                <small class="text-muted">{{ $order->part_number }}</small>
-                            @endif
-                        </td>
-                        <td>
-                            <a href="{{ route('jobs.show', $order->job_id) }}" class="text-decoration-none">
+                            <a href="{{ route('jobs.show', $order->job_id) }}" class="text-decoration-none fw-semibold">
                                 {{ $order->job->job_number ?? 'N/A' }}
                             </a>
                             <br>
@@ -95,18 +102,21 @@
                         </td>
                         <td>
                             @if($order->rq)
-                                <div><small class="text-muted">RQ:</small> {{ $order->rq }}</div>
-                            @endif
-                            @if($order->no_order_part)
-                                <div><small class="text-muted">Order:</small> {{ $order->no_order_part }}</div>
-                            @endif
-                            @if(!$order->rq && !$order->no_order_part)
+                                <span class="badge bg-info text-dark">{{ $order->rq }}</span>
+                            @else
                                 <span class="text-muted">-</span>
                             @endif
                         </td>
-                        <td>{{ $order->quantity }}</td>
                         <td>
-                            <div>{{ $order->expected_date?->format('d M Y') }}</div>
+                            @if($order->no_order_part)
+                                <span class="fw-semibold">{{ $order->no_order_part }}</span>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
+                        </td>
+                        <td>{{ $order->order_date?->format('d M Y') ?? '-' }}</td>
+                        <td>
+                            <div>{{ $order->expected_date?->format('d M Y') ?? '-' }}</div>
                             @if($order->is_overdue)
                                 <span class="badge bg-danger">{{ abs($order->days_until_expected) }} days overdue</span>
                             @elseif($order->is_due_soon)
@@ -118,15 +128,22 @@
                                 {{ $order->status_label }}
                             </span>
                         </td>
+                        <td>
+                            @if($order->notes)
+                                <span title="{{ $order->notes }}">{{ Str::limit($order->notes, 30) }}</span>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
+                        </td>
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
-                                <a href="{{ route('part-orders.edit', $order) }}" class="btn btn-outline-primary">
+                                <a href="{{ route('part-orders.edit', $order) }}" class="btn btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form action="{{ route('part-orders.destroy', $order) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this part order?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-outline-danger">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -135,10 +152,11 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center py-5">
+                        <td colspan="8" class="text-center py-5">
                             <div class="text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
                                 No part orders found
+                                <p class="small mt-2">Use the <a href="{{ route('parts.kanban') }}">Kanban view</a> to create RQs from jobs</p>
                             </div>
                         </td>
                     </tr>
