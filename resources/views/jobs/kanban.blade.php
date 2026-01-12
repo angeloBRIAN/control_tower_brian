@@ -238,6 +238,39 @@
     </div>
     @endforeach
 </div>
+
+<!-- Remark Modal for Status Change -->
+<div class="modal fade" id="remarkModal" tabindex="-1" aria-labelledby="remarkModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="remarkModalLabel">
+                    <i class="bi bi-chat-text me-2"></i>Add Remark for Status Change
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Moving <strong id="remarkJobInfo"></strong> to <strong id="remarkNewStatus"></strong>
+                </div>
+                <div class="mb-3">
+                    <label for="statusChangeRemark" class="form-label">Remark <span class="text-muted">(optional)</span></label>
+                    <textarea class="form-control" id="statusChangeRemark" rows="3" 
+                              placeholder="Add a note about this status change..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelStatusChange">
+                    <i class="bi bi-x me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmStatusChange">
+                    <i class="bi bi-check me-1"></i>Confirm Change
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -245,8 +278,96 @@
 <script>
 const canEditKanban = {{ $canEditKanban ? 'true' : 'false' }};
 
+// Store pending status change info
+let pendingStatusChange = null;
+let remarkModal = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const columns = document.querySelectorAll('.kanban-body');
+    
+    // Initialize Bootstrap modal
+    remarkModal = new bootstrap.Modal(document.getElementById('remarkModal'));
+    
+    // Handle modal cancel - revert the card position
+    document.getElementById('cancelStatusChange').addEventListener('click', function() {
+        if (pendingStatusChange && pendingStatusChange.originalColumn && pendingStatusChange.cardElement) {
+            // Move card back to original column
+            pendingStatusChange.originalColumn.appendChild(pendingStatusChange.cardElement);
+            updateColumnCounts();
+        }
+        pendingStatusChange = null;
+        remarkModal.hide();
+    });
+    
+    // Also handle modal dismiss (X button or clicking outside)
+    document.getElementById('remarkModal').addEventListener('hidden.bs.modal', function() {
+        if (pendingStatusChange && pendingStatusChange.originalColumn && pendingStatusChange.cardElement) {
+            // Check if card is still in new column (not already reverted)
+            const currentParent = pendingStatusChange.cardElement.parentElement;
+            if (currentParent && currentParent.id !== pendingStatusChange.originalColumn.id) {
+                pendingStatusChange.originalColumn.appendChild(pendingStatusChange.cardElement);
+                updateColumnCounts();
+            }
+        }
+        pendingStatusChange = null;
+        document.getElementById('statusChangeRemark').value = '';
+    });
+    
+    // Handle modal confirm
+    document.getElementById('confirmStatusChange').addEventListener('click', function() {
+        if (!pendingStatusChange) return;
+        
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating...';
+        
+        const remark = document.getElementById('statusChangeRemark').value.trim();
+        
+        // AJAX update with remark
+        fetch(`/jobs/${pendingStatusChange.jobId}/work-status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ 
+                work_status: pendingStatusChange.newStatus,
+                remark: remark
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                updateColumnCounts();
+                showToast(data.message, 'success');
+            } else {
+                // Revert on failure
+                if (pendingStatusChange.originalColumn) {
+                    pendingStatusChange.originalColumn.appendChild(pendingStatusChange.cardElement);
+                    updateColumnCounts();
+                }
+                showToast(data.message || 'Failed to update status', 'danger');
+            }
+            remarkModal.hide();
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            // Revert on error
+            if (pendingStatusChange.originalColumn) {
+                pendingStatusChange.originalColumn.appendChild(pendingStatusChange.cardElement);
+                updateColumnCounts();
+            }
+            showToast('Failed to update status', 'danger');
+            remarkModal.hide();
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Confirm Change';
+            pendingStatusChange = null;
+            document.getElementById('statusChangeRemark').value = '';
+        });
+    });
     
     // Only enable drag-and-drop if user has edit permission
     if (canEditKanban) {
@@ -257,31 +378,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
                 onEnd: function(evt) {
+                    // If dropped in the same column, do nothing
+                    if (evt.from === evt.to) return;
+                    
                     const jobId = evt.item.dataset.jobId;
                     const newStatus = evt.to.id.replace('column-', '');
+                    const oldStatus = evt.from.id.replace('column-', '');
+                    const plate = evt.item.querySelector('.plate')?.textContent || 'Job';
+                    const wip = evt.item.querySelector('.wip')?.textContent || '';
                     
-                    // AJAX update
-                    fetch(`/jobs/${jobId}/work-status`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json',
-                        },
-                        body: JSON.stringify({ work_status: newStatus })
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Update column counts
-                            updateColumnCounts();
-                            showToast(data.message, 'success');
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Error:', err);
-                        showToast('Failed to update status', 'danger');
-                    });
+                    // Get the new status label
+                    const newColumn = evt.to.closest('.kanban-column');
+                    const newStatusLabel = newColumn?.querySelector('.kanban-header span:not(.badge)')?.textContent || newStatus;
+                    
+                    // Store pending change info
+                    pendingStatusChange = {
+                        jobId: jobId,
+                        newStatus: newStatus,
+                        oldStatus: oldStatus,
+                        cardElement: evt.item,
+                        originalColumn: evt.from
+                    };
+                    
+                    // Update modal with job info
+                    document.getElementById('remarkJobInfo').textContent = `${plate} (${wip})`;
+                    document.getElementById('remarkNewStatus').textContent = newStatusLabel;
+                    
+                    // Show the remark modal
+                    remarkModal.show();
+                    
+                    // Focus on the textarea
+                    setTimeout(() => {
+                        document.getElementById('statusChangeRemark').focus();
+                    }, 300);
                 }
             });
         });

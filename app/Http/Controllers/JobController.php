@@ -802,9 +802,11 @@ class JobController extends Controller
         
         $validated = $request->validate([
             'work_status' => 'required|string',
+            'remark' => 'nullable|string|max:1000',
         ]);
         
         $newStatus = $validated['work_status'];
+        $remark = $validated['remark'] ?? null;
         
         // Finance role can only change between 3 payment-related statuses
         if ($user->isFinance()) {
@@ -820,15 +822,32 @@ class JobController extends Controller
         $oldStatus = $job->work_status;
         $job->update(['work_status' => $newStatus]);
         
-        // Log activity
-        \App\Models\JobActivity::log($job, 'work_status_changed', 
-            "Work status changed from '" . ($oldStatus ?? 'None') . "' to '{$newStatus}'",
-            ['old' => $oldStatus, 'new' => $newStatus]
-        );
+        // Get status labels for activity log
+        $oldLabel = Job::getWorkStatusMeta($oldStatus)['label'] ?? $oldStatus ?? 'None';
+        $newLabel = Job::getWorkStatusMeta($newStatus)['label'] ?? $newStatus;
+        
+        // Log activity with status change
+        $activityMessage = "Work status changed from '{$oldLabel}' to '{$newLabel}'";
+        if ($remark) {
+            $activityMessage .= " - Remark: {$remark}";
+        }
+        \App\Models\JobActivity::log($job, 'work_status_changed', $activityMessage, [
+            'old' => $oldStatus, 
+            'new' => $newStatus,
+            'remark' => $remark
+        ]);
+        
+        // If remark provided, also add it as a job remark
+        if ($remark) {
+            $job->remarks()->create([
+                'content' => "[Status Change: {$oldLabel} → {$newLabel}] " . $remark,
+                'user_id' => $user->id,
+            ]);
+        }
         
         return response()->json([
             'success' => true,
-            'message' => "Job {$job->job_number} moved to {$newStatus}",
+            'message' => "Job {$job->job_number} moved to {$newLabel}",
         ]);
     }
 
