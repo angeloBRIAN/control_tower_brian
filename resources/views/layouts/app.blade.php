@@ -448,6 +448,11 @@
                     </div>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.index') }}">
+                        <i class="bi bi-person-gear"></i> My Profile
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link text-danger" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         <i class="bi bi-box-arrow-right"></i> Logout
                     </a>

@@ -50,6 +50,12 @@ Route::middleware('auth')->group(function () {
         Route::get('{slug}', [\App\Http\Controllers\HelpController::class, 'show'])->name('show');
     });
     
+    // Profile / Password Change
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ProfileController::class, 'index'])->name('index');
+        Route::put('password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('password');
+    });
+    
     // Notifications
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index'])->name('index');
