@@ -311,6 +311,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 const canEditKanban = {{ $canEditKanban ? 'true' : 'false' }};
+const restrictedStatuses = {!! json_encode($restrictedStatuses ?? []) !!};
 
 // Store pending status change info
 let pendingStatusChange = null;
@@ -420,6 +421,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const oldStatus = evt.from.id.replace('column-', '');
                     const plate = evt.item.querySelector('.plate')?.textContent || 'Job';
                     const wip = evt.item.querySelector('.wip')?.textContent || '';
+                    
+                    // Check if the target status is restricted for this user
+                    if (restrictedStatuses.includes(newStatus)) {
+                        // Revert the card position
+                        evt.from.appendChild(evt.item);
+                        showToast('Your role cannot change jobs to this status.', 'warning');
+                        return;
+                    }
                     
                     // Get the new status label
                     const newColumn = evt.to.closest('.kanban-column');

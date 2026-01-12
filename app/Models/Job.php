@@ -224,6 +224,15 @@ class Job extends Model
         '13. Sudah Dibayar' => 'Auto-updated from Finance Kanban when invoice is paid.',
     ];
 
+    // Role-based work status restrictions
+    // Key = role, Value = array of status indices that role CANNOT manually change to
+    const ROLE_RESTRICTED_STATUSES = [
+        'control_tower' => [5, 6, 11, 12, 13],  // Can't change to part tracking or finance statuses
+        'foreman' => [5, 6, 9, 10, 11, 12, 13], // Can't change to part tracking, pemberkasan, close job, or finance
+        'sa' => [5, 6, 9, 10, 11, 12, 13],      // Same as foreman
+        'sparepart' => [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13], // Can only work with 5 and 6 (handled by Part Tracking)
+    ];
+
     /**
      * Check if a work status is protected (auto-updated by other systems)
      */
@@ -238,6 +247,59 @@ class Job extends Model
     public static function getProtectedStatusReason(string $status): ?string
     {
         return self::PROTECTED_WORK_STATUSES[$status] ?? null;
+    }
+
+    /**
+     * Get list of work statuses that a specific role is NOT allowed to manually change to
+     * Returns array of full status strings
+     */
+    public static function getRestrictedStatusesForRole(string $role): array
+    {
+        $restrictedIndices = self::ROLE_RESTRICTED_STATUSES[$role] ?? [];
+        
+        if (empty($restrictedIndices)) {
+            return []; // No restrictions (admin, manager have full access)
+        }
+        
+        $restricted = [];
+        foreach ($restrictedIndices as $index) {
+            // WORK_STATUSES is 0-indexed, but we use 1-based indices for display
+            $actualIndex = $index - 1;
+            if (isset(self::WORK_STATUSES[$actualIndex])) {
+                $restricted[] = self::WORK_STATUSES[$actualIndex];
+            }
+        }
+        
+        return $restricted;
+    }
+
+    /**
+     * Check if a role is allowed to change to a specific work status
+     */
+    public static function canRoleChangeToStatus(string $role, string $status): bool
+    {
+        $restrictedStatuses = self::getRestrictedStatusesForRole($role);
+        return !in_array($status, $restrictedStatuses);
+    }
+
+    /**
+     * Get the reason why a role cannot change to a status
+     */
+    public static function getStatusRestrictionReason(string $role, string $status): ?string
+    {
+        if (self::canRoleChangeToStatus($role, $status)) {
+            return null;
+        }
+        
+        // Determine reason based on status
+        if (in_array($status, [self::WORK_STATUSES[4], self::WORK_STATUSES[5]])) {
+            return "Status is auto-updated from Part Tracking Kanban.";
+        }
+        if (in_array($status, [self::WORK_STATUSES[10], self::WORK_STATUSES[11], self::WORK_STATUSES[12]])) {
+            return "Status is auto-updated from Finance Kanban.";
+        }
+        
+        return "Your role does not have permission to change to this status.";
     }
 
     // Legacy status mapping - maps old database values to new status values

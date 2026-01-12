@@ -831,7 +831,10 @@ class JobController extends Controller
         // Check if user can edit Kanban (drag/drop)
         $canEditKanban = $user->canEditKanban();
         
-        return view('jobs.kanban', compact('workStatuses', 'jobsByStatus', 'totalsByStatus', 'filterOptions', 'canEditKanban', 'isFinance'));
+        // Get restricted statuses for this user's role (for visual feedback)
+        $restrictedStatuses = Job::getRestrictedStatusesForRole($user->role);
+        
+        return view('jobs.kanban', compact('workStatuses', 'jobsByStatus', 'totalsByStatus', 'filterOptions', 'canEditKanban', 'isFinance', 'restrictedStatuses'));
     }
 
     /**
@@ -873,16 +876,16 @@ class JobController extends Controller
         $newStatus = $validated['work_status'];
         $remark = $validated['remark'] ?? null;
         
-        // Check if the target status is protected (auto-updated by other systems)
-        if (Job::isProtectedWorkStatus($newStatus)) {
-            $reason = Job::getProtectedStatusReason($newStatus);
+        // Check if this user's role can change to the target status
+        if (!Job::canRoleChangeToStatus($user->role, $newStatus)) {
+            $reason = Job::getStatusRestrictionReason($user->role, $newStatus);
             return response()->json([
                 'success' => false,
-                'message' => "Cannot manually change to this status. {$reason}",
+                'message' => "Cannot change to this status. {$reason}",
             ], 403);
         }
         
-        // Finance role can only change between 3 payment-related statuses
+        // Finance role can only change between 3 payment-related statuses (handled via Part Tracking / Finance Kanban)
         if ($user->isFinance()) {
             $allowedStatuses = ['proses_invoice', 'menunggu_pembayaran', 'sudah_dibayar'];
             if (!in_array($newStatus, $allowedStatuses)) {
