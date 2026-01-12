@@ -30,7 +30,29 @@
     <link href="{{ asset('css/custom.css') }}?v={{ filemtime(public_path('css/custom.css')) }}" rel="stylesheet">
     @stack('styles')
 </head>
-<body>
+<body class="{{ isset($importantAnnouncements) && $importantAnnouncements->count() > 0 ? 'has-ticker' : '' }}">
+    
+    @if(isset($importantAnnouncements) && $importantAnnouncements->count() > 0)
+    <!-- Important Announcements Ticker -->
+    <div class="news-ticker-bar">
+        <div class="news-ticker-label">
+            <i class="bi bi-megaphone-fill me-2"></i> IMPORTANT
+        </div>
+        <div class="news-ticker-content-wrapper">
+            <div class="news-ticker-track">
+                @foreach($importantAnnouncements as $announcement)
+                <div class="news-ticker-item">
+                    <span class="opacity-75 me-2" style="font-size: 0.85em">[{{ $announcement->created_at->format('d/m H:i') }}]</span>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#tickerModal{{ $announcement->id }}">
+                        {{ $announcement->title }}
+                    </a>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+    
     <nav class="sidebar d-flex flex-column">
         <div class="brand d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
@@ -1150,8 +1172,44 @@
     }
     </script>
     @endauth
-    
+    @yield('scripts')
     @stack('scripts')
+
+    @if(isset($importantAnnouncements) && $importantAnnouncements->count() > 0)
+        @foreach($importantAnnouncements as $announcement)
+        <div class="modal fade" id="tickerModal{{ $announcement->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title fs-6">
+                            <i class="bi bi-megaphone-fill me-2"></i>{{ $announcement->title }}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-between text-muted small mb-3">
+                            <span><i class="bi bi-person me-1"></i>{{ $announcement->author->name ?? 'System' }}</span>
+                            <span>{{ $announcement->created_at->format('d M Y H:i') }}</span>
+                        </div>
+                        <div class="announcement-content">
+                            {!! $announcement->content !!}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                         @if(!$announcement->isDismissedBy(auth()->user()))
+                        <form action="{{ route('announcements.dismiss', $announcement->id) }}" method="POST">
+                            @csrf
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="fetch(this.form.action, {method:'POST', headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'}}).then(() => { location.reload(); })">
+                                <i class="bi bi-x-circle me-1"></i>Dismiss
+                            </button>
+                        </form>
+                        @endif
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endforeach
+    @endif
 </body>
 </html>
-
