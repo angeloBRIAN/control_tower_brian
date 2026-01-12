@@ -349,12 +349,13 @@
                     @endif
                 </div>
 
-                @if(Auth::user()->hasRole('admin'))
+                @if(Auth::user()->hasAnyRole(['admin', 'manager']))
                 <div class="nav-section" data-bs-toggle="collapse" data-bs-target="#adminMenu" aria-expanded="{{ $isAdminActive ? 'true' : 'false' }}">
                     <span class="menu-text"><i class="bi bi-gear-fill me-2"></i>Administration</span>
                     <i class="bi bi-chevron-down arr" style="font-size: 0.7em;"></i>
                 </div>
                  <div class="collapse {{ $isAdminActive ? 'show' : '' }}" id="adminMenu">
+                    @if(Auth::user()->hasRole('admin'))
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">
                             <i class="bi bi-people-fill"></i> User Management
@@ -386,16 +387,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.scheduled-reports.*') ? 'active' : '' }}" href="{{ route('admin.scheduled-reports.index') }}">
-                            <i class="bi bi-envelope-at"></i> Scheduled Reports
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}" href="{{ route('admin.announcements.index') }}">
-                            <i class="bi bi-megaphone-fill"></i> Announcements
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.backups.*') ? 'active' : '' }}" href="{{ route('admin.backups.index') }}">
                             <i class="bi bi-database-check"></i> Database Backups
                         </a>
@@ -408,6 +399,19 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.customer-aliases.*') ? 'active' : '' }}" href="{{ route('admin.customer-aliases.index') }}">
                             <i class="bi bi-link-45deg"></i> Customer Aliases
+                        </a>
+                    </li>
+                    @endif
+                    {{-- Announcements: accessible to both admin and manager --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}" href="{{ route('admin.announcements.index') }}">
+                            <i class="bi bi-megaphone-fill"></i> Announcements
+                        </a>
+                    </li>
+                    {{-- Scheduled Reports: accessible to both admin and manager --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.scheduled-reports.*') ? 'active' : '' }}" href="{{ route('admin.scheduled-reports.index') }}">
+                            <i class="bi bi-envelope-at"></i> Scheduled Reports
                         </a>
                     </li>
                 </div>
