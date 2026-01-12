@@ -273,24 +273,34 @@ class User extends Authenticatable
      */
     public function canAddRemarkToJob(Job $job): bool
     {
-        // Admin and Control Tower can add remarks to any job
-        if ($this->hasAnyRole(['admin', 'control_tower'])) {
+        // Admin, Manager, and Control Tower can add remarks to any job
+        if ($this->hasAnyRole(['admin', 'manager', 'control_tower'])) {
             return true;
         }
 
-        // Finance can only add remarks to invoiced jobs
+        // Finance can only add remarks to invoiced jobs (or jobs at work_status step 10+)
         if ($this->isFinance()) {
             return $job->status === 'invoiced';
         }
 
         // Service Advisor can only add remarks to jobs they are assigned to
+        // Compare job's service_advisor field with the linked ServiceAdvisor's name
         if ($this->role === 'sa') {
-            return $job->service_advisor === $this->name;
+            $linkedSaName = $this->serviceAdvisor?->name;
+            if (!$linkedSaName) {
+                return false; // No linked SA record
+            }
+            return strtolower(trim($job->service_advisor ?? '')) === strtolower(trim($linkedSaName));
         }
 
         // Foreman can only add remarks to jobs they are assigned to
+        // Compare job's foreman field with the linked Foreman's name
         if ($this->role === 'foreman') {
-            return $job->foreman === $this->name;
+            $linkedForemanName = $this->foreman?->name;
+            if (!$linkedForemanName) {
+                return false; // No linked Foreman record
+            }
+            return strtolower(trim($job->foreman ?? '')) === strtolower(trim($linkedForemanName));
         }
 
         // Sparepart can only add remarks to jobs that need parts
