@@ -1163,6 +1163,67 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Need Part Checkbox Handler (in job detail)
+const needPartCheckbox = document.getElementById('needPart');
+if (needPartCheckbox && !needPartCheckbox.hasAttribute('data-ajax-bound')) {
+    needPartCheckbox.setAttribute('data-ajax-bound', 'true');
+    
+    needPartCheckbox.addEventListener('change', function(e) {
+        const jobId = {{ $job->id }};
+        const jobWip = '{{ $job->job_number }}';
+        const isChecking = this.checked;
+        
+        // Only intercept when checking (not unchecking) and job doesn't already need parts
+        if (isChecking && !{{ $job->need_part ? 'true' : 'false' }}) {
+            e.preventDefault();
+            
+            if (!confirm(`Mark job ${jobWip} as "Needs Parts"?\n\nThis will:\n• Set work status to "5. Buka RQ"\n• Create a pending Part Order`)) {
+                this.checked = false;
+                return;
+            }
+            
+            const rqNumber = prompt(`Enter RQ Number for job ${jobWip} (optional):`, '');
+            
+            // User cancelled the prompt
+            if (rqNumber === null) {
+                this.checked = false;
+                return;
+            }
+            
+            // Disable checkbox during request
+            this.disabled = true;
+            
+            fetch(`/jobs/${jobId}/need-part`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ need_part: true, rq: rqNumber || null })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload the page to show updated data
+                    window.location.reload();
+                } else {
+                    this.checked = false;
+                    this.disabled = false;
+                    alert('Error: ' + (data.message || 'Failed to update'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                this.checked = false;
+                this.disabled = false;
+                alert('Failed to update. Please try again.');
+            });
+        }
+    });
+}
 </script>
 @endpush
 @endsection

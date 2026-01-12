@@ -629,9 +629,10 @@ class JobController extends Controller
 
     /**
      * Toggle or set need_part flag for a job via AJAX.
-     * Used by job list for quick "needs parts" toggle.
+     * Used by job list and job detail for quick "needs parts" toggle.
+     * When marking as needs parts, also creates a pending PartOrder with optional RQ number.
      *
-     * @param Request $request HTTP request with optional need_part value
+     * @param Request $request HTTP request with optional need_part value and rq
      * @param Job $job The job to update
      * @return JsonResponse JSON response with success status
      */
@@ -643,25 +644,44 @@ class JobController extends Controller
             : !$job->need_part;
         
         $oldValue = $job->need_part;
+        $rqNumber = $request->input('rq');
+        
         $job->update(['need_part' => $newValue]);
         
-        // Update work status if marking as needs part
+        // Update work status and create pending part order if marking as needs part
         if ($newValue && !$oldValue) {
             // Set to "5. Buka RQ" when marking as needs part
             $job->update(['work_status' => Job::WORK_STATUSES[4] ?? '5. Buka RQ (Qrder Parts)']);
+            
+            // Create a pending PartOrder with the RQ number
+            \App\Models\PartOrder::create([
+                'job_id' => $job->id,
+                'rq' => $rqNumber,
+                'status' => 'pending',
+                'quantity' => 1,
+                'part_name' => 'Pending Order',
+                'order_date' => now()->toDateString(),
+                'created_by' => auth()->id(),
+            ]);
         }
         
         // Log activity
         $action = $newValue ? 'marked as needing parts' : 'marked as not needing parts';
+        $logMessage = "Job {$action}";
+        if ($rqNumber && $newValue) {
+            $logMessage .= " (RQ: {$rqNumber})";
+        }
         \App\Models\JobActivity::log($job, 'need_part_changed', 
-            "Job {$action}",
-            ['need_part' => $newValue]
+            $logMessage,
+            ['need_part' => $newValue, 'rq' => $rqNumber]
         );
         
         return response()->json([
             'success' => true,
             'need_part' => $newValue,
-            'message' => $newValue ? 'Job marked as needing parts' : 'Job marked as not needing parts',
+            'message' => $newValue 
+                ? 'Job marked as needing parts. Pending order created in Part Tracking.' 
+                : 'Job marked as not needing parts',
         ]);
     }
 

@@ -863,7 +863,13 @@ document.querySelectorAll('.need-part-toggle').forEach(btn => {
         const jobId = this.dataset.jobId;
         const jobWip = this.dataset.jobWip;
         
-        if (confirm(`Mark job ${jobWip} as "Needs Parts"?\n\nThis will also update the work status to "5. Buka RQ".`)) {
+        // First confirm, then ask for RQ number
+        if (confirm(`Mark job ${jobWip} as "Needs Parts"?\n\nThis will:\n• Set work status to "5. Buka RQ"\n• Create a pending Part Order`)) {
+            const rqNumber = prompt(`Enter RQ Number for job ${jobWip} (optional):`, '');
+            
+            // User cancelled the prompt
+            if (rqNumber === null) return;
+            
             fetch(`/jobs/${jobId}/need-part`, {
                 method: 'PATCH',
                 headers: {
@@ -871,11 +877,12 @@ document.querySelectorAll('.need-part-toggle').forEach(btn => {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({ need_part: true })
+                body: JSON.stringify({ need_part: true, rq: rqNumber || null })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    alert(data.message);
                     // Reload the page to show updated data
                     window.location.reload();
                 } else {
