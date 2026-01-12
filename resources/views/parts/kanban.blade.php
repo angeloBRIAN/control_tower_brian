@@ -65,6 +65,60 @@
         </div>
     </div>
 
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <form method="GET" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <input type="text" name="search" class="form-control form-control-sm" 
+                           placeholder="Search part/RQ/job..." 
+                           value="{{ request('search') }}"
+                           style="width: 160px;">
+                </div>
+                <div class="col-auto">
+                    <select name="service_advisor" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">All SA</option>
+                        @foreach($filterOptions['service_advisors'] as $sa)
+                        <option value="{{ $sa }}" {{ request('service_advisor') == $sa ? 'selected' : '' }}>{{ $sa }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <select name="foreman" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">All Foremen</option>
+                        @foreach($filterOptions['foremen'] as $fm)
+                        <option value="{{ $fm }}" {{ request('foreman') == $fm ? 'selected' : '' }}>{{ $fm }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <input type="date" name="date_from" class="form-control form-control-sm" 
+                           value="{{ request('date_from') }}" 
+                           title="Order Date From"
+                           onchange="this.form.submit()">
+                </div>
+                <div class="col-auto">
+                    <input type="date" name="date_to" class="form-control form-control-sm" 
+                           value="{{ request('date_to') }}" 
+                           title="Order Date To"
+                           onchange="this.form.submit()">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                @if(request()->hasAny(['search', 'service_advisor', 'foreman', 'date_from', 'date_to']))
+                <div class="col-auto">
+                    <a href="{{ route('part-orders.kanban') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+                @endif
+            </form>
+        </div>
+    </div>
+
     <!-- Kanban Board -->
     <div class="kanban-board">
         <div class="row flex-nowrap overflow-auto pb-3" style="min-height: 500px;">

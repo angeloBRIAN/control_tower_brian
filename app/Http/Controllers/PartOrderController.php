@@ -12,27 +12,76 @@ class PartOrderController extends Controller
     /**
      * Display Kanban board for parts tracking
      */
-    public function kanban()
+    public function kanban(Request $request)
     {
         $statuses = PartOrder::getStatuses();
         
-        // Get pending orders grouped by status
+        // Build base query with job relationship
+        $baseQuery = PartOrder::with('job')
+            ->join('jobs', 'part_orders.job_id', '=', 'jobs.id')
+            ->select('part_orders.*');
+        
+        // Apply filters
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $baseQuery->where(function($q) use ($search) {
+                $q->where('part_orders.part_name', 'like', "%{$search}%")
+                  ->orWhere('part_orders.part_number', 'like', "%{$search}%")
+                  ->orWhere('part_orders.rq', 'like', "%{$search}%")
+                  ->orWhere('jobs.job_number', 'like', "%{$search}%")
+                  ->orWhere('jobs.plate_number', 'like', "%{$search}%");
+            });
+        }
+        
+        if ($request->filled('service_advisor')) {
+            $baseQuery->where('jobs.service_advisor', $request->input('service_advisor'));
+        }
+        
+        if ($request->filled('foreman')) {
+            $baseQuery->where('jobs.foreman', $request->input('foreman'));
+        }
+        
+        if ($request->filled('date_from')) {
+            $baseQuery->whereDate('part_orders.order_date', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $baseQuery->whereDate('part_orders.order_date', '<=', $request->input('date_to'));
+        }
+        
+        // Get orders grouped by status
         $ordersByStatus = [];
         foreach (array_keys($statuses) as $status) {
-            $ordersByStatus[$status] = PartOrder::with('job')
-                ->where('status', $status)
-                ->orderBy('expected_date', 'asc')
+            $ordersByStatus[$status] = (clone $baseQuery)
+                ->where('part_orders.status', $status)
+                ->orderBy('part_orders.expected_date', 'asc')
                 ->get();
         }
 
-        // Summary counts for dashboard
+        // Summary counts (unfiltered for dashboard)
         $summary = [
             'pending' => PartOrder::pending()->count(),
             'due_soon' => PartOrder::dueSoon(7)->count(),
             'overdue' => PartOrder::overdue()->count(),
         ];
+        
+        // Get filter options
+        $filterOptions = [
+            'service_advisors' => Job::whereHas('partOrders')
+                ->distinct()
+                ->whereNotNull('service_advisor')
+                ->pluck('service_advisor')
+                ->sort()
+                ->values(),
+            'foremen' => Job::whereHas('partOrders')
+                ->distinct()
+                ->whereNotNull('foreman')
+                ->pluck('foreman')
+                ->sort()
+                ->values(),
+        ];
 
-        return view('parts.kanban', compact('statuses', 'ordersByStatus', 'summary'));
+        return view('parts.kanban', compact('statuses', 'ordersByStatus', 'summary', 'filterOptions'));
     }
 
     /**
