@@ -33,6 +33,16 @@
                         <td>{{ $user->email }}</td>
                     </tr>
                     <tr>
+                        <th class="text-muted">Auth Source</th>
+                        <td>
+                            @if(!$user->auth_source || $user->auth_source === 'local')
+                                <span class="badge bg-secondary"><i class="bi bi-database me-1"></i>Internal</span>
+                            @else
+                                <span class="badge bg-primary"><i class="bi bi-server me-1"></i>LDAP</span>
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
                         <th class="text-muted">Role</th>
                         <td>
                             <span class="badge bg-{{ $user->role === 'admin' ? 'danger' : ($user->role === 'manager' ? 'warning' : 'secondary') }}">
@@ -60,72 +70,83 @@
                 <i class="bi bi-key me-2"></i>Change Password
             </div>
             <div class="card-body">
-                @if (session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                @if($user->auth_source && $user->auth_source !== 'local')
+                    <!-- LDAP User - Cannot change password -->
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>LDAP User</strong><br>
+                        Your account is managed through LDAP/Active Directory. 
+                        To change your password, please contact your IT administrator or use your organization's password management system.
                     </div>
-                @endif
-
-                <form method="POST" action="{{ route('profile.password') }}">
-                    @csrf
-                    @method('PUT')
-
-                    <div class="mb-3">
-                        <label for="current_password" class="form-label">
-                            <i class="bi bi-lock me-1"></i>Current Password <span class="text-danger">*</span>
-                        </label>
-                        <input type="password" 
-                               class="form-control @error('current_password') is-invalid @enderror" 
-                               id="current_password" 
-                               name="current_password" 
-                               required 
-                               autocomplete="current-password">
-                        @error('current_password')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="password" class="form-label">
-                            <i class="bi bi-key me-1"></i>New Password <span class="text-danger">*</span>
-                        </label>
-                        <input type="password" 
-                               class="form-control @error('password') is-invalid @enderror" 
-                               id="password" 
-                               name="password" 
-                               required 
-                               minlength="8"
-                               autocomplete="new-password">
-                        @error('password')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                        <div class="form-text">Minimum 8 characters</div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="password_confirmation" class="form-label">
-                            <i class="bi bi-key-fill me-1"></i>Confirm New Password <span class="text-danger">*</span>
-                        </label>
-                        <input type="password" 
-                               class="form-control" 
-                               id="password_confirmation" 
-                               name="password_confirmation" 
-                               required 
-                               minlength="8"
-                               autocomplete="new-password">
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-muted small">
-                            <i class="bi bi-info-circle me-1"></i>
-                            You will remain logged in after changing your password.
+                @else
+                    <!-- Internal User - Show password change form -->
+                    @if (session('success'))
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-check-lg me-1"></i>Update Password
-                        </button>
-                    </div>
-                </form>
+                    @endif
+
+                    <form method="POST" action="{{ route('profile.password') }}">
+                        @csrf
+                        @method('PUT')
+
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">
+                                <i class="bi bi-lock me-1"></i>Current Password <span class="text-danger">*</span>
+                            </label>
+                            <input type="password" 
+                                   class="form-control @error('current_password') is-invalid @enderror" 
+                                   id="current_password" 
+                                   name="current_password" 
+                                   required 
+                                   autocomplete="current-password">
+                            @error('current_password')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">
+                                <i class="bi bi-key me-1"></i>New Password <span class="text-danger">*</span>
+                            </label>
+                            <input type="password" 
+                                   class="form-control @error('password') is-invalid @enderror" 
+                                   id="password" 
+                                   name="password" 
+                                   required 
+                                   minlength="8"
+                                   autocomplete="new-password">
+                            @error('password')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Minimum 8 characters</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="password_confirmation" class="form-label">
+                                <i class="bi bi-key-fill me-1"></i>Confirm New Password <span class="text-danger">*</span>
+                            </label>
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="password_confirmation" 
+                                   name="password_confirmation" 
+                                   required 
+                                   minlength="8"
+                                   autocomplete="new-password">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                You will remain logged in after changing your password.
+                            </div>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-check-lg me-1"></i>Update Password
+                            </button>
+                        </div>
+                    </form>
+                @endif
             </div>
         </div>
 

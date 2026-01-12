@@ -20,10 +20,18 @@ class ProfileController extends Controller
 
     /**
      * Update the user's password.
+     * Only works for internal (non-LDAP) users.
      */
     public function updatePassword(Request $request)
     {
         $user = Auth::user();
+
+        // LDAP users cannot change password through this system
+        if ($user->auth_source && $user->auth_source !== 'local') {
+            return back()->withErrors([
+                'current_password' => 'LDAP users cannot change their password here. Please contact your IT administrator.'
+            ]);
+        }
 
         $validated = $request->validate([
             'current_password' => ['required', 'string'],
