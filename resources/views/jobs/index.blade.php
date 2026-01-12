@@ -336,7 +336,14 @@
                         <td data-col="lain_lain" class="text-truncate" style="max-width: 80px;"><small>{{ Str::limit($job->lain_lain, 15) }}</small></td>
                         <td data-col="need_part" class="text-center">
                             @if($job->need_part)
-                                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></span>
+                                <span class="badge bg-warning text-dark" title="Needs Parts"><i class="bi bi-exclamation-triangle"></i></span>
+                            @else
+                                <button type="button" class="btn btn-link btn-sm p-0 text-muted opacity-50 need-part-toggle" 
+                                        data-job-id="{{ $job->id }}"
+                                        data-job-wip="{{ $job->job_number }}"
+                                        title="Click to mark as Needs Parts">
+                                    <i class="bi bi-plus-circle"></i>
+                                </button>
                             @endif
                         </td>
                         {{-- Invoice --}}
@@ -844,6 +851,44 @@ async function compressImage(file) {
         };
     });
 }
+</script>
+
+<script>
+// Need Part Toggle Handler
+document.querySelectorAll('.need-part-toggle').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const jobId = this.dataset.jobId;
+        const jobWip = this.dataset.jobWip;
+        
+        if (confirm(`Mark job ${jobWip} as "Needs Parts"?\n\nThis will also update the work status to "5. Buka RQ".`)) {
+            fetch(`/jobs/${jobId}/need-part`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ need_part: true })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to show updated data
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Failed to update'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Failed to update. Please try again.');
+            });
+        }
+    });
+});
 </script>
 
 @endsection

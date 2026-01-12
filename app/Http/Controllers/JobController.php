@@ -628,6 +628,44 @@ class JobController extends Controller
     }
 
     /**
+     * Toggle or set need_part flag for a job via AJAX.
+     * Used by job list for quick "needs parts" toggle.
+     *
+     * @param Request $request HTTP request with optional need_part value
+     * @param Job $job The job to update
+     * @return JsonResponse JSON response with success status
+     */
+    public function updateNeedPart(Request $request, Job $job): JsonResponse
+    {
+        // Toggle or set to specific value
+        $newValue = $request->has('need_part') 
+            ? (bool) $request->need_part 
+            : !$job->need_part;
+        
+        $oldValue = $job->need_part;
+        $job->update(['need_part' => $newValue]);
+        
+        // Update work status if marking as needs part
+        if ($newValue && !$oldValue) {
+            // Set to "5. Buka RQ" when marking as needs part
+            $job->update(['work_status' => Job::WORK_STATUSES[4] ?? '5. Buka RQ (Qrder Parts)']);
+        }
+        
+        // Log activity
+        $action = $newValue ? 'marked as needing parts' : 'marked as not needing parts';
+        \App\Models\JobActivity::log($job, 'need_part_changed', 
+            "Job {$action}",
+            ['need_part' => $newValue]
+        );
+        
+        return response()->json([
+            'success' => true,
+            'need_part' => $newValue,
+            'message' => $newValue ? 'Job marked as needing parts' : 'Job marked as not needing parts',
+        ]);
+    }
+
+    /**
      * Bulk update multiple jobs at once.
      * 
      * Supports two actions:

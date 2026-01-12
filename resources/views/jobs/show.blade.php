@@ -317,187 +317,98 @@
 
             <!-- Order & Parts -->
             <div class="card mb-3">
-                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                <div class="card-header py-2">
                     <span>
                         <i class="bi bi-gear me-2"></i>Order & Parts
                         @if($job->need_part)
                             <span class="badge bg-warning text-dark ms-2"><i class="bi bi-exclamation-triangle"></i> Needs Parts</span>
                         @endif
                     </span>
-                    @if(auth()->user()->hasRole('sparepart') && $job->need_part)
-                        <button type="submit" form="orderPartsForm" class="btn btn-primary btn-sm">
-                            <i class="bi bi-save me-1"></i>Save Parts Info
-                        </button>
-                    @endif
                 </div>
                 <div class="card-body py-3">
+                    {{-- Needs Parts Toggle --}}
                     @if(auth()->user()->canEdit())
-                    {{-- Full edit access for Control Tower (partial), Manager, Admin --}}
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">RQ</label>
-                            <input type="text" name="rq" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('rq', $job->rq) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
-                            <input type="text" name="no_order_part_mbina" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('no_order_part_mbina', $job->no_order_part_mbina) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">Lain Lain</label>
-                            <input type="text" name="lain_lain" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('lain_lain', $job->lain_lain) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0 d-block">&nbsp;</label>
-                            <div class="form-check">
-                                <input type="hidden" name="need_part" value="0">
-                                <input class="form-check-input" type="checkbox" name="need_part" value="1" id="needPart" {{ old('need_part', $job->need_part) ? 'checked' : '' }}>
-                                <label class="form-check-label text-warning fw-bold" for="needPart">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>Needs Parts
-                                </label>
-                            </div>
-                        </div>
+                    <div class="form-check">
+                        <input type="hidden" name="need_part" value="0">
+                        <input class="form-check-input" type="checkbox" name="need_part" value="1" id="needPart" 
+                               {{ old('need_part', $job->need_part) ? 'checked' : '' }}
+                               {{ ($readonly || $isControlTower) ? 'disabled' : '' }}>
+                        <label class="form-check-label text-warning fw-bold" for="needPart">
+                            <i class="bi bi-exclamation-triangle me-1"></i>This job needs parts
+                        </label>
                     </div>
-                    @elseif(auth()->user()->hasRole('sparepart') && $job->need_part)
-                    {{-- Sparepart role: can edit RQ, Order Part, Lain-lain on jobs that need parts --}}
-                    {{-- Note: Sparepart doesn't have canEdit() so no main form is open --}}
-                    <form action="{{ route('jobs.update-order-parts', $job) }}" method="POST" id="orderPartsForm">
-                        @csrf
-                        @method('PATCH')
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">RQ</label>
-                                <input type="text" name="rq" class="form-control form-control-sm" value="{{ old('rq', $job->rq) }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
-                                <input type="text" name="no_order_part_mbina" class="form-control form-control-sm" value="{{ old('no_order_part_mbina', $job->no_order_part_mbina) }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">Lain Lain</label>
-                                <input type="text" name="lain_lain" class="form-control form-control-sm" value="{{ old('lain_lain', $job->lain_lain) }}">
-                            </div>
-                        </div>
-                    </form>
                     @else
-                    {{-- Read-only view for SA, Foreman, Audit, Sparepart (when job doesn't need parts), etc --}}
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">RQ</label>
-                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->rq ?: '-' }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">No Order Part MBINA</label>
-                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->no_order_part_mbina ?: '-' }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">Lain Lain</label>
-                            <div class="form-control-plaintext form-control-sm border rounded px-2">{{ $job->lain_lain ?: '-' }}</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted mb-0">Needs Parts</label>
-                            <div class="form-control-plaintext form-control-sm">
-                                @if($job->need_part)
-                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Yes</span>
-                                @else
-                                    <span class="text-muted">No</span>
-                                @endif
-                            </div>
-                        </div>
+                    <div>
+                        <span class="text-muted me-2">Needs Parts:</span>
+                        @if($job->need_part)
+                            <span class="badge bg-warning text-dark"><i class="bi bi-check-lg"></i> Yes</span>
+                        @else
+                            <span class="text-muted">No</span>
+                        @endif
                     </div>
                     @endif
-                </div>
-            </div>
 
-            {{-- Part Orders Section (when job needs parts) --}}
-            @if($job->need_part)
-            <div class="card mb-3">
-                <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                    <span>
-                        <i class="bi bi-box-seam me-2"></i>Part Orders
-                        @if($job->partOrders->count() > 0)
-                            <span class="badge bg-primary ms-2">{{ $job->partOrders->count() }}</span>
-                        @endif
-                    </span>
-                    @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
-                        <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="btn btn-primary btn-sm">
-                            <i class="bi bi-plus-lg me-1"></i>Add Part Order
-                        </a>
-                    @endif
-                </div>
-                <div class="card-body p-0">
+                    {{-- Part Orders Table (inline display when has parts) --}}
                     @if($job->partOrders->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Part</th>
-                                    <th>RQ / Order No.</th>
-                                    <th>Qty</th>
-                                    <th>Expected</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($job->partOrders as $order)
-                                <tr>
-                                    <td>
-                                        <div class="fw-semibold">{{ $order->part_name }}</div>
-                                        @if($order->part_number)
-                                            <small class="text-muted">{{ $order->part_number }}</small>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($order->rq)
-                                            <div><small class="text-muted">RQ:</small> {{ $order->rq }}</div>
-                                        @endif
-                                        @if($order->no_order_part)
-                                            <div><small class="text-muted">Order:</small> {{ $order->no_order_part }}</div>
-                                        @endif
-                                        @if(!$order->rq && !$order->no_order_part)
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $order->quantity }}</td>
-                                    <td>
-                                        {{ $order->expected_date?->format('d M') }}
-                                        @if($order->is_overdue)
-                                            <span class="badge bg-danger">Overdue</span>
-                                        @elseif($order->is_due_soon)
-                                            <span class="badge bg-warning text-dark">Soon</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <span class="badge" style="background-color: {{ $order->status_color }}">
-                                            {{ $order->status_label }}
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
-                                        <a href="{{ route('part-orders.edit', $order) }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        @endif
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    <div class="mt-3">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Part Name</th>
+                                        <th>Part #</th>
+                                        <th class="text-center">Qty</th>
+                                        <th>RQ</th>
+                                        <th>Status</th>
+                                        <th>Order Date</th>
+                                        <th>Expected</th>
+                                        <th>Received</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($job->partOrders as $partOrder)
+                                    <tr>
+                                        <td>{{ $partOrder->part_name ?: '-' }}</td>
+                                        <td><small>{{ $partOrder->part_number ?: '-' }}</small></td>
+                                        <td class="text-center">{{ $partOrder->quantity ?: 1 }}</td>
+                                        <td>{{ $partOrder->rq ?: '-' }}</td>
+                                        <td>
+                                            @php
+                                                $statusColors = [
+                                                    'pending' => 'secondary',
+                                                    'ordered' => 'primary',
+                                                    'received' => 'success',
+                                                    'installed' => 'info',
+                                                    'cancelled' => 'danger',
+                                                ];
+                                            @endphp
+                                            <span class="badge bg-{{ $statusColors[$partOrder->status] ?? 'secondary' }}">
+                                                {{ ucfirst($partOrder->status) }}
+                                            </span>
+                                        </td>
+                                        <td><small>{{ $partOrder->order_date?->format('d/m/y') ?: '-' }}</small></td>
+                                        <td><small>{{ $partOrder->expected_date?->format('d/m/y') ?: '-' }}</small></td>
+                                        <td><small>{{ $partOrder->received_date?->format('d/m/y') ?: '-' }}</small></td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-plus-lg me-1"></i>Add Part Order
+                            </a>
+                        </div>
                     </div>
-                    @else
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
-                        <p class="mb-2">No part orders yet</p>
-                        @if(auth()->user()->role === 'sparepart' || auth()->user()->role === 'admin')
-                        <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="btn btn-sm btn-primary">
-                            <i class="bi bi-plus-lg me-1"></i>Add First Part Order
-                        </a>
-                        @endif
+                    @elseif($job->need_part)
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        No part orders yet. 
+                        <a href="{{ route('part-orders.create', ['job_id' => $job->id]) }}" class="alert-link">Add a part order</a> to track parts for this job.
                     </div>
                     @endif
                 </div>
             </div>
-            @endif
 
             {{-- Close main form/div before comments to avoid nested form issue --}}
             @if(auth()->user()->canEdit())
