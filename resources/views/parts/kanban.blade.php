@@ -76,7 +76,7 @@
                     <select name="service_advisor" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">All SA</option>
                         @foreach($filterOptions['service_advisors'] as $sa)
-                        <option value="{{ $sa }}" {{ request('service_advisor') == $sa ? 'selected' : '' }}>{{ $sa }}</option>
+                        <option value="{{ $sa }}" {{ ($appliedFilters['service_advisor'] ?? '') == $sa ? 'selected' : '' }}>{{ $sa }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -84,7 +84,7 @@
                     <select name="foreman" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">All Foremen</option>
                         @foreach($filterOptions['foremen'] as $fm)
-                        <option value="{{ $fm }}" {{ request('foreman') == $fm ? 'selected' : '' }}>{{ $fm }}</option>
+                        <option value="{{ $fm }}" {{ ($appliedFilters['foreman'] ?? '') == $fm ? 'selected' : '' }}>{{ $fm }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -105,11 +105,22 @@
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
-                @if(request()->hasAny(['search', 'service_advisor', 'foreman', 'date_from', 'date_to']))
+                @if(request()->hasAny(['search', 'service_advisor', 'foreman', 'date_from', 'date_to']) || ($appliedFilters['foreman'] ?? null) || ($appliedFilters['service_advisor'] ?? null))
                 <div class="col-auto">
-                    <a href="{{ route('part-orders.kanban') }}" class="btn btn-sm btn-outline-secondary">
+                    <a href="{{ route('part-orders.kanban') }}?clear=1" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i>Clear
                     </a>
+                </div>
+                @endif
+                
+                {{-- Role indicator --}}
+                @if($permissions['userRole'] === 'sa')
+                <div class="col-auto ms-auto">
+                    <span class="badge bg-info">Viewing: My Jobs (SA)</span>
+                </div>
+                @elseif($permissions['userRole'] === 'foreman')
+                <div class="col-auto ms-auto">
+                    <span class="badge bg-secondary">Viewing: My Jobs (Foreman)</span>
                 </div>
                 @endif
             </form>
@@ -140,6 +151,7 @@
                             <div class="kanban-card kanban-job-card card border-0 shadow-sm mb-2 cursor-grab" 
                                  data-job-id="{{ $job->id }}"
                                  data-job-number="{{ $job->job_number }}"
+                                 data-foreman="{{ $job->foreman }}"
                                  draggable="true">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
@@ -409,6 +421,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const orderDetailModal = new bootstrap.Modal(document.getElementById('orderDetailModal'));
     const remarkModal = new bootstrap.Modal(document.getElementById('remarkModal'));
     
+    // Permissions from PHP
+    const permissions = {
+        canOpenRq: {{ $permissions['canOpenRq'] ? 'true' : 'false' }},
+        canUpdateStatus: {{ $permissions['canUpdateStatus'] ? 'true' : 'false' }},
+        userRole: '{{ $permissions['userRole'] }}',
+        userForeman: {!! json_encode($permissions['userForeman']) !!}
+    };
+    
     // Allowed transitions (1-step only)
     const allowedTransitions = {
         'pending': ['buka_rq'],
@@ -499,16 +519,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Handle based on card type and target
+            // Permission check for Job → Buka RQ
             if (draggedType === 'job' && targetStatus === 'buka_rq') {
-                // Job → Buka RQ: Show RQ modal
+                if (!permissions.canOpenRq) {
+                    alert('You do not have permission to open RQ. Only Admin, Control Tower, or assigned Foreman can do this.');
+                    return;
+                }
+                
+                // If foreman, check if it's their assigned job
+                if (permissions.userRole === 'foreman') {
+                    const jobForeman = draggedCard.dataset.foreman || '';
+                    if (permissions.userForeman && jobForeman.toLowerCase().trim() !== permissions.userForeman.toLowerCase().trim()) {
+                        alert('You can only open RQ for jobs assigned to you.');
+                        return;
+                    }
+                }
+                
+                // Show RQ modal
                 showRqModal(draggedCard.dataset.jobId, draggedCard.dataset.jobNumber);
-            } else if (draggedType === 'order' && targetStatus === 'ordered') {
-                // Buka RQ → Ordered: Show order details modal
-                showOrderModal(draggedCard.dataset.orderId, draggedCard);
-            } else if (draggedType === 'order') {
-                // Other transitions: Show remark modal
-                showRemarkModal(draggedCard.dataset.orderId, targetStatus);
+            } 
+            // Permission check for Order status updates
+            else if (draggedType === 'order') {
+                if (!permissions.canUpdateStatus) {
+                    alert('You do not have permission to update part order status. Only Sparepart and Admin can do this.');
+                    return;
+                }
+                
+                if (targetStatus === 'ordered') {
+                    // Buka RQ → Ordered: Show order details modal
+                    showOrderModal(draggedCard.dataset.orderId, draggedCard);
+                } else {
+                    // Other transitions: Show remark modal
+                    showRemarkModal(draggedCard.dataset.orderId, targetStatus);
+                }
             }
         });
     });

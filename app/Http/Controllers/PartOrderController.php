@@ -14,10 +14,42 @@ class PartOrderController extends Controller
      * 
      * Pending column shows Jobs that need parts (not PartOrders).
      * Other columns (Buka RQ → Received) show PartOrders.
+     * 
+     * Permissions:
+     * - Pending → Buka RQ: admin, control_tower, assigned foreman
+     * - Other status changes: sparepart, admin only
+     * 
+     * Default filters by role:
+     * - SA: own assigned jobs
+     * - Foreman: own assigned jobs
+     * - Sparepart: all jobs with need_part
      */
     public function kanban(Request $request)
     {
+        $user = auth()->user();
         $statuses = PartOrder::getStatuses();
+        
+        // Determine default filter based on role (only on initial load without filters)
+        $defaultForeman = null;
+        $defaultSA = null;
+        
+        // Skip role-based defaults if 'clear' is passed or any filter is set
+        if (!$request->has('clear') && !$request->hasAny(['search', 'service_advisor', 'foreman', 'date_from', 'date_to'])) {
+            if ($user->role === 'foreman') {
+                // Foreman sees their own assigned jobs by default
+                $foreman = \App\Models\Foreman::where('user_id', $user->id)->first();
+                if ($foreman) {
+                    $defaultForeman = $foreman->name;
+                }
+            } elseif ($user->role === 'sa') {
+                // SA sees their own assigned jobs by default
+                $sa = \App\Models\ServiceAdvisor::where('user_id', $user->id)->first();
+                if ($sa) {
+                    $defaultSA = $sa->name;
+                }
+            }
+            // Sparepart/admin/control_tower see all need_part jobs (no filter applied)
+        }
         
         // Pending column: Jobs with need_part=true AND uninvoiced
         // These are jobs waiting to have an RQ opened
@@ -37,12 +69,16 @@ class PartOrderController extends Controller
             });
         }
         
-        if ($request->filled('service_advisor')) {
-            $pendingJobsQuery->where('service_advisor', $request->input('service_advisor'));
+        // Apply foreman filter (from request or default)
+        $foremanFilter = $request->input('foreman', $defaultForeman);
+        if ($foremanFilter) {
+            $pendingJobsQuery->where('foreman', $foremanFilter);
         }
         
-        if ($request->filled('foreman')) {
-            $pendingJobsQuery->where('foreman', $request->input('foreman'));
+        // Apply SA filter (from request or default)
+        $saFilter = $request->input('service_advisor', $defaultSA);
+        if ($saFilter) {
+            $pendingJobsQuery->where('service_advisor', $saFilter);
         }
         
         $pendingJobs = $pendingJobsQuery->orderBy('job_date', 'desc')->get();
@@ -63,12 +99,14 @@ class PartOrderController extends Controller
             });
         }
         
-        if ($request->filled('service_advisor')) {
-            $baseQuery->where('jobs.service_advisor', $request->input('service_advisor'));
+        // Apply foreman filter to part orders
+        if ($foremanFilter) {
+            $baseQuery->where('jobs.foreman', $foremanFilter);
         }
         
-        if ($request->filled('foreman')) {
-            $baseQuery->where('jobs.foreman', $request->input('foreman'));
+        // Apply SA filter to part orders
+        if ($saFilter) {
+            $baseQuery->where('jobs.service_advisor', $saFilter);
         }
         
         if ($request->filled('date_from')) {
@@ -111,8 +149,26 @@ class PartOrderController extends Controller
                 ->sort()
                 ->values(),
         ];
+        
+        // Permission flags for the view
+        // Pending → Buka RQ: admin, control_tower, assigned foreman
+        // Other transitions: sparepart, admin
+        $permissions = [
+            'canOpenRq' => in_array($user->role, ['admin', 'control_tower', 'foreman']),
+            'canUpdateStatus' => in_array($user->role, ['admin', 'sparepart']),
+            'userRole' => $user->role,
+            'userForeman' => $user->role === 'foreman' 
+                ? (\App\Models\Foreman::where('user_id', $user->id)->first()?->name ?? null)
+                : null,
+        ];
+        
+        // Pass applied filters for form values
+        $appliedFilters = [
+            'foreman' => $foremanFilter,
+            'service_advisor' => $saFilter,
+        ];
 
-        return view('parts.kanban', compact('statuses', 'ordersByStatus', 'pendingJobs', 'summary', 'filterOptions'));
+        return view('parts.kanban', compact('statuses', 'ordersByStatus', 'pendingJobs', 'summary', 'filterOptions', 'permissions', 'appliedFilters'));
     }
 
     /**
@@ -291,9 +347,21 @@ class PartOrderController extends Controller
      * Update status via AJAX (for Kanban drag-drop)
      * Handles status changes, extra fields, and Work Status automation.
      * Enforces 1-step movement only (e.g., buka_rq → ordered, not buka_rq → received).
+     * 
+     * Permission: Only sparepart and admin can update statuses.
      */
     public function updateStatus(Request $request, PartOrder $partOrder): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Permission check: only sparepart and admin can update status
+        if (!in_array($user->role, ['admin', 'sparepart'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to update part order status.',
+            ], 403);
+        }
+        
         $validated = $request->validate([
             'status' => 'required|string|in:' . implode(',', array_keys(PartOrder::getStatuses())),
             'no_order_part' => 'nullable|string|max:100',
@@ -379,15 +447,38 @@ class PartOrderController extends Controller
     /**
      * Create a new PartOrder from Job (for Kanban: Pending → Buka RQ)
      * Called when dragging a Job card to the Buka RQ column.
+     * 
+     * Permission: admin, control_tower, or assigned foreman only.
      */
     public function createFromJob(Request $request): JsonResponse
     {
+        $user = auth()->user();
+        
         $validated = $request->validate([
             'job_id' => 'required|exists:jobs,id',
             'rq' => 'required|string|max:50',
         ]);
         
         $job = Job::findOrFail($validated['job_id']);
+        
+        // Permission check: admin, control_tower, or assigned foreman
+        $canOpenRq = false;
+        if (in_array($user->role, ['admin', 'control_tower'])) {
+            $canOpenRq = true;
+        } elseif ($user->role === 'foreman') {
+            // Foreman can only open RQ for their assigned jobs
+            $foreman = \App\Models\Foreman::where('user_id', $user->id)->first();
+            if ($foreman && strcasecmp(trim($job->foreman), trim($foreman->name)) === 0) {
+                $canOpenRq = true;
+            }
+        }
+        
+        if (!$canOpenRq) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to open RQ for this job.',
+            ], 403);
+        }
         
         // Create new PartOrder with status buka_rq
         $partOrder = PartOrder::create([

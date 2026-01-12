@@ -12,9 +12,6 @@ class PartOrder extends Model
 
     protected $fillable = [
         'job_id',
-        'part_name',
-        'part_number',
-        'quantity',
         'rq',
         'no_order_part',
         'notes',
@@ -30,7 +27,6 @@ class PartOrder extends Model
         'order_date' => 'date',
         'expected_date' => 'date',
         'received_date' => 'date',
-        'quantity' => 'integer',
     ];
 
     // Status constants - workflow order
