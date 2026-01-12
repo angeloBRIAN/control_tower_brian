@@ -65,18 +65,34 @@
     $rawCounts = (clone $allUninvoicedJobs)
         ->selectRaw('work_status, COUNT(*) as job_count, SUM(total_sales) as total')
         ->groupBy('work_status')
-        ->get()
-        ->keyBy(fn($item) => strtolower(trim($item->work_status ?? '')));
+        ->get();
     
     // Aggregate counts by normalized status
     $aggregatedCounts = [];
-    foreach ($rawCounts as $rawStatus => $data) {
+    foreach ($rawCounts as $data) {
+        $rawStatus = $data->work_status;
         if (empty($rawStatus)) {
-            // Skip null/empty work_status - these jobs haven't been assigned yet
+            // Jobs with NULL work_status - assign to first status
+            $firstStatus = $allWorkStatuses->first();
+            if ($firstStatus) {
+                $optionId = $firstStatus->id;
+                if (!isset($aggregatedCounts[$optionId])) {
+                    $aggregatedCounts[$optionId] = [
+                        'option' => $firstStatus,
+                        'job_count' => 0,
+                        'total' => 0,
+                    ];
+                }
+                $aggregatedCounts[$optionId]['job_count'] += $data->job_count;
+                $aggregatedCounts[$optionId]['total'] += $data->total ?? 0;
+            }
             continue;
         }
         
-        $lookupKey = strtolower(trim($rawStatus));
+        // Normalize legacy status values to new format
+        $normalizedStatus = \App\Models\Job::normalizeWorkStatus($rawStatus);
+        $lookupKey = strtolower(trim($normalizedStatus));
+        
         if (isset($statusLookup[$lookupKey])) {
             $option = $statusLookup[$lookupKey];
             $optionId = $option->id;

@@ -58,11 +58,27 @@ class DashboardController extends Controller
         });
 
         $workStatusCounts = Cache::remember('dashboard_work_status_counts', self::CACHE_TTL, function () {
-            return Job::uninvoiced()
+            $rawCounts = Job::uninvoiced()
                 ->selectRaw('COALESCE(work_status, "belum_diproses") as work_status, COUNT(*) as count')
                 ->groupBy('work_status')
-                ->get()
-                ->keyBy('work_status');
+                ->get();
+            
+            // Normalize legacy status values to new format
+            $normalizedCounts = collect();
+            foreach ($rawCounts as $item) {
+                $normalizedStatus = Job::normalizeWorkStatus($item->work_status);
+                $existing = $normalizedCounts->get($normalizedStatus);
+                if ($existing) {
+                    $existing->count += $item->count;
+                    $normalizedCounts->put($normalizedStatus, $existing);
+                } else {
+                    $normalizedCounts->put($normalizedStatus, (object)[
+                        'work_status' => $normalizedStatus,
+                        'count' => $item->count
+                    ]);
+                }
+            }
+            return $normalizedCounts;
         });
 
         $workStatusOptions = Job::getWorkStatusOptions();
@@ -73,12 +89,27 @@ class DashboardController extends Controller
         });
 
         $chartData = Cache::remember('dashboard_chart_data', self::CACHE_TTL, function () use ($workStatusOptions) {
-            $workStatusCounts = Job::uninvoiced()
+            $rawCounts = Job::uninvoiced()
                 ->selectRaw('COALESCE(work_status, "belum_diproses") as work_status, COUNT(*) as count')
                 ->groupBy('work_status')
-                ->get()
-                ->keyBy('work_status');
-            return $this->getChartData($workStatusOptions, $workStatusCounts);
+                ->get();
+            
+            // Normalize legacy status values to new format  
+            $normalizedCounts = collect();
+            foreach ($rawCounts as $item) {
+                $normalizedStatus = Job::normalizeWorkStatus($item->work_status);
+                $existing = $normalizedCounts->get($normalizedStatus);
+                if ($existing) {
+                    $existing->count += $item->count;
+                    $normalizedCounts->put($normalizedStatus, $existing);
+                } else {
+                    $normalizedCounts->put($normalizedStatus, (object)[
+                        'work_status' => $normalizedStatus,
+                        'count' => $item->count
+                    ]);
+                }
+            }
+            return $this->getChartData($workStatusOptions, $normalizedCounts);
         });
 
         // Recent jobs - shorter cache (2 minutes)
