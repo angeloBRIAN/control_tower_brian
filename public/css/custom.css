@@ -1399,6 +1399,7 @@ input:checked+.slider:before {
     transform: translateY(-3px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
 /* ========================================
    NEWS TICKER (Announcements)
    ======================================== */
@@ -1408,17 +1409,20 @@ input:checked+.slider:before {
     left: 0;
     width: 100%;
     height: 36px;
-    background: #dc3545; /* Danger red */
+    background: #dc3545;
+    /* Danger red */
     color: #fff;
-    z-index: 1040; /* Above sidebar (1000) & defaults */
+    z-index: 1040;
+    /* Above sidebar (1000) & defaults */
     display: flex;
     align-items: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     font-size: 0.9rem;
 }
 
 .news-ticker-label {
-    background: #a71d2a; /* Darker red */
+    background: #a71d2a;
+    /* Darker red */
     color: #fff;
     height: 100%;
     padding: 0 20px;
@@ -1428,7 +1432,7 @@ input:checked+.slider:before {
     text-transform: uppercase;
     font-size: 0.8rem;
     z-index: 2;
-    box-shadow: 3px 0 10px rgba(0,0,0,0.2);
+    box-shadow: 3px 0 10px rgba(0, 0, 0, 0.2);
     white-space: nowrap;
 }
 
@@ -1444,11 +1448,12 @@ input:checked+.slider:before {
 
 .news-ticker-track {
     white-space: nowrap;
-    position: absolute;
-    animation: ticker 40s linear infinite;
-    will-change: transform;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
+    min-width: 100%;
+    animation: ticker 40s linear infinite;
+    will-change: transform;
 }
 
 .news-ticker-track:hover {
@@ -1466,14 +1471,20 @@ input:checked+.slider:before {
     text-decoration: none;
     font-weight: 500;
 }
+
 .news-ticker-item a:hover {
     text-decoration: underline;
     color: #ffd;
 }
 
 @keyframes ticker {
-    0% { transform: translateX(100vw); } 
-    100% { transform: translateX(-100%); }
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
 }
 
 /* Adjustments when ticker is present */
@@ -1483,26 +1494,23 @@ body.has-ticker .sidebar {
 }
 
 body.has-ticker .main-content {
-    padding-top: calc(2rem + 36px); /* 2rem original + 36px ticker */
+    padding-top: calc(2rem + 36px);
+    /* 2rem original + 36px ticker */
 }
 
 body.has-ticker .mobile-menu-toggle {
     /* bottom fixed, no change needed usually */
 }
 
-/* Different animation for different screen sizes? */
-@media (min-width: 1200px) {
-    @keyframes ticker {
-        0% { transform: translateX(100%); } 
-        100% { transform: translateX(-100%); }
-    }
-}
+
 
 @media (max-width: 768px) {
     body.has-ticker .sidebar-overlay {
         top: 36px;
     }
+
     body.has-ticker .sidebar {
-        z-index: 1035; /* Below ticker */
+        z-index: 1035;
+        /* Below ticker */
     }
 }
