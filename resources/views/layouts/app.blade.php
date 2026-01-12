@@ -44,7 +44,7 @@
                 <div class="news-ticker-item">
                     <span class="opacity-75 me-2" style="font-size: 0.85em">[{{ $announcement->created_at->format('d/m H:i') }}]</span>
                     <a href="#" data-bs-toggle="modal" data-bs-target="#tickerModal{{ $announcement->id }}">
-                        {{ $announcement->title }}
+                        <strong>{{ $announcement->title }}:</strong> {{ \Illuminate\Support\Str::limit(strip_tags($announcement->content), 100) }}
                     </a>
                 </div>
                 @endforeach
