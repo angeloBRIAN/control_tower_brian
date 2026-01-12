@@ -129,7 +129,8 @@
 
     <!-- Kanban Board -->
     <div class="kanban-board">
-        <div class="row flex-nowrap overflow-auto pb-3" style="min-height: 500px;">
+        <div class="overflow-auto pb-3" style="min-height: 500px;">
+            <div class="row flex-nowrap m-0">
             
             {{-- PENDING COLUMN - Shows JOBS (not PartOrders) --}}
             <div class="col-kanban" style="min-width: 280px; max-width: 320px;">
@@ -253,6 +254,7 @@
                     </div>
                 </div>
             @endforeach
+            </div>
         </div>
     </div>
 </div>

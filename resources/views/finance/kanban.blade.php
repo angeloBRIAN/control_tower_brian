@@ -128,7 +128,8 @@
 
     <!-- Kanban Board -->
     <div class="kanban-board">
-        <div class="row flex-nowrap overflow-auto pb-3" style="min-height: 500px;">
+        <div class="overflow-auto pb-3" style="min-height: 500px;">
+            <div class="row flex-nowrap m-0">
             @php
                 $columns = [
                     'draft' => ['label' => 'Draft', 'color' => 'secondary', 'icon' => 'file-earmark'],
@@ -222,6 +223,7 @@
                     </div>
                 </div>
             @endforeach
+            </div>
         </div>
     </div>
     
