@@ -918,7 +918,7 @@ class JobController extends Controller
         // If remark provided, also add it as a job remark
         if ($remark) {
             $job->remarks()->create([
-                'content' => "[Status Change: {$oldLabel} → {$newLabel}] " . $remark,
+                'remark_text' => "[Status Change: {$oldLabel} → {$newLabel}] " . $remark,
                 'user_id' => $user->id,
             ]);
         }
