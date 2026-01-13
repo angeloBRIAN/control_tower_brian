@@ -11,7 +11,28 @@ class UpdateJobRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->canEdit() ?? false;
+        $user = $this->user();
+        if (!$user) return false;
+
+        if ($user->canEdit()) return true;
+
+        // Allow Foreman to update if assigned to the job
+        if ($user->hasRole('foreman')) {
+            $job = $this->route('job');
+            if (is_numeric($job)) {
+                $job = \App\Models\Job::find($job);
+            }
+            
+            if ($job) {
+                // Check if user is linked to the foreman assigned to this job (supports multiple assignments)
+                $foremanNames = \App\Models\Foreman::where('user_id', $user->id)->pluck('name')->toArray();
+                if (!empty($foremanNames) && in_array($job->foreman, $foremanNames)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -21,6 +42,14 @@ class UpdateJobRequest extends FormRequest
      */
     public function rules(): array
     {
+        // If user cannot edit (e.g. Foreman), they can ONLY update technician and need_part
+        if (! $this->user()->canEdit()) {
+            return [
+                'technician' => 'nullable|string',
+                'need_part' => 'nullable|boolean',
+            ];
+        }
+
         $jobId = $this->route('job')?->id ?? $this->route('job');
         
         return [
@@ -38,9 +67,10 @@ class UpdateJobRequest extends FormRequest
             'technician' => 'nullable|string',
             'foreman' => 'nullable|string',
             'job_date' => 'nullable|date',
-            'labour_sales' => 'nullable|numeric',
-            'part_sales' => 'nullable|numeric',
-            'total_sales' => 'nullable|numeric',
+            // Sales fields removed to prevent manual editing (imported from DMS)
+            // 'labour_sales' => 'nullable|numeric',
+            // 'part_sales' => 'nullable|numeric',
+            // 'total_sales' => 'nullable|numeric',
             'rq' => 'nullable|string',
             'no_order_part_mbina' => 'nullable|string',
             'lain_lain' => 'nullable|string',

@@ -59,12 +59,12 @@
     </div>
 </div>
 
-@if(auth()->user()->canEdit())
+@if(auth()->user()->canEdit() || auth()->user()->hasRole('foreman'))
 <form action="{{ route('jobs.update', $job) }}" method="POST" id="jobForm">
     @csrf
     @method('PUT')
 @php 
-    $readonly = false; 
+    $readonly = !auth()->user()->canEdit(); 
     $isControlTower = auth()->user()->hasRole('control_tower');
 @endphp
 @else
@@ -213,7 +213,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Technician</label>
-                            <input type="text" name="technician" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('technician', $job->technician) }}">
+                            <input type="text" name="technician" class="form-control form-control-sm" {{ ($readonly && !auth()->user()->hasRole('foreman')) ? 'disabled' : '' }} value="{{ old('technician', $job->technician) }}">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Block</label>
@@ -249,15 +249,15 @@
                     <div class="row g-2">
                         <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Labour Sales (Rp)</label>
-                            <input type="number" name="labour_sales" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('labour_sales', $job->labour_sales) }}" step="0.01">
+                            <input type="number" name="labour_sales" class="form-control form-control-sm bg-light" disabled value="{{ old('labour_sales', $job->labour_sales) }}" step="0.01">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Part Sales (Rp)</label>
-                            <input type="number" name="part_sales" class="form-control form-control-sm" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('part_sales', $job->part_sales) }}" step="0.01">
+                            <input type="number" name="part_sales" class="form-control form-control-sm bg-light" disabled value="{{ old('part_sales', $job->part_sales) }}" step="0.01">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Total Sales (Rp)</label>
-                            <input type="number" name="total_sales" class="form-control form-control-sm fw-bold" {{ ($readonly || $isControlTower) ? 'disabled' : '' }} value="{{ old('total_sales', $job->total_sales) }}" step="0.01">
+                            <input type="number" name="total_sales" class="form-control form-control-sm fw-bold bg-light" disabled value="{{ old('total_sales', $job->total_sales) }}" step="0.01">
                         </div>
                     </div>
                 </div>
@@ -411,7 +411,7 @@
             </div>
 
             {{-- Close main form/div before comments to avoid nested form issue --}}
-            @if(auth()->user()->canEdit())
+            @if(auth()->user()->canEdit() || auth()->user()->hasRole('foreman'))
             </form>
             @else
             </div>
