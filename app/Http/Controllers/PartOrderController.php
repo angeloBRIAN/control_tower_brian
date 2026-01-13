@@ -467,9 +467,9 @@ class PartOrderController extends Controller
         if (in_array($user->role, ['admin', 'control_tower'])) {
             $canOpenRq = true;
         } elseif ($user->role === 'foreman') {
-            // Foreman can only open RQ for their assigned jobs
-            $foreman = \App\Models\Foreman::where('user_id', $user->id)->first();
-            if ($foreman && strcasecmp(trim($job->foreman), trim($foreman->name)) === 0) {
+            // Foreman can only open RQ for their assigned jobs (supports multiple foreman assignments)
+            $foremanNames = \App\Models\Foreman::where('user_id', $user->id)->pluck('name')->toArray();
+            if (!empty($foremanNames) && in_array($job->foreman, $foremanNames)) {
                 $canOpenRq = true;
             }
         }
