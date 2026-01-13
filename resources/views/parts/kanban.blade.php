@@ -107,7 +107,7 @@
                 </div>
                 @if(request()->hasAny(['search', 'service_advisor', 'foreman', 'date_from', 'date_to']) || ($appliedFilters['foreman'] ?? null) || ($appliedFilters['service_advisor'] ?? null))
                 <div class="col-auto">
-                    <a href="{{ route('part-orders.kanban') }}?clear=1" class="btn btn-sm btn-outline-secondary">
+                    <a href="{{ route('parts.kanban') }}?clear=1" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-x-circle me-1"></i>Clear
                     </a>
                 </div>
