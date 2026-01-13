@@ -475,9 +475,13 @@ class PartOrderController extends Controller
         }
         
         if (!$canOpenRq) {
+            $errorMsg = 'You do not have permission to open RQ for this job.';
+            if ($user->role === 'foreman') {
+                $errorMsg = "This job is assigned to foreman '{$job->foreman}', not to you. You can only open RQ for jobs assigned to your linked foreman profile.";
+            }
             return response()->json([
                 'success' => false,
-                'message' => 'You do not have permission to open RQ for this job.',
+                'message' => $errorMsg,
             ], 403);
         }
         
@@ -488,6 +492,7 @@ class PartOrderController extends Controller
             'notes' => $validated['notes'] ?? null,
             'status' => PartOrder::STATUS_BUKA_RQ,
             'order_date' => now()->toDateString(),
+            'expected_date' => now()->addDays(7)->toDateString(),
             'created_by' => auth()->id(),
         ]);
         
