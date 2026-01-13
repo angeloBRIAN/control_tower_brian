@@ -202,11 +202,15 @@ class UserController extends Controller
         ]);
 
         // Log activity
-        activity()
-            ->causedBy(auth()->user())
-            ->performedOn($user)
-            ->withProperties(['action' => 'admin_password_reset', 'target_user' => $user->email])
-            ->log('Admin reset password for user');
+        \App\Models\AuditLog::create([
+            'auditable_type' => User::class,
+            'auditable_id' => $user->id,
+            'user_id' => auth()->id(),
+            'action' => 'password_reset',
+            'new_values' => ['target_user' => $user->email],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
 
         return response()->json([
             'success' => true,
