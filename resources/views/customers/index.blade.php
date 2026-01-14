@@ -35,7 +35,7 @@
 
                 @auth
                 <div class="dropdown">
-                    <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-layout-three-columns"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 200px;">

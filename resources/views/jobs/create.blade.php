@@ -79,6 +79,10 @@
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label">Block</label>
+                    <input type="text" name="block" class="form-control" value="{{ old('block') }}">
+                </div>
 
                 <div class="col-md-4">
                     <label class="form-label">Job Type</label>
