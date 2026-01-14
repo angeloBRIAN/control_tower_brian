@@ -229,7 +229,7 @@ class JobController extends Controller
             $user?->id
         );
 
-        return redirect()->route('jobs.show', $job)
+        return redirect()->route('jobs.index')
             ->with('success', 'Job created successfully.');
     }
 
@@ -319,7 +319,7 @@ class JobController extends Controller
             );
         }
 
-        return redirect()->route('jobs.show', $job)
+        return redirect()->route('jobs.index')
             ->with('success', 'Job updated successfully.');
     }
 
