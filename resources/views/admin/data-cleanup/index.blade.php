@@ -14,6 +14,43 @@
 
 <div class="row">
     <div class="col-lg-8">
+        <!-- Reassign Personnel Card -->
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-people-fill me-2"></i>Personnel Reassignment (Fix Imported Data)
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Use this tool to fix issues where personnel names have changed. 
+                    Updates historical <strong>Jobs</strong> and merges/renames the <strong>Master Record</strong>.
+                </p>
+                <form action="{{ route('data-cleanup.reassign') }}" method="POST">
+                    @csrf
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Type</label>
+                            <select name="type" class="form-select" id="reassignType" required>
+                                <option value="sa">Service Advisor</option>
+                                <option value="foreman">Foreman</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Old Name</label>
+                            <input type="text" name="old_name" class="form-control" placeholder="e.g. ADITYA" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">New Name / Target</label>
+                            <input type="text" name="new_name" class="form-control" list="existingNames" placeholder="Type or Select..." required>
+                            <datalist id="existingNames"></datalist>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Fix</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
                 <i class="bi bi-exclamation-triangle me-2"></i>Warning: This action is irreversible!
@@ -232,6 +269,30 @@ document.addEventListener('DOMContentLoaded', function() {
         bootstrap.Modal.getInstance(confirmModal).hide();
         form.submit();
     });
+
+    // Reassign Tool Logic
+    const reassignType = document.getElementById('reassignType');
+    const existingNamesList = document.getElementById('existingNames');
+    
+    if (reassignType && existingNamesList) {
+        const saNames = @json($serviceAdvisors->pluck('name'));
+        const foremanNames = @json($foremen->pluck('name'));
+
+        function updateDatalist() {
+            existingNamesList.innerHTML = '';
+            const type = reassignType.value;
+            const names = type === 'sa' ? saNames : foremanNames;
+            
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                existingNamesList.appendChild(option);
+            });
+        }
+
+        reassignType.addEventListener('change', updateDatalist);
+        updateDatalist(); // Initialize on load
+    }
 });
 </script>
 @endpush

@@ -251,6 +251,7 @@ Route::middleware('auth')->group(function () {
         // Data Cleanup
         Route::get('data-cleanup', [\App\Http\Controllers\Admin\DataCleanupController::class, 'index'])->name('data-cleanup.index');
         Route::post('data-cleanup', [\App\Http\Controllers\Admin\DataCleanupController::class, 'cleanup'])->name('data-cleanup.execute');
+        Route::post('data-cleanup/reassign', [\App\Http\Controllers\Admin\DataCleanupController::class, 'reassign'])->name('data-cleanup.reassign');
 
         // Session Manager
         Route::get('sessions', [\App\Http\Controllers\Admin\SessionController::class, 'index'])->name('sessions.index');

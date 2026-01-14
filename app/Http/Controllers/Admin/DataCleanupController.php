@@ -77,7 +77,10 @@ class DataCleanupController extends Controller
 
         $tableGroups = $this->tableGroups;
         
-        return view('admin.data-cleanup.index', compact('counts', 'totalRecords', 'tableGroups'));
+        $serviceAdvisors = \App\Models\ServiceAdvisor::orderBy('name')->get();
+        $foremen = \App\Models\Foreman::orderBy('name')->get();
+
+        return view('admin.data-cleanup.index', compact('counts', 'totalRecords', 'tableGroups', 'serviceAdvisors', 'foremen'));
     }
 
     /**
@@ -188,5 +191,67 @@ class DataCleanupController extends Controller
             return redirect()->route('admin.data-cleanup.index')
                 ->with('error', 'Data cleanup failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Reassign personnel (SA/Foreman) in jobs and master data
+     */
+    public function reassign(Request $request)
+    {
+        $request->validate([
+            'type' => 'required|in:sa,foreman',
+            'old_name' => 'required|string',
+            'new_name' => 'required|string|different:old_name',
+        ]);
+
+        $type = $request->input('type');
+        $oldName = trim($request->input('old_name'));
+        $newName = trim($request->input('new_name'));
+        
+        $jobCount = 0;
+        $msg = "";
+
+        DB::transaction(function () use ($type, $oldName, $newName, &$jobCount, &$msg) {
+            if ($type === 'sa') {
+                // Update Jobs
+                $jobCount = \App\Models\Job::where('service_advisor', $oldName)->update(['service_advisor' => $newName]);
+                
+                // Update Master Data
+                $oldMaster = \App\Models\ServiceAdvisor::where('name', $oldName)->first();
+                if ($oldMaster) {
+                    $newMaster = \App\Models\ServiceAdvisor::where('name', $newName)->first();
+                    if ($newMaster) {
+                        $oldMaster->delete();
+                        $msg = "Merged SA '{$oldName}' into '{$newName}'.";
+                    } else {
+                        $oldMaster->update(['name' => $newName]);
+                        $msg = "Renamed SA '{$oldName}' to '{$newName}'.";
+                    }
+                } else {
+                    $msg = "No SA master record found for '{$oldName}', but updated jobs.";
+                }
+            } else {
+                // Update Jobs
+                $jobCount = \App\Models\Job::where('foreman', $oldName)->update(['foreman' => $newName]);
+                
+                // Update Master Data
+                $oldMaster = \App\Models\Foreman::where('name', $oldName)->first();
+                if ($oldMaster) {
+                    $newMaster = \App\Models\Foreman::where('name', $newName)->first();
+                    if ($newMaster) {
+                        $oldMaster->delete();
+                        $msg = "Merged Foreman '{$oldName}' into '{$newName}'.";
+                    } else {
+                        $oldMaster->update(['name' => $newName]);
+                        $msg = "Renamed Foreman '{$oldName}' to '{$newName}'.";
+                    }
+                } else {
+                    $msg = "No Foreman master record found for '{$oldName}', but updated jobs.";
+                }
+            }
+        });
+
+        return redirect()->route('admin.data-cleanup.index')
+            ->with('success', "Reassignment complete! Updated {$jobCount} jobs. {$msg}");
     }
 }
