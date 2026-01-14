@@ -5,7 +5,12 @@
 @section('content')
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
-        <h1><i class="bi bi-trash3 me-2"></i>Data Cleanup</h1>
+        <h1>
+            <a href="javascript:history.back()" class="text-decoration-none text-body me-2" title="Go Back">
+                <i class="bi bi-arrow-left-circle"></i>
+            </a>
+            <i class="bi bi-trash3 me-2"></i>Data Cleanup
+        </h1>
         <p class="text-muted mb-0">Clean up transactional data while keeping master data and users</p>
     </div>
 </div>

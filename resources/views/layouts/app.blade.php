@@ -496,8 +496,11 @@
             </ul>
         </div>
 
-        <!-- Theme Toggle at bottom of sidebar -->
+        <!-- PWA Install Button & Theme Toggle -->
         <div class="p-3 border-top border-secondary">
+            <button class="btn btn-outline-light btn-sm w-100 mb-3" id="pwaInstallBtn">
+                <i class="bi bi-download me-2"></i>Install App
+            </button>
              <div class="d-flex align-items-center justify-content-between text-white-50">
                 <span class="small"><i class="bi bi-moon-stars-fill me-1"></i> Dark Mode</span>
                 <div class="theme-switch-wrapper">
@@ -528,10 +531,7 @@
         <i class="bi bi-list" id="mobileMenuIcon"></i>
     </button>
     
-    <!-- PWA Install Button -->
-    <button class="btn btn-primary rounded-pill shadow" id="pwaInstallBtn">
-        <i class="bi bi-download me-2"></i>Install App
-    </button>
+
 
     <main class="main-content">
         <!-- Global Search Bar -->

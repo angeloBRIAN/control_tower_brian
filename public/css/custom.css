@@ -572,10 +572,7 @@ input:checked+.slider:before {
 /* PWA Install Button */
 #pwaInstallBtn {
     display: none;
-    position: fixed;
-    bottom: 80px;
-    right: 20px;
-    z-index: 1000;
+    /* Positioned in sidebar now */
 }
 
 /* Tablet and below */
@@ -1514,6 +1511,7 @@ body.has-ticker .mobile-menu-toggle {
         /* Below ticker */
     }
 }
+
 /* ========================================
    KANBAN DARK MODE FIXES
    ======================================== */
@@ -1538,10 +1536,11 @@ body.has-ticker .mobile-menu-toggle {
 }
 
 [data-bs-theme="dark"] .kanban-card .text-muted {
-    color: #6c757d !important; /* Keep card muted text slightly darker than body text */
+    color: #6c757d !important;
+    /* Keep card muted text slightly darker than body text */
 }
 
 /* Ensure shadow on cards is subtle in dark mode */
 [data-bs-theme="dark"] .kanban-card.shadow-sm {
-    box-shadow: 0 .125rem .25rem rgba(0,0,0,.5) !important;
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .5) !important;
 }
