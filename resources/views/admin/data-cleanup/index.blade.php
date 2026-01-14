@@ -24,7 +24,7 @@
                     Use this tool to fix issues where personnel names have changed. 
                     Updates historical <strong>Jobs</strong> and merges/renames the <strong>Master Record</strong>.
                 </p>
-                <form action="{{ route('data-cleanup.reassign') }}" method="POST">
+                <form action="{{ route('admin.data-cleanup.reassign') }}" method="POST">
                     @csrf
                     <div class="row g-3 align-items-end">
                         <div class="col-md-3">
