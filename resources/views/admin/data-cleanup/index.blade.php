@@ -35,13 +35,16 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Old Name</label>
-                            <input type="text" name="old_name" class="form-control" placeholder="e.g. ADITYA" required>
+                            <label class="form-label">Old Name (Source)</label>
+                            <select name="old_name" class="form-select" id="oldNameSelect" required>
+                                <option value="">-- Select Source --</option>
+                            </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">New Name / Target</label>
-                            <input type="text" name="new_name" class="form-control" list="existingNames" placeholder="Type or Select..." required>
-                            <datalist id="existingNames"></datalist>
+                            <label class="form-label">New Name (Target)</label>
+                            <select name="new_name" class="form-select" id="newNameSelect" required>
+                                <option value="">-- Select Target --</option>
+                            </select>
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100">Fix</button>
@@ -272,26 +275,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Reassign Tool Logic
     const reassignType = document.getElementById('reassignType');
-    const existingNamesList = document.getElementById('existingNames');
+    const oldNameSelect = document.getElementById('oldNameSelect');
+    const newNameSelect = document.getElementById('newNameSelect');
     
-    if (reassignType && existingNamesList) {
+    if (reassignType && oldNameSelect && newNameSelect) {
         const saNames = @json($serviceAdvisors->pluck('name'));
         const foremanNames = @json($foremen->pluck('name'));
 
-        function updateDatalist() {
-            existingNamesList.innerHTML = '';
+        function updateDropdowns() {
+            // Clear existing options
+            oldNameSelect.innerHTML = '<option value="">-- Select Source --</option>';
+            newNameSelect.innerHTML = '<option value="">-- Select Target --</option>';
+            
             const type = reassignType.value;
             const names = type === 'sa' ? saNames : foremanNames;
             
             names.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                existingNamesList.appendChild(option);
+                // Populate Old Name Select
+                const optionOld = document.createElement('option');
+                optionOld.value = name;
+                optionOld.textContent = name;
+                oldNameSelect.appendChild(optionOld);
+
+                // Populate New Name Select
+                const optionNew = document.createElement('option');
+                optionNew.value = name;
+                optionNew.textContent = name;
+                newNameSelect.appendChild(optionNew);
             });
         }
 
-        reassignType.addEventListener('change', updateDatalist);
-        updateDatalist(); // Initialize on load
+        reassignType.addEventListener('change', updateDropdowns);
+        updateDropdowns(); // Initialize on load
     }
 });
 </script>
