@@ -60,11 +60,24 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Service Advisor</label>
-                    <input type="text" name="service_advisor" class="form-control" value="{{ old('service_advisor') }}">
+                    <select name="service_advisor" class="form-select">
+                        <option value="">-- Select SA --</option>
+                        @foreach($serviceAdvisors as $sa)
+                        <option value="{{ $sa->name }}" {{ old('service_advisor') == $sa->name ? 'selected' : '' }}>{{ $sa->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Technician</label>
-                    <input type="text" name="technician" class="form-control" value="{{ old('technician') }}">
+                    <label class="form-label">Foreman</label>
+                    <select name="foreman" class="form-select @error('foreman') is-invalid @enderror">
+                        <option value="">-- Select Foreman --</option>
+                        @foreach($foremen as $fm)
+                        <option value="{{ $fm->name }}" {{ old('foreman') == $fm->name ? 'selected' : '' }}>{{ $fm->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('foreman')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Payment Type</label>

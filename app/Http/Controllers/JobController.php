@@ -205,7 +205,9 @@ class JobController extends Controller
      */
     public function create(): View
     {
-        return view('jobs.create');
+        $serviceAdvisors = \App\Models\ServiceAdvisor::orderBy('name')->get();
+        $foremen = \App\Models\Foreman::orderBy('name')->get();
+        return view('jobs.create', compact('serviceAdvisors', 'foremen'));
     }
 
     /**
