@@ -534,9 +534,12 @@
 
 
     <main class="main-content">
-        <!-- Global Search Bar -->
-        <div class="global-search-container mb-3">
-            <div class="position-relative" id="globalSearchWrapper">
+        <!-- Global Search Bar & Back Button -->
+        <div class="global-search-container mb-3 d-flex gap-2">
+            <button onclick="history.back()" class="btn btn-light bg-white border shadow-sm" title="Go Back">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <div class="position-relative flex-grow-1" id="globalSearchWrapper">
                 <div class="input-group">
                     <span class="input-group-text bg-body border-end-0"><i class="bi bi-search"></i></span>
                     <input type="text" class="form-control border-start-0 ps-0" id="globalSearchInput" 
