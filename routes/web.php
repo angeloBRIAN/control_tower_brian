@@ -147,7 +147,7 @@ Route::middleware('auth')->group(function () {
         Route::get('jobs/create', [JobController::class, 'create'])->name('jobs.create');
         Route::post('jobs', [JobController::class, 'store'])->name('jobs.store');
         Route::get('jobs/{job}/edit', [JobController::class, 'edit'])->name('jobs.edit');
-        Route::put('jobs/{job}', [JobController::class, 'update'])->name('jobs.update');
+
         Route::post('jobs/{job}/mark-invoiced', [JobController::class, 'markInvoiced'])->name('jobs.mark-invoiced');
 
         // Vehicles CRUD (except destroy and workshop toggle)
@@ -201,6 +201,7 @@ Route::middleware('auth')->group(function () {
 
     // Part Tracking & Job Updates - Foreman, Sparepart, Control Tower, Manager, Admin
     Route::middleware('role:foreman,sparepart,control_tower,manager,admin')->group(function () {
+        Route::put('jobs/{job}', [JobController::class, 'update'])->name('jobs.update');
         Route::patch('jobs/{job}/need-part', [JobController::class, 'updateNeedPart'])->name('jobs.update-need-part');
 
         // Part Orders Management

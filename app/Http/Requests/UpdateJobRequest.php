@@ -24,9 +24,9 @@ class UpdateJobRequest extends FormRequest
             }
             
             if ($job) {
-                // Check if user is linked to the foreman assigned to this job (supports multiple assignments)
-                $foremanNames = \App\Models\Foreman::where('user_id', $user->id)->pluck('name')->toArray();
-                if (!empty($foremanNames) && in_array($job->foreman, $foremanNames)) {
+                // Check if user is linked to the foreman assigned to this job (supports multiple assignments, case-insensitive)
+                $foremanNames = \App\Models\Foreman::where('user_id', $user->id)->pluck('name')->map(fn($n) => strtolower(trim($n)))->toArray();
+                if (!empty($foremanNames) && in_array(strtolower(trim($job->foreman)), $foremanNames)) {
                     return true;
                 }
             }
