@@ -8,6 +8,8 @@ use Carbon\Carbon;
 use App\Models\BackupLog;
 use App\Models\AuditLog;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
+use ZipArchive;
 
 class BackupService
 {
@@ -16,21 +18,80 @@ class BackupService
 
     public function create($remark = null)
     {
-        $filename = 'backup-' . Carbon::now()->format('Y-m-d-H-i-s') . '.sql.gz';
-        $path = storage_path('app/' . $this->backupFolder . '/' . $filename);
+        $timestamp = Carbon::now()->format('Y-m-d-H-i-s');
+        $zipFilename = 'backup-' . $timestamp . '.zip';
+        $zipPath = storage_path('app/' . $this->backupFolder . '/' . $zipFilename);
         
-        // Ensure directory exists
-        if (!file_exists(dirname($path))) {
-            mkdir(dirname($path), 0755, true);
+        // Ensure backup directory exists
+        if (!file_exists(dirname($zipPath))) {
+            mkdir(dirname($zipPath), 0755, true);
         }
 
+        $tempDir = storage_path('app/temp_backup_' . time());
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        $sqlPath = $tempDir . '/database.sql';
+
+        try {
+            // 1. Generate SQL Dump
+            $this->generateSqlDump($sqlPath);
+
+            // 2. Create ZIP
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw new \Exception("Cannot open zip file: $zipPath");
+            }
+
+            // Add SQL file
+            $zip->addFile($sqlPath, 'database.sql');
+
+            // 3. Add Storage Files (Remarks)
+            $remarksPath = storage_path('app/public/remarks');
+            if (File::exists($remarksPath)) {
+                $files = File::allFiles($remarksPath);
+                foreach ($files as $file) {
+                    // Add to zip relative to storage root: storage/remarks/filename.jpg
+                    $relativePath = 'storage/remarks/' . $file->getRelativePathname();
+                    $zip->addFile($file->getRealPath(), $relativePath);
+                }
+            }
+
+            $zip->close();
+
+            // Get accurate file size
+            clearstatcache(true, $zipPath);
+            $fileSize = file_exists($zipPath) ? filesize($zipPath) : 0;
+            
+            if ($fileSize < 100) {
+                throw new \Exception('Backup file is too small (' . $fileSize . ' bytes), backup may have failed');
+            }
+
+            // Create BackupLog record
+            BackupLog::create([
+                'filename' => $zipFilename,
+                'path' => $this->backupFolder . '/' . $zipFilename,
+                'disk' => $this->disk,
+                'size' => $fileSize,
+                'remark' => $remark,
+                'created_by' => Auth::check() ? Auth::user()->name : 'System/Scheduler',
+            ]);
+
+            return $zipFilename;
+
+        } finally {
+            // Cleanup temp SQL
+            if (File::exists($tempDir)) {
+                File::deleteDirectory($tempDir);
+            }
+        }
+    }
+
+    protected function generateSqlDump($outputPath)
+    {
         $config = config('database.connections.mysql');
         
-        // Create temporary SQL file first, then gzip (more reliable than piping)
-        $tempSqlPath = $path . '.tmp.sql';
-        
-        // Build mysqldump command - capture stderr, disable SSL for internal Docker network
-        // --no-tablespaces avoids PROCESS privilege requirement
         $command = sprintf(
             'mysqldump --skip-ssl --no-tablespaces --user=%s --password=%s --host=%s --port=%s %s 2>/dev/null',
             escapeshellarg($config['username']),
@@ -40,10 +101,8 @@ class BackupService
             escapeshellarg($config['database'])
         );
 
-        // Execute and capture output
         $sqlContent = shell_exec($command);
         
-        // Check if mysqldump returned valid SQL (should start with comments or SET)
         if (empty($sqlContent) || strlen($sqlContent) < 100) {
             // Try again with stderr to get actual error
             $errorCommand = sprintf(
@@ -55,50 +114,14 @@ class BackupService
                 escapeshellarg($config['database'])
             );
             $errorOutput = shell_exec($errorCommand);
-            throw new \Exception('Backup failed: ' . ($errorOutput ?: 'mysqldump returned empty output'));
+            throw new \Exception('Database dump failed: ' . ($errorOutput ?: 'Empty output'));
         }
 
-        // Write SQL to temp file
-        file_put_contents($tempSqlPath, $sqlContent);
-        
-        // Gzip the file
-        $gzHandle = gzopen($path, 'wb9');
-        if (!$gzHandle) {
-            unlink($tempSqlPath);
-            throw new \Exception('Failed to create gzip file');
-        }
-        gzwrite($gzHandle, $sqlContent);
-        gzclose($gzHandle);
-        
-        // Clean up temp file
-        if (file_exists($tempSqlPath)) {
-            unlink($tempSqlPath);
-        }
-
-        // Get accurate file size
-        clearstatcache(true, $path);
-        $fileSize = file_exists($path) ? filesize($path) : 0;
-        
-        if ($fileSize < 100) {
-            throw new \Exception('Backup file is too small (' . $fileSize . ' bytes), backup may have failed');
-        }
-
-        // Create BackupLog record
-        BackupLog::create([
-            'filename' => $filename,
-            'path' => $this->backupFolder . '/' . $filename,
-            'disk' => $this->disk,
-            'size' => $fileSize,
-            'remark' => $remark,
-            'created_by' => Auth::check() ? Auth::user()->name : 'System/Scheduler',
-        ]);
-
-        return $filename;
+        file_put_contents($outputPath, $sqlContent);
     }
 
     public function list()
     {
-        // Return BackupLogs ordered by latest
         return BackupLog::latest()->get();
     }
 
@@ -114,19 +137,15 @@ class BackupService
         return true;
     }
 
-    /**
-     * Restore from uploaded file
-     */
     public function restoreFromFile(UploadedFile $file)
     {
         // Save uploaded file temporarily
-        $tempPath = storage_path('app/temp_restore_' . time() . '.sql.gz');
+        $tempPath = storage_path('app/temp_restore_upload_' . time() . '.' . $file->getClientOriginalExtension());
         $file->move(dirname($tempPath), basename($tempPath));
 
         try {
             $this->restoreFromPath($tempPath, $file->getClientOriginalName());
         } finally {
-            // Clean up temp file
             if (file_exists($tempPath)) {
                 unlink($tempPath);
             }
@@ -135,44 +154,18 @@ class BackupService
         return true;
     }
 
-    /**
-     * Common restore logic
-     */
     protected function restoreFromPath($path, $filename)
     {
-        $config = config('database.connections.mysql');
-        
-        // Detect if file is gzipped
-        $isGzipped = str_ends_with(strtolower($filename), '.gz');
-        
-        if ($isGzipped) {
-            $command = sprintf(
-                'gunzip < %s | mysql --skip-ssl --user=%s --password=%s --host=%s --port=%s %s',
-                escapeshellarg($path),
-                escapeshellarg($config['username']),
-                escapeshellarg($config['password']),
-                escapeshellarg($config['host']),
-                escapeshellarg($config['port']),
-                escapeshellarg($config['database'])
-            );
+        $isZip = str_ends_with(strtolower($path), '.zip') || str_ends_with(strtolower($filename), '.zip');
+        $isGzip = str_ends_with(strtolower($filename), '.gz');
+
+        if ($isZip) {
+            $this->restoreFromZip($path);
         } else {
-            $command = sprintf(
-                'mysql --skip-ssl --user=%s --password=%s --host=%s --port=%s %s < %s',
-                escapeshellarg($config['username']),
-                escapeshellarg($config['password']),
-                escapeshellarg($config['host']),
-                escapeshellarg($config['port']),
-                escapeshellarg($config['database']),
-                escapeshellarg($path)
-            );
+            // Legacy handling for .sql or .sql.gz
+            $this->restoreFromSql($path, $isGzip);
         }
 
-        exec($command, $output, $returnVar);
-
-        if ($returnVar !== 0) {
-            throw new \Exception('Restore failed with exit code ' . $returnVar);
-        }
-        
         // Log the restoration action
         AuditLog::create([
             'user_id' => Auth::id(),
@@ -189,16 +182,92 @@ class BackupService
         ]);
     }
 
+    protected function restoreFromZip($zipPath)
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($zipPath) !== true) {
+            throw new \Exception('Could not open ZIP file');
+        }
+
+        $extractPath = storage_path('app/temp_restore_zip_' . time());
+        if (!file_exists($extractPath)) {
+            mkdir($extractPath, 0755, true);
+        }
+
+        try {
+            $zip->extractTo($extractPath);
+            $zip->close();
+
+            // 1. Restore Database
+            $sqlFile = $extractPath . '/database.sql';
+            if (file_exists($sqlFile)) {
+                $this->restoreFromSql($sqlFile, false);
+            } else {
+                throw new \Exception('database.sql not found in ZIP archive');
+            }
+
+            // 2. Restore Remarks Images
+            // Expecting storage/remarks/ in zip
+            $sourceRemarks = $extractPath . '/storage/remarks';
+            $targetRemarks = storage_path('app/public/remarks');
+            
+            if (File::exists($sourceRemarks)) {
+                // Ensure target exists
+                if (!File::exists($targetRemarks)) {
+                    File::makeDirectory($targetRemarks, 0755, true);
+                }
+                
+                // Copy files
+                File::copyDirectory($sourceRemarks, $targetRemarks);
+            }
+
+        } finally {
+            // Cleanup extracted files
+            if (file_exists($extractPath)) {
+                File::deleteDirectory($extractPath);
+            }
+        }
+    }
+
+    protected function restoreFromSql($path, $isGzipped)
+    {
+        $config = config('database.connections.mysql');
+        
+        // Build command
+        $cmdArgs = sprintf(
+            '--skip-ssl --user=%s --password=%s --host=%s --port=%s %s',
+            escapeshellarg($config['username']),
+            escapeshellarg($config['password']),
+            escapeshellarg($config['host']),
+            escapeshellarg($config['port']),
+            escapeshellarg($config['database'])
+        );
+
+        if ($isGzipped) {
+            $command = "gunzip < " . escapeshellarg($path) . " | mysql $cmdArgs 2>&1";
+        } else {
+            $command = "mysql $cmdArgs < " . escapeshellarg($path) . " 2>&1";
+        }
+
+        // Execute
+        $output = null;
+        $returnVar = 0;
+        exec($command, $output, $returnVar);
+
+        if ($returnVar !== 0) {
+            $errorMsg = implode("\n", $output);
+            throw new \Exception("Database restore failed (Exit Code $returnVar): $errorMsg");
+        }
+    }
+
     public function delete($filename)
     {
         $path = $this->backupFolder . '/' . $filename;
         
-        // Delete file
         if (Storage::disk($this->disk)->exists($path)) {
             Storage::disk($this->disk)->delete($path);
         }
         
-        // Delete log record
         BackupLog::where('filename', $filename)->delete();
         
         return true;
@@ -213,9 +282,6 @@ class BackupService
          return null;
     }
 
-    /**
-     * Delete multiple backups
-     */
     public function deleteBatch(array $filenames): int
     {
         $deleted = 0;
@@ -224,15 +290,12 @@ class BackupService
                 $this->delete($filename);
                 $deleted++;
             } catch (\Exception $e) {
-                // Continue with other files
+                // Continue
             }
         }
         return $deleted;
     }
 
-    /**
-     * Prune old backups based on retention policy (like borgbackup)
-     */
     public function prune(int $keepDaily = 7, int $keepWeekly = 4, int $keepMonthly = 6): array
     {
         $backups = BackupLog::orderByDesc('created_at')->get();
@@ -259,7 +322,7 @@ class BackupService
                 $dailyCounts[$dayKey]++;
             }
 
-            // Keep weekly (first of each week)
+            // Keep weekly
             if (!isset($weeklyCounts[$weekKey])) {
                 $weeklyCounts[$weekKey] = 0;
             }
@@ -268,7 +331,7 @@ class BackupService
                 $weeklyCounts[$weekKey]++;
             }
 
-            // Keep monthly (first of each month)
+            // Keep monthly
             if (!isset($monthlyCounts[$monthKey])) {
                 $monthlyCounts[$monthKey] = 0;
             }
@@ -282,7 +345,6 @@ class BackupService
             }
         }
 
-        // Delete backups not in keep set
         $deleted = [];
         foreach ($backups as $backup) {
             if (!isset($keepSet[$backup->filename])) {
@@ -290,7 +352,6 @@ class BackupService
                     $this->delete($backup->filename);
                     $deleted[] = $backup->filename;
                 } catch (\Exception $e) {
-                    // Continue
                 }
             }
         }
