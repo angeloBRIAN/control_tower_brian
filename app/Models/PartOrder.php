@@ -29,18 +29,18 @@ class PartOrder extends Model
         'received_date' => 'date',
     ];
 
-    // Status constants - workflow order (new 6-status flow)
+    // Status constants - workflow order (5-status flow: removed Ordering)
     const STATUS_PENDING = 'pending';       // Part needed, waiting for RQ form (Workshop)
     const STATUS_RQ_SENT = 'rq_sent';       // RQ form completed and sent to Sparepart (Workshop)
-    const STATUS_PROCESSING = 'processing'; // Sparepart checking stock availability (Sparepart)
-    const STATUS_ORDERING = 'ordering';     // Part not in stock, ordered from supplier (Sparepart)
+    const STATUS_PROCESSING = 'processing'; // Sparepart processing order (check stock, order from supplier) (Sparepart)
     const STATUS_READY = 'ready';           // Part available for pickup (Sparepart)
     const STATUS_RECEIVED = 'received';     // Part delivered to workshop/installed (Workshop)
     const STATUS_CANCELLED = 'cancelled';
     
     // Legacy status mappings (for backwards compatibility)
     const STATUS_BUKA_RQ = 'rq_sent';       // Alias for backwards compatibility
-    const STATUS_ORDERED = 'ordering';      // Alias for backwards compatibility
+    const STATUS_ORDERING = 'processing';   // Ordering merged into Processing
+    const STATUS_ORDERED = 'processing';    // Alias for backwards compatibility
     const STATUS_CONFIRMED = 'ready';       // Alias for backwards compatibility
     const STATUS_SHIPPED = 'ready';         // Alias for backwards compatibility
     const STATUS_INSTALLED = 'received';    // Alias for backwards compatibility
@@ -54,7 +54,6 @@ class PartOrder extends Model
             self::STATUS_PENDING => ['label' => 'Pending', 'color' => '#f59e0b', 'icon' => 'bi-hourglass-split', 'owner' => 'Workshop'],
             self::STATUS_RQ_SENT => ['label' => 'RQ Sent', 'color' => '#06b6d4', 'icon' => 'bi-send', 'owner' => 'Workshop'],
             self::STATUS_PROCESSING => ['label' => 'Processing', 'color' => '#8b5cf6', 'icon' => 'bi-gear', 'owner' => 'Sparepart'],
-            self::STATUS_ORDERING => ['label' => 'Ordering', 'color' => '#6366f1', 'icon' => 'bi-cart', 'owner' => 'Sparepart'],
             self::STATUS_READY => ['label' => 'Ready', 'color' => '#3b82f6', 'icon' => 'bi-check-circle', 'owner' => 'Sparepart'],
             self::STATUS_RECEIVED => ['label' => 'Received', 'color' => '#22c55e', 'icon' => 'bi-box-seam', 'owner' => 'Workshop'],
             self::STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => '#ef4444', 'icon' => 'bi-x-circle', 'owner' => 'Any'],

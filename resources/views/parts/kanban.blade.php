@@ -297,22 +297,22 @@
     </div>
 </div>
 
-<!-- Order Details Modal (Processing → Ordering) -->
+<!-- Order Details Modal (RQ Sent → Processing) -->
 <div class="modal fade" id="orderDetailModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-cart me-2"></i>Order from Supplier</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-purple text-white" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);">
+                <h5 class="modal-title"><i class="bi bi-gear me-2"></i>Process Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="orderDetailForm">
                     <input type="hidden" name="order_id" id="od_order_id">
-                    <input type="hidden" name="status" value="ordering">
+                    <input type="hidden" name="status" value="processing">
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">RQ Number</label>
-                        <div class="form-control-plaintext" id="od_rq_display"></div>
+                        <div class="form-control-plaintext fw-semibold text-primary" id="od_rq_display"></div>
                     </div>
                     
                     <div class="row g-3">
@@ -330,7 +330,7 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Notes</label>
-                            <textarea class="form-control" name="notes" id="od_notes" rows="2"></textarea>
+                            <textarea class="form-control" name="notes" id="od_notes" rows="2" placeholder="Additional notes about this order..."></textarea>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Remark (for Job Activity)</label>
@@ -341,7 +341,9 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveOrderDetails">Confirm & Order</button>
+                <button type="button" class="btn btn-primary" id="saveOrderDetails">
+                    <i class="bi bi-check-circle me-1"></i>Process Order
+                </button>
             </div>
         </div>
     </div>
@@ -437,21 +439,19 @@ document.addEventListener('DOMContentLoaded', function() {
         userForeman: {!! json_encode($permissions['userForeman']) !!}
     };
     
-    // Allowed transitions (1-step only, new 6-status flow)
+    // Allowed transitions (1-step only, 5-status flow)
     const allowedTransitions = {
         'pending': ['rq_sent'],
         'rq_sent': ['processing'],
-        'processing': ['ordering', 'ready'],  // Can go to ordering OR ready (if in stock)
-        'ordering': ['ready'],
+        'processing': ['ready'],
         'ready': ['received']
     };
     
-    // Status labels (new flow)
+    // Status labels (5-status flow)
     const statusLabels = {
         'pending': 'Pending',
         'rq_sent': 'RQ Sent',
         'processing': 'Processing',
-        'ordering': 'Ordering',
         'ready': 'Ready',
         'received': 'Received'
     };
@@ -563,8 +563,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     
-                    if (targetStatus === 'ordering') {
-                        // Processing → Ordering: Show order details modal (supplier order)
+                    if (originalStatus === 'rq_sent' && targetStatus === 'processing') {
+                        // RQ Sent → Processing: Show order details modal (order number, dates, notes)
                         showOrderModal(draggedCard.dataset.orderId, draggedCard);
                     } else {
                         // Other transitions: Show remark modal

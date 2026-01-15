@@ -388,11 +388,18 @@ class PartOrderController extends Controller
         $oldStatus = $partOrder->status;
         $newStatus = $validated['status'];
         
-        // Define allowed transitions (1-step only, new 6-status flow)
+        // Handle legacy 'ordering' status - map to 'processing'
+        if ($oldStatus === 'ordering') {
+            $oldStatus = PartOrder::STATUS_PROCESSING;
+        }
+        if ($newStatus === 'ordering') {
+            $newStatus = PartOrder::STATUS_PROCESSING;
+        }
+        
+        // Define allowed transitions (1-step only, 5-status flow)
         $allowedTransitions = [
             PartOrder::STATUS_RQ_SENT => [PartOrder::STATUS_PROCESSING],
-            PartOrder::STATUS_PROCESSING => [PartOrder::STATUS_ORDERING, PartOrder::STATUS_READY], // Can go to Ordering OR Ready (in-stock)
-            PartOrder::STATUS_ORDERING => [PartOrder::STATUS_READY],
+            PartOrder::STATUS_PROCESSING => [PartOrder::STATUS_READY],
             PartOrder::STATUS_READY => [PartOrder::STATUS_RECEIVED],
         ];
         
@@ -404,12 +411,12 @@ class PartOrderController extends Controller
             ], 400);
         }
         
-        // Validate required fields when moving to "ordering" (supplier order)
-        if ($newStatus === PartOrder::STATUS_ORDERING) {
+        // Validate required fields when moving to "processing" (order details required)
+        if ($newStatus === PartOrder::STATUS_PROCESSING && $oldStatus === PartOrder::STATUS_RQ_SENT) {
             if (empty($validated['no_order_part']) || empty($validated['order_date']) || empty($validated['expected_date'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order No, Order Date, and Expected Date are required when ordering from supplier.',
+                    'message' => 'Order No, Order Date, and Expected Date are required when processing an order.',
                 ], 400);
             }
         }
