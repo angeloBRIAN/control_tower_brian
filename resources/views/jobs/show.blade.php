@@ -368,46 +368,34 @@
                     <div class="mt-3">
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Part Name</th>
-                                        <th>Part #</th>
-                                        <th class="text-center">Qty</th>
-                                        <th>RQ</th>
-                                        <th>Status</th>
-                                        <th>Order Date</th>
-                                        <th>Expected</th>
-                                        <th>Received</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($job->partOrders as $partOrder)
-                                    <tr>
-                                        <td>
-                                            @if($partOrder->part_name)
-                                                {{ $partOrder->part_name }}
-                                            @else
-                                                <span class="text-muted fst-italic">See RQ details</span>
-                                            @endif
-                                        </td>
-                                        <td><small>{{ $partOrder->part_number ?: '-' }}</small></td>
-                                        <td class="text-center">{{ $partOrder->quantity ?: 1 }}</td>
-                                        <td>
-                                            <a href="{{ route('part-orders.edit', $partOrder) }}" class="fw-bold text-decoration-none">
-                                                {{ $partOrder->rq ?: '-' }}
-                                            </a>
-                                        </td>
-                                        <td>
-                                            <span class="badge" style="background-color: {{ $partOrder->status_color }}">
-                                                {{ $partOrder->status_label }}
-                                            </span>
-                                        </td>
-                                        <td><small>{{ $partOrder->order_date?->format('d/m/y') ?: '-' }}</small></td>
-                                        <td><small>{{ $partOrder->expected_date?->format('d/m/y') ?: '-' }}</small></td>
-                                        <td><small>{{ $partOrder->received_date?->format('d/m/y') ?: '-' }}</small></td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
+                                    <thead>
+                                        <tr>
+                                            <th>RQ Number</th>
+                                            <th>Status</th>
+                                            <th>Order Date</th>
+                                            <th>Expected</th>
+                                            <th>Received</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($job->partOrders as $partOrder)
+                                        <tr>
+                                            <td>
+                                                <a href="{{ route('part-orders.edit', $partOrder) }}" class="fw-bold text-decoration-none">
+                                                    {{ $partOrder->rq ?: '-' }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="badge" style="background-color: {{ $partOrder->status_color }}">
+                                                    {{ $partOrder->status_label }}
+                                                </span>
+                                            </td>
+                                            <td><small>{{ $partOrder->order_date?->format('d/m/y') ?: '-' }}</small></td>
+                                            <td><small>{{ $partOrder->expected_date?->format('d/m/y') ?: '-' }}</small></td>
+                                            <td><small>{{ $partOrder->received_date?->format('d/m/y') ?: '-' }}</small></td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
                             </table>
                         </div>
                         <div class="mt-2">
