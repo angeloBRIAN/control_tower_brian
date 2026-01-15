@@ -252,10 +252,13 @@ class PartOrderController extends Controller
         Job::where('id', $validated['job_id'])->update(['need_part' => true]);
 
         // Log Activity
+        $job = $partOrder->job;
+        $rqLink = route('part-orders.edit', $partOrder->id);
+        
         JobActivity::log(
-            $partOrder->job, 
+            $job, 
             JobActivity::ACTION_PARTS_UPDATED, 
-            "RQ opened: {$partOrder->rq}",
+            "RQ opened: <a href='{$rqLink}'>{$partOrder->rq}</a>",
             ['rq' => $partOrder->rq]
         );
 
@@ -320,12 +323,27 @@ class PartOrderController extends Controller
         ]);
 
         // Log Activity if meaningful changes
-        JobActivity::log(
-            $partOrder->job, 
-            JobActivity::ACTION_PARTS_UPDATED, 
-            "RQ {$partOrder->rq} updated",
-            $partOrder->getChanges()
-        );
+        $changes = $partOrder->getChanges();
+        if (!empty($changes)) {
+            $changeDetails = [];
+            foreach ($changes as $field => $newValue) {
+                if (in_array($field, ['updated_at', 'updated_by'])) continue;
+                $orig = $partOrder->getOriginal($field);
+                $changeDetails[] = ucfirst(str_replace('_', ' ', $field)) . ": '{$orig}' → '{$newValue}'";
+            }
+            
+            if (!empty($changeDetails)) {
+                $rqLink = route('part-orders.edit', $partOrder->id);
+                $desc = "RQ <a href='{$rqLink}'>{$partOrder->rq}</a> updated: " . implode(', ', $changeDetails);
+                
+                JobActivity::log(
+                    $partOrder->job, 
+                    JobActivity::ACTION_PARTS_UPDATED, 
+                    $desc,
+                    $changes
+                );
+            }
+        }
 
         // Auto-set received_date when status changes to received (if it were passed which it isn't here but keeping logic safe)
         // (This logic is mainly handled in updateStatus for Kanban)
@@ -493,10 +511,14 @@ class PartOrderController extends Controller
         }
 
         // Log Activity
+        $rqLink = route('part-orders.edit', $partOrder->id);
+        $statusLabel = $partOrder->status_label;
+        $oldStatusLabel = PartOrder::getStatuses()[$oldStatus]['label'] ?? $oldStatus;
+        
         JobActivity::log(
             $job, 
             JobActivity::ACTION_PARTS_UPDATED, 
-            "RQ {$partOrder->rq} status: {$oldStatus} → {$newStatus}",
+            "RQ <a href='{$rqLink}'>{$partOrder->rq}</a> status changed: <strong>{$oldStatusLabel}</strong> → <strong>{$statusLabel}</strong>",
             ['from' => $oldStatus, 'to' => $newStatus]
         );
 

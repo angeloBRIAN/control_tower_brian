@@ -383,22 +383,23 @@
                                 <tbody>
                                     @foreach($job->partOrders as $partOrder)
                                     <tr>
-                                        <td>{{ $partOrder->part_name ?: '-' }}</td>
+                                        <td>
+                                            @if($partOrder->part_name)
+                                                {{ $partOrder->part_name }}
+                                            @else
+                                                <span class="text-muted fst-italic">See RQ details</span>
+                                            @endif
+                                        </td>
                                         <td><small>{{ $partOrder->part_number ?: '-' }}</small></td>
                                         <td class="text-center">{{ $partOrder->quantity ?: 1 }}</td>
-                                        <td>{{ $partOrder->rq ?: '-' }}</td>
                                         <td>
-                                            @php
-                                                $statusColors = [
-                                                    'pending' => 'secondary',
-                                                    'ordered' => 'primary',
-                                                    'received' => 'success',
-                                                    'installed' => 'info',
-                                                    'cancelled' => 'danger',
-                                                ];
-                                            @endphp
-                                            <span class="badge bg-{{ $statusColors[$partOrder->status] ?? 'secondary' }}">
-                                                {{ ucfirst($partOrder->status) }}
+                                            <a href="{{ route('part-orders.edit', $partOrder) }}" class="fw-bold text-decoration-none">
+                                                {{ $partOrder->rq ?: '-' }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span class="badge" style="background-color: {{ $partOrder->status_color }}">
+                                                {{ $partOrder->status_label }}
                                             </span>
                                         </td>
                                         <td><small>{{ $partOrder->order_date?->format('d/m/y') ?: '-' }}</small></td>
