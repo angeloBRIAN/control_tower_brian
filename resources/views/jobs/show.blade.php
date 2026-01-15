@@ -599,7 +599,7 @@
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <strong class="text-{{ $activity->color }}">{{ ucfirst(str_replace('_', ' ', $activity->action)) }}</strong>
-                                        <p class="mb-0 small text-muted">{{ $activity->description }}</p>
+                                        <p class="mb-0 small text-muted">{!! $activity->description !!}</p>
                                     </div>
                                     <small class="text-muted text-nowrap">
                                         <span class="d-none d-print-inline">{{ $activity->created_at->format('d/m/Y H:i') }}</span>

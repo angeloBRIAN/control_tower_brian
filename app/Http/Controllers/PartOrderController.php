@@ -288,11 +288,24 @@ class PartOrderController extends Controller
      */
     public function edit(PartOrder $partOrder)
     {
-        $partOrder->load(['job.remarks' => function($q) {
-            $q->orderBy('created_at', 'desc');
+        // Eager load job and remarks for context
+        $partOrder->load(['job.remarks' => function($query) {
+            $query->orderBy('created_at', 'desc');
         }]);
+
+        // Filter activities relevant to this RQ
+        $rqActivities = \App\Models\JobActivity::where('job_id', $partOrder->job_id)
+            ->where(function($q) use ($partOrder) {
+                // Check description for RQ number
+                $q->where('description', 'like', "%{$partOrder->rq}%")
+                  // Or check changes JSON column if we used it
+                  ->orWhereJsonContains('changes->rq', $partOrder->rq);
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         $statuses = PartOrder::getStatuses();
-        return view('parts.form', compact('partOrder', 'statuses'));
+        return view('parts.form', compact('partOrder', 'statuses', 'rqActivities'));
     }
 
     /**

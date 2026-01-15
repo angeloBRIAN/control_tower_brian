@@ -174,52 +174,111 @@
                         </div>
 
                         @if(isset($partOrder))
+                        @if(isset($partOrder))
                         <div class="row mt-4 pt-3 border-top">
                             <div class="col-12">
-                                <h5 class="mb-3 h6 fw-bold text-uppercase text-muted"><i class="bi bi-chat-dots me-2"></i>Activity & Comments</h5>
-                                
-                                <div class="card bg-light border-0 mb-3">
-                                    <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
-                                        @php
-                                            $rqRef = '[RQ:'.$partOrder->rq.']';
-                                            $rqRemarks = $partOrder->job->remarks->filter(function($r) use ($rqRef) {
-                                                return str_contains($r->remark_text, $rqRef);
-                                            });
-                                        @endphp
+                                <!-- Tabs -->
+                                <ul class="nav nav-tabs mb-3" id="rqTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments" type="button" role="tab" aria-controls="comments" aria-selected="true">
+                                            <i class="bi bi-chat-dots me-2"></i>Comments
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" role="tab" aria-controls="activity" aria-selected="false">
+                                            <i class="bi bi-clock-history me-2"></i>Activity
+                                        </button>
+                                    </li>
+                                </ul>
 
-                                        @forelse($rqRemarks as $remark)
-                                            <div class="d-flex mb-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-primary fw-bold" 
-                                                         style="width: 32px; height: 32px; font-size: 12px;">
-                                                        {{ strtoupper(substr($remark->created_by ?? 'S', 0, 1)) }}
+                                <div class="tab-content" id="rqTabsContent">
+                                    <!-- Comments Tab -->
+                                    <div class="tab-pane fade show active" id="comments" role="tabpanel" aria-labelledby="comments-tab">
+                                        <div class="card bg-light border-0 mb-3">
+                                            <div class="card-body p-3" style="max-height: 400px; overflow-y: auto;">
+                                                @php
+                                                    $rqRef = '[RQ:'.$partOrder->rq.']';
+                                                    $rqRemarks = $partOrder->job->remarks->filter(function($r) use ($rqRef) {
+                                                        return str_contains($r->remark_text, $rqRef);
+                                                    });
+                                                @endphp
+
+                                                @forelse($rqRemarks as $remark)
+                                                    <div class="d-flex mb-3">
+                                                        <div class="flex-shrink-0">
+                                                            <div class="rounded-circle bg-white border d-flex align-items-center justify-content-center text-primary fw-bold" 
+                                                                 style="width: 32px; height: 32px; font-size: 12px;">
+                                                                {{ strtoupper(substr($remark->created_by ?? 'S', 0, 1)) }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex-grow-1 ms-3">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                <strong class="small text-dark">{{ $remark->created_by ?? 'System' }}</strong>
+                                                                <span class="text-muted" style="font-size: 11px;">
+                                                                    {{ $remark->created_at->format('d M H:i') }}
+                                                                </span>
+                                                            </div>
+                                                            <div class="p-2 bg-white rounded border-0 shadow-sm small text-dark">
+                                                                {{ str_replace($rqRef, '', $remark->remark_text) }}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div class="flex-grow-1 ms-3">
-                                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                                        <strong class="small text-dark">{{ $remark->created_by ?? 'System' }}</strong>
-                                                        <span class="text-muted" style="font-size: 11px;">
-                                                            {{ $remark->created_at->format('d M H:i') }}
-                                                        </span>
+                                                @empty
+                                                    <div class="text-center text-muted small py-4">
+                                                        <i class="bi bi-chat-square-dots d-block mb-2 fs-4"></i>
+                                                        No comments for this RQ yet.
                                                     </div>
-                                                    <div class="p-2 bg-white rounded border-0 shadow-sm small text-dark">
-                                                        {{ str_replace($rqRef, '', $remark->remark_text) }}
-                                                    </div>
-                                                </div>
+                                                @endforelse
                                             </div>
-                                        @empty
-                                            <div class="text-center text-muted small py-4">
-                                                <i class="bi bi-chat-square-dots d-block mb-2 fs-4"></i>
-                                                No comments for this RQ yet.
-                                            </div>
-                                        @endforelse
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="new_comment" class="form-label small fw-bold">Add Comment</label>
+                                            <textarea name="new_comment" id="new_comment" class="form-control" rows="2" placeholder="Type a comment to sync with Job remarks..."></textarea>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div class="mb-3">
-                                    <label for="new_comment" class="form-label small fw-bold">Add Comment</label>
-                                    <textarea name="new_comment" id="new_comment" class="form-control" rows="2" placeholder="Type a comment..."></textarea>
-                                    <div class="form-text small">This comment will be visible on the Job page as well.</div>
+                                    <!-- Activity Tab -->
+                                    <div class="tab-pane fade" id="activity" role="tabpanel" aria-labelledby="activity-tab">
+                                        <div class="card border-0 shadow-sm">
+                                            <div class="card-body p-0">
+                                                <div class="list-group list-group-flush">
+                                                    @forelse($rqActivities ?? [] as $activity)
+                                                    <div class="list-group-item px-3 py-3">
+                                                        <div class="d-flex gap-3">
+                                                            <div class="text-center" style="width: 40px;">
+                                                                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1" style="width: 32px; height: 32px;">
+                                                                    <i class="bi bi-{{ $activity->icon }} text-{{ $activity->color }}"></i>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex-grow-1">
+                                                                <div class="d-flex justify-content-between align-items-start">
+                                                                    <div>
+                                                                        <strong class="text-{{ $activity->color }} d-block" style="font-size: 0.9rem;">
+                                                                            {{ ucfirst(str_replace('_', ' ', $activity->action)) }}
+                                                                        </strong>
+                                                                        <div class="small text-muted mt-1">{!! $activity->description !!}</div>
+                                                                    </div>
+                                                                    <small class="text-muted text-nowrap" style="font-size: 0.75rem;">
+                                                                        {{ $activity->created_at->diffForHumans() }}
+                                                                    </small>
+                                                                </div>
+                                                                <div class="small text-muted mt-1" style="font-size: 0.8rem;">
+                                                                    <i class="bi bi-person me-1"></i>{{ $activity->user_name }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    @empty
+                                                    <div class="text-center text-muted py-5">
+                                                        <i class="bi bi-clock-history fs-1 opacity-50 mb-2"></i>
+                                                        <p class="small mb-0">No activity recorded for this RQ yet.</p>
+                                                    </div>
+                                                    @endforelse
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
