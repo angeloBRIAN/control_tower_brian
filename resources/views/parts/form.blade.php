@@ -174,7 +174,7 @@
                         </div>
 
                         @if(isset($partOrder))
-                        @if(isset($partOrder))
+
                         <div class="row mt-4 pt-3 border-top">
                             <div class="col-12">
                                 <!-- Tabs -->
