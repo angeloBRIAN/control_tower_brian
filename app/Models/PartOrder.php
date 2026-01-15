@@ -29,15 +29,21 @@ class PartOrder extends Model
         'received_date' => 'date',
     ];
 
-    // Status constants - workflow order
-    const STATUS_PENDING = 'pending';     // Job needs parts, waiting to open RQ
-    const STATUS_BUKA_RQ = 'buka_rq';     // RQ opened, waiting to order from supplier
-    const STATUS_ORDERED = 'ordered';     // Order placed with supplier (has no_order_part)
-    const STATUS_CONFIRMED = 'confirmed'; // Supplier confirmed the order
-    const STATUS_SHIPPED = 'shipped';     // Parts shipped
-    const STATUS_RECEIVED = 'received';   // Parts received at workshop
-    const STATUS_INSTALLED = 'installed'; // Parts installed on vehicle
+    // Status constants - workflow order (new 6-status flow)
+    const STATUS_PENDING = 'pending';       // Part needed, waiting for RQ form (Workshop)
+    const STATUS_RQ_SENT = 'rq_sent';       // RQ form completed and sent to Sparepart (Workshop)
+    const STATUS_PROCESSING = 'processing'; // Sparepart checking stock availability (Sparepart)
+    const STATUS_ORDERING = 'ordering';     // Part not in stock, ordered from supplier (Sparepart)
+    const STATUS_READY = 'ready';           // Part available for pickup (Sparepart)
+    const STATUS_RECEIVED = 'received';     // Part delivered to workshop/installed (Workshop)
     const STATUS_CANCELLED = 'cancelled';
+    
+    // Legacy status mappings (for backwards compatibility)
+    const STATUS_BUKA_RQ = 'rq_sent';       // Alias for backwards compatibility
+    const STATUS_ORDERED = 'ordering';      // Alias for backwards compatibility
+    const STATUS_CONFIRMED = 'ready';       // Alias for backwards compatibility
+    const STATUS_SHIPPED = 'ready';         // Alias for backwards compatibility
+    const STATUS_INSTALLED = 'received';    // Alias for backwards compatibility
 
     /**
      * Get all available statuses in workflow order
@@ -45,15 +51,24 @@ class PartOrder extends Model
     public static function getStatuses(): array
     {
         return [
-            self::STATUS_PENDING => ['label' => 'Pending', 'color' => '#f59e0b', 'icon' => 'bi-hourglass-split'],
-            self::STATUS_BUKA_RQ => ['label' => 'Buka RQ', 'color' => '#06b6d4', 'icon' => 'bi-file-plus'],
-            self::STATUS_ORDERED => ['label' => 'Ordered', 'color' => '#6b7280', 'icon' => 'bi-cart'],
-            self::STATUS_CONFIRMED => ['label' => 'Confirmed', 'color' => '#3b82f6', 'icon' => 'bi-check-circle'],
-            self::STATUS_SHIPPED => ['label' => 'Shipped', 'color' => '#8b5cf6', 'icon' => 'bi-truck'],
-            self::STATUS_RECEIVED => ['label' => 'Received', 'color' => '#22c55e', 'icon' => 'bi-box-seam'],
-            self::STATUS_INSTALLED => ['label' => 'Installed', 'color' => '#10b981', 'icon' => 'bi-check2-all'],
-            self::STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => '#ef4444', 'icon' => 'bi-x-circle'],
+            self::STATUS_PENDING => ['label' => 'Pending', 'color' => '#f59e0b', 'icon' => 'bi-hourglass-split', 'owner' => 'Workshop'],
+            self::STATUS_RQ_SENT => ['label' => 'RQ Sent', 'color' => '#06b6d4', 'icon' => 'bi-send', 'owner' => 'Workshop'],
+            self::STATUS_PROCESSING => ['label' => 'Processing', 'color' => '#8b5cf6', 'icon' => 'bi-gear', 'owner' => 'Sparepart'],
+            self::STATUS_ORDERING => ['label' => 'Ordering', 'color' => '#6366f1', 'icon' => 'bi-cart', 'owner' => 'Sparepart'],
+            self::STATUS_READY => ['label' => 'Ready', 'color' => '#3b82f6', 'icon' => 'bi-check-circle', 'owner' => 'Sparepart'],
+            self::STATUS_RECEIVED => ['label' => 'Received', 'color' => '#22c55e', 'icon' => 'bi-box-seam', 'owner' => 'Workshop'],
+            self::STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => '#ef4444', 'icon' => 'bi-x-circle', 'owner' => 'Any'],
         ];
+    }
+
+    /**
+     * Get Kanban-displayable statuses (excludes cancelled)
+     */
+    public static function getKanbanStatuses(): array
+    {
+        $statuses = self::getStatuses();
+        unset($statuses[self::STATUS_CANCELLED]);
+        return $statuses;
     }
 
     /**

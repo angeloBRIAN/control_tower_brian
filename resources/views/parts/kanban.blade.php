@@ -185,9 +185,9 @@
                 </div>
             </div>
             
-            {{-- OTHER COLUMNS - Show PartOrders --}}
+            {{-- OTHER COLUMNS - Show PartOrders (6-status flow) --}}
             @php
-                $displayStatuses = ['buka_rq', 'ordered', 'confirmed', 'shipped', 'received'];
+                $displayStatuses = ['rq_sent', 'processing', 'ordering', 'ready', 'received'];
             @endphp
             @foreach($displayStatuses as $statusKey)
                 @php $statusInfo = $statuses[$statusKey]; @endphp
@@ -259,12 +259,12 @@
     </div>
 </div>
 
-<!-- RQ Modal (Pending → Buka RQ) -->
+<!-- RQ Modal (Pending → RQ Sent) -->
 <div class="modal fade" id="rqModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-file-plus me-2"></i>Open RQ (Buka RQ)</h5>
+                <h5 class="modal-title"><i class="bi bi-send me-2"></i>Send RQ to Sparepart</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -290,25 +290,25 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-info text-white" id="saveRq">
-                    <i class="bi bi-check-lg me-1"></i>Create RQ
+                    <i class="bi bi-send me-1"></i>Send RQ
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Order Details Modal (Buka RQ → Ordered) -->
+<!-- Order Details Modal (Processing → Ordering) -->
 <div class="modal fade" id="orderDetailModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-cart me-2"></i>Order Details</h5>
+                <h5 class="modal-title"><i class="bi bi-cart me-2"></i>Order from Supplier</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="orderDetailForm">
                     <input type="hidden" name="order_id" id="od_order_id">
-                    <input type="hidden" name="status" value="ordered">
+                    <input type="hidden" name="status" value="ordering">
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">RQ Number</label>
@@ -436,22 +436,22 @@ document.addEventListener('DOMContentLoaded', function() {
         userForeman: {!! json_encode($permissions['userForeman']) !!}
     };
     
-    // Allowed transitions (1-step only)
+    // Allowed transitions (1-step only, new 6-status flow)
     const allowedTransitions = {
-        'pending': ['buka_rq'],
-        'buka_rq': ['ordered'],
-        'ordered': ['confirmed'],
-        'confirmed': ['shipped'],
-        'shipped': ['received']
+        'pending': ['rq_sent'],
+        'rq_sent': ['processing'],
+        'processing': ['ordering', 'ready'],  // Can go to ordering OR ready (if in stock)
+        'ordering': ['ready'],
+        'ready': ['received']
     };
     
-    // Status labels
+    // Status labels (new flow)
     const statusLabels = {
         'pending': 'Pending',
-        'buka_rq': 'Buka RQ',
-        'ordered': 'Ordered',
-        'confirmed': 'Confirmed',
-        'shipped': 'Shipped',
+        'rq_sent': 'RQ Sent',
+        'processing': 'Processing',
+        'ordering': 'Ordering',
+        'ready': 'Ready',
         'received': 'Received'
     };
 
@@ -526,10 +526,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Permission check for Job → Buka RQ
-            if (draggedType === 'job' && targetStatus === 'buka_rq') {
+            // Permission check for Job → RQ Sent (Workshop creates & sends RQ)
+            if (draggedType === 'job' && targetStatus === 'rq_sent') {
                 if (!permissions.canOpenRq) {
-                    alert('You do not have permission to open RQ. Only Admin, Control Tower, or assigned Foreman can do this.');
+                    alert('You do not have permission to send RQ. Only Admin, Control Tower, or assigned Foreman can do this.');
                     return;
                 }
                 
@@ -537,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (permissions.userRole === 'foreman') {
                     const jobForeman = draggedCard.dataset.foreman || '';
                     if (permissions.userForeman && jobForeman.toLowerCase().trim() !== permissions.userForeman.toLowerCase().trim()) {
-                        alert('You can only open RQ for jobs assigned to you.');
+                        alert('You can only send RQ for jobs assigned to you.');
                         return;
                     }
                 }
@@ -552,8 +552,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                if (targetStatus === 'ordered') {
-                    // Buka RQ → Ordered: Show order details modal
+                if (targetStatus === 'ordering') {
+                    // Processing → Ordering: Show order details modal (supplier order)
                     showOrderModal(draggedCard.dataset.orderId, draggedCard);
                 } else {
                     // Other transitions: Show remark modal
