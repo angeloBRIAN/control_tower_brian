@@ -48,7 +48,35 @@ class SanitizeCustomerAddresses extends Command
                 }
             }
             
-            // Also check if multiple address fields contain the same value
+            // If main address field is populated, check if address_1-5 are substrings
+            $mainAddress = $customer->address ?? $customer->address_1 ?? '';
+            if (!empty($mainAddress)) {
+                $normalizedMain = strtolower($mainAddress);
+                $partsInMain = array_map('trim', explode(',', $normalizedMain));
+                
+                foreach (['address_1', 'address_2', 'address_3', 'address_4', 'address_5'] as $field) {
+                    if ($field === 'address_1' && empty($customer->address)) {
+                        continue; // address_1 is the main if address is empty
+                    }
+                    
+                    $value = trim($customer->$field ?? '');
+                    if (empty($value)) continue;
+                    
+                    $normalizedValue = strtolower($value);
+                    
+                    // Check if this value is contained in the main address
+                    if (strpos($normalizedMain, $normalizedValue) !== false || in_array($normalizedValue, $partsInMain)) {
+                        if ($dryRun) {
+                            $this->line("Customer ID {$customer->id}: {$field} \"{$value}\" already in main address, clearing");
+                        } else {
+                            $customer->$field = null;
+                            $updated = true;
+                        }
+                    }
+                }
+            }
+            
+            // Also check if multiple address fields contain the exact same value
             $uniqueValues = [];
             foreach ($addressFields as $field) {
                 $value = trim($customer->$field ?? '');
