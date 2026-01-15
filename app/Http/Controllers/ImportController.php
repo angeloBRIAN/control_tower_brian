@@ -1052,8 +1052,8 @@ class ImportController extends Controller
                     'customer_id' => $customerId,
                     'status' => 'invoiced',
                     'invoiced_at' => $invoiceDate ?? now(),
-                    // Set work_status to menunggu_pembayaran for regular invoices, skip for CN
-                    'work_status' => $isCreditNote ? null : 'menunggu_pembayaran',
+                    // Set work_status to "11. Proses Invoice" for regular invoices, skip for CN
+                    'work_status' => $isCreditNote ? null : Job::WORK_STATUSES[10],
                 ], fn($v) => !is_null($v));
 
                 // Normalize job number for matching (trim whitespace, handle numeric comparisons)
