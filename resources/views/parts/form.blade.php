@@ -154,7 +154,7 @@
                                 </span>
                                 <span class="text-muted small ms-2">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Change status via <a href="{{ route('part-orders.kanban') }}" class="text-decoration-none">Kanban Board</a>
+                                    Change status via <a href="{{ route('parts.kanban') }}" class="text-decoration-none">Kanban Board</a>
                                 </span>
                             </div>
                         </div>
