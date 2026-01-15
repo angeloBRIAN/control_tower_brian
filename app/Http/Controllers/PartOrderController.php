@@ -374,12 +374,12 @@ class PartOrderController extends Controller
         $oldStatus = $partOrder->status;
         $newStatus = $validated['status'];
         
-        // Define allowed transitions (1-step only)
+        // Define allowed transitions (1-step only, new 6-status flow)
         $allowedTransitions = [
-            PartOrder::STATUS_BUKA_RQ => [PartOrder::STATUS_ORDERED],
-            PartOrder::STATUS_ORDERED => [PartOrder::STATUS_CONFIRMED],
-            PartOrder::STATUS_CONFIRMED => [PartOrder::STATUS_SHIPPED],
-            PartOrder::STATUS_SHIPPED => [PartOrder::STATUS_RECEIVED],
+            PartOrder::STATUS_RQ_SENT => [PartOrder::STATUS_PROCESSING],
+            PartOrder::STATUS_PROCESSING => [PartOrder::STATUS_ORDERING, PartOrder::STATUS_READY], // Can go to Ordering OR Ready (in-stock)
+            PartOrder::STATUS_ORDERING => [PartOrder::STATUS_READY],
+            PartOrder::STATUS_READY => [PartOrder::STATUS_RECEIVED],
         ];
         
         // Validate 1-step movement
@@ -390,12 +390,12 @@ class PartOrderController extends Controller
             ], 400);
         }
         
-        // Validate required fields when moving to "ordered"
-        if ($newStatus === PartOrder::STATUS_ORDERED) {
+        // Validate required fields when moving to "ordering" (supplier order)
+        if ($newStatus === PartOrder::STATUS_ORDERING) {
             if (empty($validated['no_order_part']) || empty($validated['order_date']) || empty($validated['expected_date'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Order No, Order Date, and Expected Date are required when moving to Ordered.',
+                    'message' => 'Order No, Order Date, and Expected Date are required when ordering from supplier.',
                 ], 400);
             }
         }
@@ -413,17 +413,17 @@ class PartOrderController extends Controller
             'received_date' => $newStatus === PartOrder::STATUS_RECEIVED ? now()->toDateString() : $partOrder->received_date,
         ]);
 
-        // Job Work Status Logic
+        // Job Work Status Logic - Trigger on READY (part available for pickup)
         $job = $partOrder->job;
         
-        if ($newStatus === PartOrder::STATUS_RECEIVED) {
-            // Check if ALL part orders for this job are received
-            $unreceived = PartOrder::where('job_id', $job->id)
-                ->whereNotIn('status', [PartOrder::STATUS_RECEIVED, PartOrder::STATUS_INSTALLED, PartOrder::STATUS_CANCELLED])
+        if ($newStatus === PartOrder::STATUS_READY) {
+            // Check if ALL part orders for this job are ready or beyond
+            $notReady = PartOrder::where('job_id', $job->id)
+                ->whereNotIn('status', [PartOrder::STATUS_READY, PartOrder::STATUS_RECEIVED, PartOrder::STATUS_CANCELLED])
                 ->count();
             
-            if ($unreceived === 0) {
-                // All parts received - update job work_status to "6. Parts Datang"
+            if ($notReady === 0) {
+                // All parts ready - update job work_status to "6. Parts Datang"
                 $job->update(['work_status' => Job::WORK_STATUSES[5] ?? '6. Parts Datang (Parts Received)']);
             }
         }
@@ -485,12 +485,12 @@ class PartOrderController extends Controller
             ], 403);
         }
         
-        // Create new PartOrder with status buka_rq
+        // Create new PartOrder with status rq_sent (RQ submitted to Sparepart)
         $partOrder = PartOrder::create([
             'job_id' => $job->id,
             'rq' => $validated['rq'],
             'notes' => $validated['notes'] ?? null,
-            'status' => PartOrder::STATUS_BUKA_RQ,
+            'status' => PartOrder::STATUS_RQ_SENT,
             'order_date' => now()->toDateString(),
 
             'created_by' => auth()->id(),
