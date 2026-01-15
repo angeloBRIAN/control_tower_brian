@@ -1011,8 +1011,8 @@
             console.warn('[Echo] Failed to initialize:', err.message);
         }
         
-        // Toast notification function
-        function showNotificationToast(notification) {
+        // Toast notification function (globally accessible)
+        window.showNotificationToast = function(notification) {
             // Create toast container if not exists
             let container = document.getElementById('toastContainer');
             if (!container) {
