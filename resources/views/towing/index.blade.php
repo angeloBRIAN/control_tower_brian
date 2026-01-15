@@ -277,14 +277,22 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
             body: JSON.stringify({ columns: prefs, widths: widths, order: order, sort: currentSort, dir: currentDir, table: 'towing' })
-        }).then(res => res.json()).then(data => {
+        }).then(res => {
+            if (res.status === 419) { alert('Your session has expired. Please refresh the page and try again.'); return { success: false }; }
+            if (res.status === 401) { alert('You have been logged out. Please refresh the page and log in again.'); return { success: false }; }
+            if (!res.ok) { throw new Error('Server error: ' + res.status); }
+            return res.json();
+        }).then(data => {
             if(data.success) {
                 const btn = document.getElementById('saveColumnsBtn');
                 btn.innerHTML = '<i class="bi bi-check"></i> Saved!';
                 btn.classList.replace('btn-primary', 'btn-success');
                 setTimeout(() => { btn.innerHTML = 'Save'; btn.classList.replace('btn-success', 'btn-primary'); }, 1500);
             }
-        }).catch(err => alert('Error: ' + err.message));
+        }).catch(err => {
+            if (err.message === 'Failed to fetch') { alert('Network error: Unable to save preferences. Please check your internet connection and refresh the page.'); }
+            else { alert('Error saving preferences: ' + err.message); }
+        });
     });
 
     table.querySelectorAll('th').forEach(th => {
