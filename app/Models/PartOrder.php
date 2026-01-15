@@ -17,6 +17,7 @@ class PartOrder extends Model
         'notes',
         'order_date',
         'expected_date',
+        'ready_date',
         'received_date',
         'status',
         'created_by',
@@ -26,6 +27,7 @@ class PartOrder extends Model
     protected $casts = [
         'order_date' => 'date',
         'expected_date' => 'date',
+        'ready_date' => 'date',
         'received_date' => 'date',
     ];
 

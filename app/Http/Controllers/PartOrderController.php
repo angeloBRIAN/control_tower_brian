@@ -427,10 +427,11 @@ class PartOrderController extends Controller
             $partOrder->update($fillable);
         }
 
-        // Update Status
+        // Update Status with auto-dates
         $partOrder->update([
             'status' => $newStatus,
             'updated_by' => auth()->id(),
+            'ready_date' => $newStatus === PartOrder::STATUS_READY ? now()->toDateString() : $partOrder->ready_date,
             'received_date' => $newStatus === PartOrder::STATUS_RECEIVED ? now()->toDateString() : $partOrder->received_date,
         ]);
 

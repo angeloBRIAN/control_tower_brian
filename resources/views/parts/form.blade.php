@@ -95,48 +95,55 @@
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label for="order_date" class="form-label">Order Date <span class="text-danger">*</span></label>
+                                    <label for="order_date" class="form-label">Order Date</label>
                                     <input type="date" 
-                                           class="form-control @error('order_date') is-invalid @enderror" 
+                                           class="form-control bg-light" 
                                            id="order_date" 
                                            name="order_date" 
                                            value="{{ old('order_date', isset($partOrder) && $partOrder->order_date ? $partOrder->order_date->format('Y-m-d') : date('Y-m-d')) }}"
-                                           required>
-                                    @error('order_date')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                           readonly>
+                                    <div class="form-text text-muted small">Auto-set when created</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="expected_date" class="form-label">Expected Date <span class="text-danger">*</span></label>
                                     <input type="date" 
-                                           class="form-control @error('expected_date') is-invalid @enderror" 
+                                           class="form-control date-shortcuts @error('expected_date') is-invalid @enderror" 
                                            id="expected_date" 
                                            name="expected_date" 
                                            value="{{ old('expected_date', isset($partOrder) && $partOrder->expected_date ? $partOrder->expected_date->format('Y-m-d') : '') }}"
                                            required>
+                                    <div class="form-text text-muted small">
+                                        <kbd>t</kbd> today | <kbd>→</kbd> +1d | <kbd>←</kbd> -1d | <kbd>↑</kbd> +7d | <kbd>↓</kbd> -7d
+                                    </div>
                                     @error('expected_date')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
                             </div>
-                            @if(isset($partOrder))
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label for="received_date" class="form-label">Received Date</label>
-                                    <input type="date" 
-                                           class="form-control @error('received_date') is-invalid @enderror" 
-                                           id="received_date" 
-                                           name="received_date" 
-                                           value="{{ old('received_date', $partOrder->received_date?->format('Y-m-d')) }}">
-                                    @error('received_date')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <label class="form-label">Status Dates</label>
+                                    @if(isset($partOrder))
+                                    <div class="small">
+                                        <div class="d-flex justify-content-between py-1 border-bottom">
+                                            <span class="text-muted">Ready:</span>
+                                            <span class="fw-semibold">{{ $partOrder->ready_date?->format('d/m/Y') ?? '-' }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-1">
+                                            <span class="text-muted">Received:</span>
+                                            <span class="fw-semibold">{{ $partOrder->received_date?->format('d/m/Y') ?? '-' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-text text-muted small">Auto-set on Kanban status change</div>
+                                    @else
+                                    <div class="form-control-plaintext text-muted small">-</div>
+                                    @endif
                                 </div>
                             </div>
-                            @endif
                         </div>
+
 
                         @if(isset($partOrder))
                         <div class="mb-3">
@@ -179,3 +186,57 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Date keyboard shortcuts for fields with .date-shortcuts class
+    document.querySelectorAll('.date-shortcuts').forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            // Get current date or today if empty
+            let currentDate = this.value ? new Date(this.value) : new Date();
+            
+            let handled = false;
+            
+            switch(e.key) {
+                case 't':
+                case 'T':
+                    // t = Today
+                    currentDate = new Date();
+                    handled = true;
+                    break;
+                case 'ArrowRight':
+                    // → = +1 day
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    handled = true;
+                    break;
+                case 'ArrowLeft':
+                    // ← = -1 day
+                    currentDate.setDate(currentDate.getDate() - 1);
+                    handled = true;
+                    break;
+                case 'ArrowUp':
+                    // ↑ = +7 days (next week)
+                    currentDate.setDate(currentDate.getDate() + 7);
+                    handled = true;
+                    break;
+                case 'ArrowDown':
+                    // ↓ = -7 days (previous week)
+                    currentDate.setDate(currentDate.getDate() - 7);
+                    handled = true;
+                    break;
+            }
+            
+            if (handled) {
+                e.preventDefault();
+                // Format as YYYY-MM-DD
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                this.value = `${year}-${month}-${day}`;
+            }
+        });
+    });
+});
+</script>
+@endpush
