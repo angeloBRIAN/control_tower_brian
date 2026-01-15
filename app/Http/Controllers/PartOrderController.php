@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PartOrder;
 use App\Models\Job;
+use App\Models\JobActivity;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -250,6 +251,14 @@ class PartOrderController extends Controller
         // Update job's need_part flag
         Job::where('id', $validated['job_id'])->update(['need_part' => true]);
 
+        // Log Activity
+        JobActivity::log(
+            $partOrder->job, 
+            JobActivity::ACTION_PARTS_UPDATED, 
+            "RQ opened: {$partOrder->rq}",
+            ['rq' => $partOrder->rq]
+        );
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -309,6 +318,14 @@ class PartOrderController extends Controller
             'notes' => $validated['notes'],
             'updated_by' => auth()->id(),
         ]);
+
+        // Log Activity if meaningful changes
+        JobActivity::log(
+            $partOrder->job, 
+            JobActivity::ACTION_PARTS_UPDATED, 
+            "RQ {$partOrder->rq} updated",
+            $partOrder->getChanges()
+        );
 
         // Auto-set received_date when status changes to received (if it were passed which it isn't here but keeping logic safe)
         // (This logic is mainly handled in updateStatus for Kanban)
@@ -474,6 +491,14 @@ class PartOrderController extends Controller
                 auth()->id()
             );
         }
+
+        // Log Activity
+        JobActivity::log(
+            $job, 
+            JobActivity::ACTION_PARTS_UPDATED, 
+            "RQ {$partOrder->rq} status: {$oldStatus} → {$newStatus}",
+            ['from' => $oldStatus, 'to' => $newStatus]
+        );
 
         return response()->json([
             'success' => true,
