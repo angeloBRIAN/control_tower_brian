@@ -95,6 +95,7 @@
                         <option value="cash" {{ old('job_type') == 'cash' ? 'selected' : '' }}>Cash</option>
                         <option value="booking_service" {{ old('job_type') == 'booking_service' ? 'selected' : '' }}>Booking Service</option>
                         <option value="pdi" {{ old('job_type') == 'pdi' ? 'selected' : '' }}>Pre Delivery Inspection</option>
+                        <option value="internal" {{ old('job_type') == 'internal' ? 'selected' : '' }}>Internal</option>
                     </select>
                 </div>
                 <div class="col-md-3">

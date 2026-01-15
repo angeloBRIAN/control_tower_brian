@@ -217,6 +217,20 @@
                             <input type="text" name="block" class="form-control form-control-sm" {{ $readonly ? 'disabled' : '' }} value="{{ old('block', $job->block) }}">
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label small text-muted mb-0">Job Type</label>
+                            <select name="job_type" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }}>
+                                <option value="">-- Select Type --</option>
+                                <option value="quick_service" {{ old('job_type', $job->job_type) == 'quick_service' ? 'selected' : '' }}>Quick Service</option>
+                                <option value="warranty" {{ old('job_type', $job->job_type) == 'warranty' ? 'selected' : '' }}>Warranty</option>
+                                <option value="isp" {{ old('job_type', $job->job_type) == 'isp' ? 'selected' : '' }}>ISP</option>
+                                <option value="campaign" {{ old('job_type', $job->job_type) == 'campaign' ? 'selected' : '' }}>Campaign</option>
+                                <option value="cash" {{ old('job_type', $job->job_type) == 'cash' ? 'selected' : '' }}>Cash</option>
+                                <option value="booking_service" {{ old('job_type', $job->job_type) == 'booking_service' ? 'selected' : '' }}>Booking Service</option>
+                                <option value="pdi" {{ old('job_type', $job->job_type) == 'pdi' ? 'selected' : '' }}>Pre Delivery Inspection</option>
+                                <option value="internal" {{ old('job_type', $job->job_type) == 'internal' ? 'selected' : '' }}>Internal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label small text-muted mb-0">Work Status</label>
                             <select name="work_status" class="form-select form-select-sm" {{ $readonly ? 'disabled' : '' }}>
                                 <option value="">-- Select Status --</option>
