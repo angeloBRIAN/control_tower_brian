@@ -466,7 +466,7 @@ class ImportController extends Controller
                         'tipe', 'type unit', 'unit', 'model', 'type', 'kendaraan'
                     ]),
                     // Set default work_status for new jobs so they appear in Kanban
-                    'work_status' => 'belum_diproses',
+                    // 'work_status' => 'belum_diproses', // REMOVED: Don't overwrite status for existing jobs
                 ];
 
                 // Match by Job Number AND Franchise if possible? 
@@ -528,8 +528,9 @@ class ImportController extends Controller
                         JobActivity::log($job, JobActivity::ACTION_IMPORT_UPDATED, 'Job updated via data import');
                     }
                 } else {
-                    // New Job - filter null values to allow DB defaults (especially franchise)
-                    $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId]), fn($value) => !is_null($value)));
+                    // New Job - filter null values to allow DB defaults
+                    // Set default work_status ONLY for new jobs
+                    $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId, 'work_status' => 'belum_diproses']), fn($value) => !is_null($value)));
                     $imported++;
                     \Log::info("PROGRESS: Created job {$jobNumber}", ['data' => array_filter($jobData, fn($v) => !is_null($v))]);
                     
@@ -759,7 +760,8 @@ class ImportController extends Controller
                         'update remarks', 'update remark', 'update keterangan'
                     ]),
                     'status' => 'uninvoiced',
-                    'work_status' => 'belum_diproses', // Set default work_status for Kanban
+                    'status' => 'uninvoiced',
+                    // 'work_status' => 'belum_diproses', // REMOVED: Don't overwrite status
                 ];
 
                 // RECONCILIATION Check
@@ -844,10 +846,15 @@ class ImportController extends Controller
                 // Track old plate before update for orphan cleanup
                 $oldPlate = Job::where('job_number', $jobNumber)->value('plate_number');
 
-                $job = Job::updateOrCreate(
-                    ['job_number' => $jobNumber],
-                    array_filter($jobData)
-                );
+                // Use firstOrNew to only set work_status on creation, never overwrite
+                $job = Job::firstOrNew(['job_number' => $jobNumber]);
+                
+                if (!$job->exists) {
+                    $job->work_status = 'belum_diproses';
+                }
+                
+                $job->fill(array_filter($jobData));
+                $job->save();
 
                 $importedJobIds[] = $job->id;
 
@@ -1053,7 +1060,8 @@ class ImportController extends Controller
                     'status' => 'invoiced',
                     'invoiced_at' => $invoiceDate ?? now(),
                     // Set work_status to "11. Proses Invoice" for regular invoices, skip for CN
-                    'work_status' => $isCreditNote ? null : Job::WORK_STATUSES[10],
+                    // Set work_status only if it's currently null or for new jobs (handled below)
+                    // 'work_status' => $job->work_status ?? ($isCreditNote ? null : Job::WORK_STATUSES[10]), // REMOVED: Don't force update
                 ], fn($v) => !is_null($v));
 
                 // Normalize job number for matching (trim whitespace, handle numeric comparisons)
@@ -1199,6 +1207,8 @@ class ImportController extends Controller
                         'account_no' => $accountNo,
                         'department' => $department,
                         'import_id' => $importId,
+                        // Set default status for NEW invoiced jobs
+                        'work_status' => $isCreditNote ? null : Job::WORK_STATUSES[10],
                     ], fn($v) => !is_null($v)));
                     $job = Job::create($newJobData);
                     $imported++;
