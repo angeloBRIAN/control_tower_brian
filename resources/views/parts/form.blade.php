@@ -142,7 +142,7 @@
                                            class="form-control @error('order_date') is-invalid @enderror" 
                                            id="order_date" 
                                            name="order_date" 
-                                           value="{{ old('order_date', isset($partOrder) ? $partOrder->order_date->format('Y-m-d') : date('Y-m-d')) }}"
+                                           value="{{ old('order_date', isset($partOrder) && $partOrder->order_date ? $partOrder->order_date->format('Y-m-d') : date('Y-m-d')) }}"
                                            required>
                                     @error('order_date')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -156,7 +156,7 @@
                                            class="form-control @error('expected_date') is-invalid @enderror" 
                                            id="expected_date" 
                                            name="expected_date" 
-                                           value="{{ old('expected_date', isset($partOrder) ? $partOrder->expected_date->format('Y-m-d') : '') }}"
+                                           value="{{ old('expected_date', isset($partOrder) && $partOrder->expected_date ? $partOrder->expected_date->format('Y-m-d') : '') }}"
                                            required>
                                     @error('expected_date')
                                         <div class="invalid-feedback">{{ $message }}</div>
