@@ -119,6 +119,16 @@ class CustomerController extends Controller
                     $dmsCustomer = $alias->customer;
                 }
             }
+            
+            // Try via vehicle's customer_id link (fallback when customer_name is truncated)
+            if (!$dmsCustomer) {
+                $vehicle = Vehicle::where('customer_name', $customerName)
+                    ->whereNotNull('customer_id')
+                    ->first();
+                if ($vehicle && $vehicle->customer_id) {
+                    $dmsCustomer = \App\Models\Customer::find($vehicle->customer_id);
+                }
+            }
         }
 
         // Get related vehicles

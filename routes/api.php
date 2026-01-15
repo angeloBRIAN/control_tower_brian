@@ -75,7 +75,7 @@ Route::get('/customers/lookup-address', function (Request $request) {
     }
     
     if ($customer) {
-        // Build full address from address fields
+        // Build full address from address fields, removing duplicates
         $addressParts = array_filter([
             $customer->address,
             $customer->address_1,
@@ -85,7 +85,16 @@ Route::get('/customers/lookup-address', function (Request $request) {
             $customer->address_5,
         ]);
         
-        $fullAddress = !empty($addressParts) ? implode(', ', $addressParts) : null;
+        // Remove duplicates (case-insensitive)
+        $uniqueParts = [];
+        foreach ($addressParts as $part) {
+            $normalized = strtolower(trim($part));
+            if (!isset($uniqueParts[$normalized])) {
+                $uniqueParts[$normalized] = trim($part);
+            }
+        }
+        
+        $fullAddress = !empty($uniqueParts) ? implode(', ', array_values($uniqueParts)) : null;
         
         return response()->json([
             'found' => true,
