@@ -1060,8 +1060,8 @@ class ImportController extends Controller
                     'status' => 'invoiced',
                     'invoiced_at' => $invoiceDate ?? now(),
                     // Set work_status to "11. Proses Invoice" for regular invoices, skip for CN
-                    // Set work_status only if it's currently null or for new jobs (handled below)
-                    // 'work_status' => $job->work_status ?? ($isCreditNote ? null : Job::WORK_STATUSES[10]), // REMOVED: Don't force update
+                    // User Request: Force update status for Invoiced import
+                   'work_status' => $isCreditNote ? null : Job::WORK_STATUSES[10], 
                 ], fn($v) => !is_null($v));
 
                 // Normalize job number for matching (trim whitespace, handle numeric comparisons)
