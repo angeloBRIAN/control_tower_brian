@@ -14,7 +14,10 @@ class RevertImportStatus extends Command
      *
      * @var string
      */
-    protected $signature = 'audit:revert-import-status {--hours=1 : How many hours back to look} {--dry-run : Only show what would be changed}';
+    protected $signature = 'audit:revert-import-status 
+                            {--hours= : How many hours back to look} 
+                            {--date= : Specific date to target (YYYY-MM-DD)} 
+                            {--dry-run : Only show what would be changed}';
 
     /**
      * The console command description.
@@ -29,19 +32,29 @@ class RevertImportStatus extends Command
     public function handle()
     {
         $hours = $this->option('hours');
+        $date = $this->option('date');
         $isDryRun = $this->option('dry-run');
         
-        $this->info("Scanning Audit Logs for the last {$hours} hours...");
+        if (!$hours && !$date) {
+            $this->error("Please specify either --hours or --date.");
+            return;
+        }
         
-        $since = Carbon::now()->subHours($hours);
-        
-        // Find AuditLogs for Jobs where work_status was changed
-        $logs = AuditLog::where('auditable_type', Job::class)
+        $query = AuditLog::where('auditable_type', Job::class)
             ->where('action', 'updated')
-            ->where('created_at', '>=', $since)
-            ->whereJsonContains('new_values->work_status', 'belum_diproses') // specifically target the overwrite issue
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->whereJsonContains('new_values->work_status', 'belum_diproses')
+            ->orderBy('created_at', 'desc');
+
+        if ($date) {
+            $this->info("Scanning Audit Logs for date: {$date}...");
+            $query->whereDate('created_at', $date);
+        } else {
+            $this->info("Scanning Audit Logs for the last {$hours} hours...");
+            $since = Carbon::now()->subHours($hours);
+            $query->where('created_at', '>=', $since);
+        }
+        
+        $logs = $query->get();
 
         $count = 0;
         
