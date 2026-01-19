@@ -427,16 +427,47 @@
     cursor: grabbing;
 }
 .kanban-card.dragging {
-    opacity: 0.5;
+    opacity: 0.4;
     transform: rotate(3deg);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
 }
-.kanban-column.drag-over {
-    background: rgba(var(--bs-primary-rgb), 0.1) !important;
-    border: 2px dashed var(--bs-primary);
+.kanban-body.drag-over {
+    background: rgba(var(--bs-success-rgb), 0.08) !important;
+    border: 2px dashed var(--bs-success) !important;
+    border-radius: 8px;
+    position: relative;
 }
-.kanban-column.drag-invalid {
-    background: rgba(var(--bs-danger-rgb), 0.1) !important;
-    border: 2px dashed var(--bs-danger);
+.kanban-body.drag-over::after {
+    content: 'Drop here';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--bs-success);
+    font-weight: 600;
+    font-size: 1.2rem;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 1;
+}
+.kanban-body.drag-invalid {
+    background: rgba(var(--bs-danger-rgb), 0.08) !important;
+    border: 2px dashed var(--bs-danger) !important;
+    border-radius: 8px;
+    position: relative;
+}
+.kanban-body.drag-invalid::after {
+    content: 'Not allowed';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--bs-danger);
+    font-weight: 600;
+    font-size: 1.2rem;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 1;
 }
 
 /* Sortable ghost */
