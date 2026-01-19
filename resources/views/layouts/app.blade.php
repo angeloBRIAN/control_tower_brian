@@ -543,7 +543,7 @@
                 <div class="input-group">
                     <span class="input-group-text bg-body border-end-0"><i class="bi bi-search"></i></span>
                     <input type="text" class="form-control border-start-0 ps-0" id="globalSearchInput" 
-                           placeholder="Search jobs, vehicles, customers... (Ctrl+K)" 
+                           placeholder="Search anything: jobs, vehicles, invoices, parts, bookings, customers... (Ctrl+K)" 
                            autocomplete="off">
                     <span class="input-group-text bg-body text-muted small border-start-0">
                         <kbd class="bg-secondary text-white px-1 rounded">Ctrl</kbd>+<kbd class="bg-secondary text-white px-1 rounded">K</kbd>

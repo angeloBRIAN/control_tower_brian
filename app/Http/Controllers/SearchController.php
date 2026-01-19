@@ -5,12 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Job;
 use App\Models\Vehicle;
 use App\Models\Customer;
+use App\Models\JobInvoice;
+use App\Models\PartOrder;
+use App\Models\Booking;
+use App\Models\TowingRecord;
+use App\Models\PdiRecord;
+use App\Models\ServiceAdvisor;
+use App\Models\Foreman;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
 {
     /**
-     * Global search across jobs, vehicles, customers
+     * Global search across all major entities
      */
     public function search(Request $request)
     {
@@ -30,6 +37,7 @@ class SearchController extends Controller
             ->orWhere('plate_number', 'like', "%{$query}%")
             ->orWhere('invoice_number', 'like', "%{$query}%")
             ->orWhere('customer_name', 'like', "%{$query}%")
+            ->orWhere('vin', 'like', "%{$query}%")
             ->limit(5)
             ->get(['id', 'job_number', 'plate_number', 'customer_name', 'status']);
             
@@ -65,24 +73,169 @@ class SearchController extends Controller
             ];
         }
         
-        // Search by Customer Name in Jobs (unique customers)
-        $customers = Job::where('customer_name', 'like', "%{$query}%")
-            ->whereNotNull('customer_name')
-            ->select('customer_name')
-            ->distinct()
+        // Search Job Invoices
+        $invoices = JobInvoice::where('invoice_number', 'like', "%{$query}%")
+            ->orWhereHas('job', function($q) use ($query) {
+                $q->where('job_number', 'like', "%{$query}%")
+                  ->orWhere('plate_number', 'like', "%{$query}%")
+                  ->orWhere('customer_name', 'like', "%{$query}%");
+            })
+            ->with('job')
             ->limit(5)
-            ->pluck('customer_name');
+            ->get();
             
-        foreach ($customers as $customerName) {
-            $jobCount = Job::where('customer_name', $customerName)->count();
+        foreach ($invoices as $invoice) {
+            $results[] = [
+                'type' => 'invoice',
+                'icon' => 'bi-receipt',
+                'title' => $invoice->invoice_number ?: 'No Invoice #',
+                'subtitle' => ($invoice->job ? $invoice->job->job_number . ' - ' . $invoice->job->customer_name : 'No Job'),
+                'badge' => ucfirst(str_replace('_', ' ', $invoice->status)),
+                'badge_class' => $invoice->status === 'paid' ? 'bg-success' : ($invoice->status === 'pending' ? 'bg-warning text-dark' : 'bg-info'),
+                'url' => $invoice->job ? route('jobs.show', $invoice->job->id) : '#',
+            ];
+        }
+        
+        // Search Part Orders
+        $partOrders = PartOrder::where('rq', 'like', "%{$query}%")
+            ->orWhere('no_order_part', 'like', "%{$query}%")
+            ->orWhereHas('job', function($q) use ($query) {
+                $q->where('job_number', 'like', "%{$query}%")
+                  ->orWhere('plate_number', 'like', "%{$query}%");
+            })
+            ->with('job')
+            ->limit(5)
+            ->get();
+            
+        foreach ($partOrders as $order) {
+            $results[] = [
+                'type' => 'part_order',
+                'icon' => 'bi-box-seam',
+                'title' => 'RQ: ' . ($order->rq ?: 'N/A'),
+                'subtitle' => ($order->job ? $order->job->job_number . ' - ' . $order->job->plate_number : 'No Job'),
+                'badge' => ucfirst(str_replace('_', ' ', $order->status)),
+                'badge_class' => $order->status === 'received' ? 'bg-success' : 'bg-warning text-dark',
+                'url' => $order->job ? route('jobs.show', $order->job->id) : route('part-orders.index'),
+            ];
+        }
+        
+        // Search Bookings
+        if (auth()->user()->canManageMasterData()) {
+            $bookings = Booking::where('plate_number', 'like', "%{$query}%")
+                ->orWhere('customer_name', 'like', "%{$query}%")
+                ->orWhere('contact_number', 'like', "%{$query}%")
+                ->limit(5)
+                ->get();
+                
+            foreach ($bookings as $booking) {
+                $results[] = [
+                    'type' => 'booking',
+                    'icon' => 'bi-calendar-check',
+                    'title' => $booking->plate_number ?: 'No Plate',
+                    'subtitle' => ($booking->customer_name ?: 'No Name') . ' - ' . $booking->booking_date . ' ' . $booking->booking_time,
+                    'badge' => ucfirst($booking->status),
+                    'badge_class' => $booking->status === 'completed' ? 'bg-success' : ($booking->status === 'confirmed' ? 'bg-info' : 'bg-warning text-dark'),
+                    'url' => route('bookings.show', $booking->id),
+                ];
+            }
+        }
+        
+        // Search Towing Records
+        if (auth()->user()->canManageMasterData()) {
+            $towingRecords = TowingRecord::where('plate_number', 'like', "%{$query}%")
+                ->orWhere('customer_name', 'like', "%{$query}%")
+                ->orWhere('contact_number', 'like', "%{$query}%")
+                ->orWhere('location_from', 'like', "%{$query}%")
+                ->limit(5)
+                ->get();
+                
+            foreach ($towingRecords as $record) {
+                $results[] = [
+                    'type' => 'towing',
+                    'icon' => 'bi-truck',
+                    'title' => $record->plate_number ?: 'No Plate',
+                    'subtitle' => ($record->customer_name ?: 'No Name') . ' - ' . ($record->location_from ?: 'Unknown location'),
+                    'badge' => 'Towing',
+                    'badge_class' => 'bg-secondary',
+                    'url' => route('towing-records.show', $record->id),
+                ];
+            }
+        }
+        
+        // Search PDI Records
+        if (auth()->user()->canManageMasterData()) {
+            $pdiRecords = PdiRecord::where('plate_number', 'like', "%{$query}%")
+                ->orWhere('customer_name', 'like', "%{$query}%")
+                ->orWhere('vin', 'like', "%{$query}%")
+                ->limit(5)
+                ->get();
+                
+            foreach ($pdiRecords as $record) {
+                $results[] = [
+                    'type' => 'pdi',
+                    'icon' => 'bi-clipboard-check',
+                    'title' => $record->plate_number ?: 'No Plate',
+                    'subtitle' => ($record->customer_name ?: 'No Name') . ' - PDI Check',
+                    'badge' => 'PDI',
+                    'badge_class' => 'bg-primary',
+                    'url' => route('pdi-records.show', $record->id),
+                ];
+            }
+        }
+        
+        // Search by Customer Name in Customers table
+        $customers = Customer::where('name', 'like', "%{$query}%")
+            ->orWhere('email', 'like', "%{$query}%")
+            ->orWhere('phone', 'like', "%{$query}%")
+            ->limit(5)
+            ->get();
+            
+        foreach ($customers as $customer) {
+            $jobCount = Job::where('customer_name', $customer->name)->count();
             $results[] = [
                 'type' => 'customer',
                 'icon' => 'bi-person',
-                'title' => $customerName,
-                'subtitle' => $jobCount . ' job(s)',
+                'title' => $customer->name,
+                'subtitle' => $jobCount . ' job(s)' . ($customer->email ? ' - ' . $customer->email : ''),
                 'badge' => null,
                 'badge_class' => null,
-                'url' => route('customers.index', ['search' => $customerName]),
+                'url' => route('customers.show', $customer->id),
+            ];
+        }
+        
+        // Search Service Advisors
+        $serviceAdvisors = ServiceAdvisor::where('name', 'like', "%{$query}%")
+            ->limit(5)
+            ->get();
+            
+        foreach ($serviceAdvisors as $sa) {
+            $jobCount = Job::where('service_advisor', $sa->name)->count();
+            $results[] = [
+                'type' => 'service_advisor',
+                'icon' => 'bi-person-badge',
+                'title' => $sa->name,
+                'subtitle' => 'Service Advisor - ' . $jobCount . ' job(s)',
+                'badge' => 'SA',
+                'badge_class' => 'bg-info',
+                'url' => route('jobs.index', ['service_advisor' => $sa->name]),
+            ];
+        }
+        
+        // Search Foremen
+        $foremen = Foreman::where('name', 'like', "%{$query}%")
+            ->limit(5)
+            ->get();
+            
+        foreach ($foremen as $foreman) {
+            $jobCount = Job::where('foreman', $foreman->name)->count();
+            $results[] = [
+                'type' => 'foreman',
+                'icon' => 'bi-person-gear',
+                'title' => $foreman->name,
+                'subtitle' => 'Foreman - ' . $jobCount . ' job(s)',
+                'badge' => 'Foreman',
+                'badge_class' => 'bg-secondary',
+                'url' => route('jobs.index', ['foreman' => $foreman->name]),
             ];
         }
         
@@ -94,7 +247,7 @@ class SearchController extends Controller
         });
         
         return response()->json([
-            'results' => array_slice($results, 0, 10),
+            'results' => array_slice($results, 0, 15), // Increased from 10 to 15
             'total' => count($results),
             'query' => $query
         ]);
