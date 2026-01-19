@@ -479,7 +479,7 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const columns = document.querySelectorAll('.kanban-column');
+    const columns = document.querySelectorAll('.kanban-body');
     let draggedCard = null;
     let draggedType = null; // 'job' or 'order'
     let originalStatus = null;
