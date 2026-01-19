@@ -169,8 +169,12 @@ class DataCleanupController extends Controller
             }
 
             // Clear all application cache
+            // Clear all application cache
             \Artisan::call('cache:clear');
             \Artisan::call('view:clear');
+            
+            // Explicitly clear dashboard-specific cache keys
+            \App\Http\Controllers\DashboardController::clearCache();
 
             // Log the cleanup action
             Log::info('Data cleanup executed by ' . auth()->user()->name, [
