@@ -15,7 +15,14 @@ class RoleController extends Controller
      */
     public function index()
     {
-        $roles = Role::withCount('users')->orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
+        
+        // Add user counts from old role system (users.role string field)
+        // The new many-to-many system (user_roles) is not currently in use
+        $roles->each(function($role) {
+            $role->old_system_users_count = $role->getUserCountFromOldSystem();
+        });
+        
         return view('admin.roles.index', compact('roles'));
     }
 

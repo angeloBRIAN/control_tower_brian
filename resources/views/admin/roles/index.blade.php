@@ -13,6 +13,11 @@
     </a>
 </div>
 
+<div class="alert alert-info mb-3">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Note:</strong> User counts shown here are from the system's <code>users.role</code> field (current active system). The many-to-many role assignment feature is reserved for future use.
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
@@ -32,7 +37,7 @@
                     <td><strong>{{ $role->name }}</strong></td>
                     <td><code>{{ $role->slug }}</code></td>
                     <td>{{ $role->description ?? '-' }}</td>
-                    <td><span class="badge bg-secondary">{{ $role->users_count }}</span></td>
+                    <td><span class="badge bg-secondary">{{ $role->old_system_users_count ?? 0 }}</span></td>
                     <td>
                         @if($role->is_system)
                         <span class="badge bg-primary">System</span>

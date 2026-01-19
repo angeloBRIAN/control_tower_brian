@@ -103,4 +103,37 @@ class Role extends Model
             'Settings' => 'System Settings',
         ];
     }
+
+    /**
+     * Map role slugs to old system role field values
+     * This allows Role Management to show counts from the old 'role' string field
+     */
+    public static function getOldRoleFieldMapping(): array
+    {
+        return [
+            'administrator' => 'admin',
+            'control_tower' => 'control_tower',
+            'finance' => 'finance',
+            'foreman' => 'foreman',
+            'sa' => 'sa',
+            'sparepart' => 'sparepart',
+            'viewer' => 'viewer',
+            'manager' => 'manager',
+        ];
+    }
+
+    /**
+     * Get user count from old role system (users.role string field)
+     */
+    public function getUserCountFromOldSystem(): int
+    {
+        $mapping = self::getOldRoleFieldMapping();
+        $oldRoleValue = $mapping[$this->slug] ?? null;
+        
+        if (!$oldRoleValue) {
+            return 0;
+        }
+        
+        return User::where('role', $oldRoleValue)->count();
+    }
 }
