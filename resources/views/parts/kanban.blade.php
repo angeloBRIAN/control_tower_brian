@@ -3,21 +3,19 @@
 @section('title', 'Parts Tracking - Kanban')
 
 @section('content')
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-1">
-                <i class="bi bi-kanban me-2"></i>Parts Tracking
-            </h1>
-            <p class="text-muted mb-0">Drag and drop to update status (1-step at a time)</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ route('part-orders.index') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-list me-1"></i>List View
-            </a>
-        </div>
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h1>
+            <i class="bi bi-kanban me-2"></i>Parts Tracking Kanban
+        </h1>
+        <p class="text-muted mb-0">Drag jobs/orders between columns to update status (1-step at a time)</p>
     </div>
+    <div class="d-flex gap-2">
+        <a href="{{ route('part-orders.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-list-ul me-1"></i>List View
+        </a>
+    </div>
+</div>
 
     <!-- Summary Cards -->
     <div class="row g-3 mb-4">
@@ -127,136 +125,118 @@
         </div>
     </div>
 
-    <!-- Kanban Board -->
-    <div class="kanban-board">
-        <div class="overflow-auto pb-3" style="min-height: 500px;">
-            <div class="row flex-nowrap m-0">
-            
-            {{-- PENDING COLUMN - Shows JOBS (not PartOrders) --}}
-            <div class="col-kanban" style="min-width: 280px; max-width: 320px;">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-3">
-                        <div class="d-flex align-items-center">
-                            <span class="badge rounded-pill me-2" style="background-color: #f59e0b">
-                                {{ $pendingJobs->count() }}
-                            </span>
-                            <span class="fw-semibold">Pending</span>
-                        </div>
-                        <i class="bi bi-hourglass-split text-muted"></i>
+<!-- Kanban Board -->
+<div class="kanban-container">
+    {{-- PENDING COLUMN - Shows JOBS (not PartOrders) --}}
+    <div class="kanban-column" data-color="warning">
+        <div class="kanban-header">
+            <i class="bi bi-hourglass-split text-warning"></i>
+            <span>Pending</span>
+            <span class="badge bg-warning ms-auto">{{ $pendingJobs->count() }}</span>
+        </div>
+        <div class="kanban-body" data-status="pending" data-is-job-column="true">
+            @forelse($pendingJobs as $job)
+                <div class="kanban-card kanban-job-card" 
+                     data-job-id="{{ $job->id }}"
+                     data-job-number="{{ $job->job_number }}"
+                     data-foreman="{{ $job->foreman }}"
+                     draggable="true">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0 fw-semibold text-primary">{{ $job->job_number }}</h6>
+                        <span class="badge bg-warning text-dark">Job</span>
                     </div>
-                    <div class="card-body kanban-column p-2 kanban-column-bg" 
-                         data-status="pending"
-                         data-is-job-column="true"
-                         style="min-height: 400px; border-radius: 0.5rem;">
-                        @forelse($pendingJobs as $job)
-                            <div class="kanban-card kanban-job-card card border-0 shadow-sm mb-2 cursor-grab" 
-                                 data-job-id="{{ $job->id }}"
-                                 data-job-number="{{ $job->job_number }}"
-                                 data-foreman="{{ $job->foreman }}"
-                                 draggable="true">
-                                <div class="card-body p-3">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-0 fw-semibold text-primary">{{ $job->job_number }}</h6>
-                                        <span class="badge bg-warning text-dark">Job</span>
-                                    </div>
-                                    <div class="small text-muted mb-1">
-                                        <i class="bi bi-car-front me-1"></i>{{ $job->plate_number ?: 'No Plate' }}
-                                    </div>
-                                    <div class="small text-muted mb-1">
-                                        <i class="bi bi-person me-1"></i>{{ Str::limit($job->customer_name, 20) ?: '-' }}
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
-                                        <small class="text-muted">
-                                            <i class="bi bi-headset me-1"></i>{{ $job->service_advisor ?: '-' }}
-                                        </small>
-                                        <small class="text-muted">
-                                            {{ $job->foreman ?: '-' }}
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-inbox fs-1 opacity-25"></i>
-                                <p class="small mt-2 mb-0">No jobs need parts</p>
-                            </div>
-                        @endforelse
+                    <div class="small text-muted mb-1">
+                        <i class="bi bi-car-front me-1"></i>{{ $job->plate_number ?: 'No Plate' }}
+                    </div>
+                    <div class="small text-muted mb-1">
+                        <i class="bi bi-person me-1"></i>{{ Str::limit($job->customer_name, 20) ?: '-' }}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                        <small class="text-muted">
+                            <i class="bi bi-headset me-1"></i>{{ $job->service_advisor ?: '-' }}
+                        </small>
+                        <small class="text-muted">
+                            {{ $job->foreman ?: '-' }}
+                        </small>
                     </div>
                 </div>
-            </div>
-            
-            {{-- OTHER COLUMNS - Show PartOrders (5-status flow) --}}
-            @php
-                $displayStatuses = ['rq_sent', 'processing', 'ready', 'received'];
-            @endphp
-            @foreach($displayStatuses as $statusKey)
-                @php $statusInfo = $statuses[$statusKey]; @endphp
-                <div class="col-kanban" style="min-width: 280px; max-width: 320px;">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between py-3">
-                            <div class="d-flex align-items-center">
-                                <span class="badge rounded-pill me-2" style="background-color: {{ $statusInfo['color'] }}">
-                                    {{ count($ordersByStatus[$statusKey] ?? []) }}
-                                </span>
-                                <span class="fw-semibold">{{ $statusInfo['label'] }}</span>
-                            </div>
-                            <i class="bi {{ $statusInfo['icon'] }} text-muted"></i>
-                        </div>
-                        <div class="card-body kanban-column p-2 kanban-column-bg" 
-                             data-status="{{ $statusKey }}"
-                             style="min-height: 400px; border-radius: 0.5rem;">
-                            @forelse($ordersByStatus[$statusKey] ?? [] as $order)
-                                <div class="kanban-card kanban-order-card card border-0 shadow-sm mb-2 cursor-grab" 
-                                     data-order-id="{{ $order->id }}"
-                                     data-current-status="{{ $order->status }}"
-                                     draggable="true">
-                                    <div class="card-body p-3">
-                                        <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="mb-0 fw-semibold">
-                                                <a href="{{ route('jobs.show', $order->job_id) }}" class="text-decoration-none">
-                                                    {{ $order->job->job_number ?? 'N/A' }}
-                                                </a>
-                                            </h6>
-                                            @if($order->is_overdue)
-                                                <span class="badge bg-danger">Overdue</span>
-                                            @elseif($order->is_due_soon)
-                                                <span class="badge bg-warning text-dark">Due Soon</span>
-                                            @endif
-                                        </div>
-                                        <div class="small mb-2">
-                                            <span class="badge bg-info text-dark">
-                                                <i class="bi bi-receipt me-1"></i>RQ: {{ $order->rq ?: '-' }}
-                                            </span>
-                                        </div>
-                                        @if($order->no_order_part)
-                                            <div class="small text-muted mb-1">
-                                                <i class="bi bi-cart me-1"></i>Order: {{ $order->no_order_part }}
-                                            </div>
-                                        @endif
-                                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
-                                            <small class="text-muted">
-                                                <i class="bi bi-calendar me-1"></i>
-                                                {{ $order->expected_date?->format('d M') ?: '-' }}
-                                            </small>
-                                            <small class="text-muted">
-                                                {{ $order->job->plate_number ?: '-' }}
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox fs-1 opacity-25"></i>
-                                    <p class="small mt-2 mb-0">No orders</p>
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
+            @empty
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1 opacity-25"></i>
+                    <p class="small mt-2 mb-0">No jobs need parts</p>
                 </div>
-            @endforeach
-            </div>
+            @endforelse
         </div>
     </div>
+    
+    {{-- OTHER COLUMNS - Show PartOrders (5-status flow) --}}
+    @php
+        $displayStatuses = ['rq_sent', 'processing', 'ready', 'received'];
+        $statusColors = [
+            'rq_sent' => 'info',
+            'processing' => 'purple',
+            'ready' => 'success',
+            'received' => 'success'
+        ];
+    @endphp
+    @foreach($displayStatuses as $statusKey)
+        @php 
+            $statusInfo = $statuses[$statusKey]; 
+            $color = $statusColors[$statusKey] ?? 'secondary';
+        @endphp
+        <div class="kanban-column" data-color="{{ $color }}">
+            <div class="kanban-header">
+                <i class="bi {{ $statusInfo['icon'] }} text-{{ $color }}"></i>
+                <span>{{ $statusInfo['label'] }}</span>
+                <span class="badge bg-{{ $color }} ms-auto">{{ count($ordersByStatus[$statusKey] ?? []) }}</span>
+            </div>
+            <div class="kanban-body" data-status="{{ $statusKey }}">
+                @forelse($ordersByStatus[$statusKey] ?? [] as $order)
+                    <div class="kanban-card kanban-order-card" 
+                         data-order-id="{{ $order->id }}"
+                         data-current-status="{{ $order->status }}"
+                         draggable="true">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0 fw-semibold">
+                                <a href="{{ route('jobs.show', $order->job_id) }}" class="text-decoration-none">
+                                    {{ $order->job->job_number ?? 'N/A' }}
+                                </a>
+                            </h6>
+                            @if($order->is_overdue)
+                                <span class="badge bg-danger">Overdue</span>
+                            @elseif($order->is_due_soon)
+                                <span class="badge bg-warning text-dark">Due Soon</span>
+                            @endif
+                        </div>
+                        <div class="small mb-2">
+                            <span class="badge bg-info text-dark">
+                                <i class="bi bi-receipt me-1"></i>RQ: {{ $order->rq ?: '-' }}
+                            </span>
+                        </div>
+                        @if($order->no_order_part)
+                            <div class="small text-muted mb-1">
+                                <i class="bi bi-cart me-1"></i>Order: {{ $order->no_order_part }}
+                            </div>
+                        @endif
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar me-1"></i>
+                                {{ $order->expected_date?->format('d M') ?: '-' }}
+                            </small>
+                            <small class="text-muted">
+                                {{ $order->job->plate_number ?: '-' }}
+                            </small>
+                        </div>
+                    </div>
+                @empty
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 opacity-25"></i>
+                        <p class="small mt-2 mb-0">No orders</p>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    @endforeach
 </div>
 
 <!-- RQ Modal (Pending → RQ Sent) -->
@@ -383,15 +363,56 @@
 
 @push('styles')
 <style>
-.kanban-board {
+.kanban-container {
+    display: flex;
+    gap: 1rem;
     overflow-x: auto;
+    padding-bottom: 1rem;
+    min-height: 70vh;
+}
+.kanban-column {
+    flex: 0 0 280px;
+    background: var(--bs-tertiary-bg);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 250px);
+}
+.kanban-header {
+    padding: 0.75rem 1rem;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.kanban-header .badge {
+    font-size: 0.75rem;
+}
+.kanban-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+    min-height: 200px;
 }
 .kanban-card {
-    transition: transform 0.2s, box-shadow 0.2s;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 .kanban-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.kanban-card:active {
+    cursor: grabbing;
 }
 .kanban-card.dragging {
     opacity: 0.5;
@@ -405,18 +426,28 @@
     background: rgba(var(--bs-danger-rgb), 0.1) !important;
     border: 2px dashed var(--bs-danger);
 }
-.cursor-grab {
-    cursor: grab;
+
+/* Sortable ghost */
+.sortable-ghost {
+    opacity: 0.4;
+    background: var(--bs-primary-bg-subtle);
 }
-.cursor-grab:active {
-    cursor: grabbing;
+.sortable-chosen {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
 }
+
 .kanban-job-card {
     border-left: 4px solid #f59e0b !important;
 }
 .kanban-order-card {
     border-left: 4px solid #06b6d4 !important;
 }
+
+/* Color-coded column backgrounds */
+.kanban-column[data-color="warning"] .kanban-header { background: linear-gradient(135deg, #f59e0b20, #f59e0b40); }
+.kanban-column[data-color="info"] .kanban-header { background: linear-gradient(135deg, #0dcaf020, #0dcaf040); }
+.kanban-column[data-color="purple"] .kanban-header { background: linear-gradient(135deg, #6f42c120, #6f42c140); }
+.kanban-column[data-color="success"] .kanban-header { background: linear-gradient(135deg, #19875420, #19875440); }
 </style>
 @endpush
 

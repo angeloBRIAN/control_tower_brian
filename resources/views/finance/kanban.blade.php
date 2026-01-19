@@ -3,21 +3,19 @@
 @section('title', 'Finance Kanban - Invoices')
 
 @section('content')
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-1">
-                <i class="bi bi-cash-coin me-2"></i>Finance Kanban
-            </h1>
-            <p class="text-muted mb-0">Track invoice payments (Drag to update status)</p>
-        </div>
-        <div>
-            <a href="{{ route('jobs.kanban') }}" class="btn btn-outline-primary">
-                <i class="bi bi-kanban me-1"></i> View Job Kanban
-            </a>
-        </div>
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h1>
+            <i class="bi bi-kanban me-2"></i>Finance Kanban
+        </h1>
+        <p class="text-muted mb-0">Track invoice payments (Drag to update status)</p>
     </div>
+    <div>
+        <a href="{{ route('jobs.kanban') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-list-ul me-1"></i>View Job Kanban
+        </a>
+    </div>
+</div>
 
     <!-- Filter Bar -->
     <div class="card mb-4 shadow-sm">
@@ -126,106 +124,91 @@
         </div>
     </div>
 
-    <!-- Kanban Board -->
-    <div class="kanban-board">
-        <div class="overflow-auto pb-3" style="min-height: 500px;">
-            <div class="row flex-nowrap m-0">
-            @php
-                $columns = [
-                    'draft' => ['label' => 'Draft', 'color' => 'secondary', 'icon' => 'file-earmark'],
-                    'pending' => ['label' => 'Pending Payment', 'color' => 'warning', 'icon' => 'hourglass'],
-                    'partially_paid' => ['label' => 'Partially Paid', 'color' => 'info', 'icon' => 'pie-chart'],
-                    'paid' => ['label' => 'Paid', 'color' => 'success', 'icon' => 'check-circle'],
-                    'credit_note' => ['label' => 'Credit Notes', 'color' => 'danger', 'icon' => 'dash-circle'],
-                ];
-            @endphp
-
-            @foreach($columns as $statusKey => $col)
-                <div class="col-kanban" style="min-width: 280px; max-width: 320px;">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-{{ $col['color'] }} bg-opacity-10 border-0 d-flex align-items-center justify-content-between py-3">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-{{ $col['icon'] }} me-2 text-{{ $col['color'] }}"></i>
-                                <span class="fw-semibold">{{ $col['label'] }}</span>
-                                <span class="badge bg-{{ $col['color'] }} ms-2">
-                                    {{ isset($invoicesByStatus[$statusKey]) ? $invoicesByStatus[$statusKey]->count() : 0 }}
+<!-- Kanban Board -->
+@php
+    $columns = [
+        'draft' => ['label' => 'Draft', 'color' => 'secondary', 'icon' => 'file-earmark'],
+        'pending' => ['label' => 'Pending Payment', 'color' => 'warning', 'icon' => 'hourglass'],
+        'partially_paid' => ['label' => 'Partially Paid', 'color' => 'info', 'icon' => 'pie-chart'],
+        'paid' => ['label' => 'Paid', 'color' => 'success', 'icon' => 'check-circle'],
+        'credit_note' => ['label' => 'Credit Notes', 'color' => 'danger', 'icon' => 'dash-circle'],
+    ];
+@endphp
+<div class="kanban-container">
+    @foreach($columns as $statusKey => $col)
+        <div class="kanban-column" data-color="{{ $col['color'] }}">
+            <div class="kanban-header">
+                <i class="bi bi-{{ $col['icon'] }} text-{{ $col['color'] }}"></i>
+                <span>{{ $col['label'] }}</span>
+                <span class="badge bg-{{ $col['color'] }} ms-auto">
+                    {{ isset($invoicesByStatus[$statusKey]) ? $invoicesByStatus[$statusKey]->count() : 0 }}
+                </span>
+            </div>
+            <div class="kanban-body" data-status="{{ $statusKey }}">
+                @forelse($invoicesByStatus[$statusKey] ?? [] as $invoice)
+                    <div class="kanban-card {{ $statusKey === 'credit_note' ? 'border-start border-danger border-3' : '' }}" 
+                         data-invoice-id="{{ $invoice->id }}"
+                         data-amount="{{ $invoice->inv_ppn_meterai }}"
+                         data-paid="{{ $invoice->paid_amount }}"
+                         draggable="{{ $statusKey !== 'credit_note' ? 'true' : 'false' }}">
+                        <!-- Invoice Number -->
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0 fw-bold text-primary">
+                                {{ $invoice->invoice_number ?: 'No Invoice #' }}
+                            </h6>
+                            <span class="badge bg-{{ $invoice->isCreditNote() ? 'danger' : 'secondary' }}">
+                                {{ $invoice->type_sale_label }}
+                            </span>
+                        </div>
+                        
+                        <!-- Job Reference -->
+                        @if($invoice->job)
+                        <div class="small text-muted mb-2">
+                            <a href="{{ route('jobs.show', $invoice->job->id) }}" class="text-decoration-none">
+                                <i class="bi bi-briefcase me-1"></i>{{ $invoice->job->job_number }}
+                            </a>
+                            <span class="ms-1">{{ Str::limit($invoice->job->customer_name, 20) }}</span>
+                        </div>
+                        @endif
+                        
+                        <!-- Amount -->
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold {{ $invoice->isCreditNote() ? 'text-danger' : 'text-dark' }}">
+                                    {{ $invoice->isCreditNote() ? '-' : '' }}Rp {{ number_format($invoice->inv_ppn_meterai, 0, ',', '.') }}
                                 </span>
+                                @if($invoice->status === 'partially_paid' && $invoice->paid_amount > 0)
+                                    <br>
+                                    <small class="text-success">
+                                        Paid: Rp {{ number_format($invoice->paid_amount, 0, ',', '.') }}
+                                    </small>
+                                @endif
                             </div>
+                            @if($invoice->invoice_date)
+                            <small class="text-muted">
+                                {{ $invoice->invoice_date->format('d M') }}
+                            </small>
+                            @endif
                         </div>
-                        <div class="card-body kanban-column p-2 kanban-column-bg"  
-                             data-status="{{ $statusKey }}"
-                             style="min-height: 400px; border-radius: 0 0 0.5rem 0.5rem; overflow-y: auto; max-height: 600px;">
-                             
-                            @forelse($invoicesByStatus[$statusKey] ?? [] as $invoice)
-                                <div class="kanban-card card border-0 shadow-sm mb-2 cursor-grab {{ $statusKey === 'credit_note' ? 'border-start border-danger border-3' : '' }}" 
-                                     data-invoice-id="{{ $invoice->id }}"
-                                     data-amount="{{ $invoice->inv_ppn_meterai }}"
-                                     data-paid="{{ $invoice->paid_amount }}"
-                                     draggable="{{ $statusKey !== 'credit_note' ? 'true' : 'false' }}">
-                                    <div class="card-body p-3">
-                                        <!-- Invoice Number -->
-                                        <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="mb-0 fw-bold text-primary">
-                                                {{ $invoice->invoice_number ?: 'No Invoice #' }}
-                                            </h6>
-                                            <span class="badge bg-{{ $invoice->isCreditNote() ? 'danger' : 'secondary' }}">
-                                                {{ $invoice->type_sale_label }}
-                                            </span>
-                                        </div>
-                                        
-                                        <!-- Job Reference -->
-                                        @if($invoice->job)
-                                        <div class="small text-muted mb-2">
-                                            <a href="{{ route('jobs.show', $invoice->job->id) }}" class="text-decoration-none">
-                                                <i class="bi bi-briefcase me-1"></i>{{ $invoice->job->job_number }}
-                                            </a>
-                                            <span class="ms-1">{{ Str::limit($invoice->job->customer_name, 20) }}</span>
-                                        </div>
-                                        @endif
-                                        
-                                        <!-- Amount -->
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <span class="fw-bold {{ $invoice->isCreditNote() ? 'text-danger' : 'text-dark' }}">
-                                                    {{ $invoice->isCreditNote() ? '-' : '' }}Rp {{ number_format($invoice->inv_ppn_meterai, 0, ',', '.') }}
-                                                </span>
-                                                @if($invoice->status === 'partially_paid' && $invoice->paid_amount > 0)
-                                                    <br>
-                                                    <small class="text-success">
-                                                        Paid: Rp {{ number_format($invoice->paid_amount, 0, ',', '.') }}
-                                                    </small>
-                                                @endif
-                                            </div>
-                                            @if($invoice->invoice_date)
-                                            <small class="text-muted">
-                                                {{ $invoice->invoice_date->format('d M') }}
-                                            </small>
-                                            @endif
-                                        </div>
-                                        
-                                        <!-- Payment Progress for partially paid -->
-                                        @if($invoice->status === 'partially_paid' && $invoice->inv_ppn_meterai > 0)
-                                            @php $pct = min(100, ($invoice->paid_amount / $invoice->inv_ppn_meterai) * 100); @endphp
-                                            <div class="progress mt-2" style="height: 4px;">
-                                                <div class="progress-bar bg-success" style="width: {{ $pct }}%"></div>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="text-center text-muted py-4 opacity-50">
-                                    <i class="bi bi-inbox fs-1"></i>
-                                    <p class="small mt-2 mb-0">No invoices</p>
-                                </div>
-                            @endforelse
-                            
-                        </div>
+                        
+                        <!-- Payment Progress for partially paid -->
+                        @if($invoice->status === 'partially_paid' && $invoice->inv_ppn_meterai > 0)
+                            @php $pct = min(100, ($invoice->paid_amount / $invoice->inv_ppn_meterai) * 100); @endphp
+                            <div class="progress mt-2" style="height: 4px;">
+                                <div class="progress-bar bg-success" style="width: {{ $pct }}%"></div>
+                            </div>
+                        @endif
                     </div>
-                </div>
-            @endforeach
+                @empty
+                    <div class="text-center text-muted py-4 opacity-50">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="small mt-2 mb-0">No invoices</p>
+                    </div>
+                @endforelse
             </div>
         </div>
-    </div>
+    @endforeach
+</div>
     
     <!-- Status Change Modal (with Remark) -->
     <div class="modal fade" id="statusModal" tabindex="-1">
@@ -307,13 +290,81 @@
 
 @push('styles')
 <style>
-.kanban-board { overflow-x: auto; }
-.kanban-card { transition: transform 0.2s, box-shadow 0.2s; }
-.kanban-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important; }
-.kanban-card.dragging { opacity: 0.5; transform: rotate(2deg); }
-.kanban-column.drag-over { background: rgba(var(--bs-primary-rgb), 0.1) !important; border: 2px dashed var(--bs-primary); }
-.cursor-grab { cursor: grab; }
-.cursor-grab:active { cursor: grabbing; }
+.kanban-container {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    min-height: 70vh;
+}
+.kanban-column {
+    flex: 0 0 280px;
+    background: var(--bs-tertiary-bg);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 250px);
+}
+.kanban-header {
+    padding: 0.75rem 1rem;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.kanban-header .badge {
+    font-size: 0.75rem;
+}
+.kanban-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+    min-height: 200px;
+}
+.kanban-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.kanban-card:active {
+    cursor: grabbing;
+}
+.kanban-card.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}
+.kanban-column.drag-over {
+    background: rgba(var(--bs-primary-rgb), 0.1) !important;
+    border: 2px dashed var(--bs-primary);
+}
+
+/* Sortable ghost */
+.sortable-ghost {
+    opacity: 0.4;
+    background: var(--bs-primary-bg-subtle);
+}
+.sortable-chosen {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+/* Color-coded column backgrounds */
+.kanban-column[data-color="secondary"] .kanban-header { background: linear-gradient(135deg, #6c757d20, #6c757d40); }
+.kanban-column[data-color="warning"] .kanban-header { background: linear-gradient(135deg, #ffc10720, #ffc10740); }
+.kanban-column[data-color="info"] .kanban-header { background: linear-gradient(135deg, #0dcaf020, #0dcaf040); }
+.kanban-column[data-color="success"] .kanban-header { background: linear-gradient(135deg, #19875420, #19875440); }
+.kanban-column[data-color="danger"] .kanban-header { background: linear-gradient(135deg, #dc354520, #dc354540); }
 </style>
 @endpush
 
