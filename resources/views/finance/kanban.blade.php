@@ -475,27 +475,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleDragOver(e) { 
         e.preventDefault(); 
-        e.dataTransfer.dropEffect = "move"; 
-    }
-    
-    function handleDragEnter(e) { 
-        // Only show drag-over if it is not the source column
-        if (originalParent !== this) {
-            // Check if it is an invalid drop target (credit_note column)
-            if (this.dataset.status === "credit_note") {
-                this.classList.add("drag-invalid");
-                this.classList.remove("drag-over");
+        e.dataTransfer.dropEffect = "move";
+        
+        // Only apply visual feedback if not the source column
+        // Use dragover instead of dragenter/leave for better performance with large datasets
+        const targetColumn = e.currentTarget;
+        if (originalParent !== targetColumn) {
+            // Check if it's an invalid drop target (credit_note column)
+            if (targetColumn.dataset.status === "credit_note") {
+                if (!targetColumn.classList.contains("drag-invalid")) {
+                    targetColumn.classList.add("drag-invalid");
+                    targetColumn.classList.remove("drag-over");
+                }
             } else {
-                this.classList.add("drag-over");
-                this.classList.remove("drag-invalid");
+                if (!targetColumn.classList.contains("drag-over")) {
+                    targetColumn.classList.add("drag-over");
+                    targetColumn.classList.remove("drag-invalid");
+                }
             }
         }
     }
     
+    function handleDragEnter(e) { 
+        // Keep for compatibility but do nothing - dragover handles the visual feedback
+        e.preventDefault();
+    }
+    
     function handleDragLeave(e) { 
-        // Only remove if actually leaving (not entering a child)
-        if (e.relatedTarget && !this.contains(e.relatedTarget)) {
-            this.classList.remove("drag-over", "drag-invalid");
+        // Only remove classes when leaving the column entirely (to another column or outside)
+        const targetColumn = e.currentTarget;
+        const rect = targetColumn.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        // Check if mouse is outside the column boundaries
+        if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+            targetColumn.classList.remove("drag-over", "drag-invalid");
         }
     }
 
