@@ -28,7 +28,7 @@ class JobFactory extends Factory
             'job_type' => $this->faker->randomElement(['Service', 'Repair', 'PDI', 'Warranty']),
             'department' => $this->faker->randomElement(['W', 'B']),
             'status' => 'uninvoiced',
-            'work_status' => $this->faker->randomElement(['pending', 'in_progress', 'waiting_parts', 'completed']),
+            'work_status' => $this->faker->randomElement(\App\Models\Job::WORK_STATUSES),
             'estimated_amount' => $this->faker->randomFloat(2, 100000, 10000000),
             'total_sales' => $this->faker->randomFloat(2, 100000, 10000000),
             'need_part' => $this->faker->boolean(30),
