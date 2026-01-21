@@ -530,7 +530,7 @@ class ImportController extends Controller
                 } else {
                     // New Job - filter null values to allow DB defaults
                     // Set default work_status ONLY for new jobs
-                    $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId, 'work_status' => 'belum_diproses']), fn($value) => !is_null($value)));
+                    $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId, 'work_status' => Job::WORK_STATUSES[0]]), fn($value) => !is_null($value)));
                     $imported++;
                     \Log::info("PROGRESS: Created job {$jobNumber}", ['data' => array_filter($jobData, fn($v) => !is_null($v))]);
                     
@@ -850,7 +850,7 @@ class ImportController extends Controller
                 $job = Job::firstOrNew(['job_number' => $jobNumber]);
                 
                 if (!$job->exists) {
-                    $job->work_status = 'belum_diproses';
+                    $job->work_status = Job::WORK_STATUSES[0];
                 }
                 
                 $job->fill(array_filter($jobData));
