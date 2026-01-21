@@ -94,7 +94,7 @@ class TwoFactorController extends Controller
         
         $user = auth()->user();
         
-        if (!Hash::check($request->password, $user->password)) {
+        if ($user->auth_source === 'local' && !Hash::check($request->password, $user->password)) {
             return back()->with('error', 'Incorrect password.');
         }
         
@@ -119,7 +119,7 @@ class TwoFactorController extends Controller
         
         $user = auth()->user();
         
-        if (!Hash::check($request->password, $user->password)) {
+        if ($user->auth_source === 'local' && !Hash::check($request->password, $user->password)) {
             return back()->with('error', 'Incorrect password.');
         }
         
@@ -215,7 +215,7 @@ class TwoFactorController extends Controller
             'password' => 'required|string',
         ]);
         
-        if (!Hash::check($request->password, auth()->user()->password)) {
+        if ($user->auth_source === 'local' && !Hash::check($request->password, $user->password)) {
             return back()->with('error', 'Incorrect password.');
         }
         
