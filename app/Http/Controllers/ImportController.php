@@ -270,7 +270,7 @@ class ImportController extends Controller
             'records_imported' => 0,
             'records_updated' => 0,
             'records_failed' => 0,
-            'imported_by' => auth()->user()?->name,
+            'imported_by' => auth()->id(),
         ]);
         $importId = $import->id;
         
@@ -634,7 +634,7 @@ class ImportController extends Controller
             'records_imported' => 0,
             'records_updated' => 0,
             'records_failed' => 0,
-            'imported_by' => auth()->user()?->name,
+            'imported_by' => auth()->id(),
         ]);
         $importId = $import->id;
 
