@@ -593,11 +593,11 @@ class ImportController extends Controller
         $file = $request->file('file');
         
         // Auto-backup before processing
-        try {
-            $this->backupService->create('Auto-backup before Import Uninvoiced: ' . $file->getClientOriginalName());
-        } catch (\Exception $e) {
-            \Log::error('Auto-backup failed: ' . $e->getMessage());
-        }
+        // try {
+        //     $this->backupService->create('Auto-backup before Import Uninvoiced: ' . $file->getClientOriginalName());
+        // } catch (\Exception $e) {
+        //     \Log::error('Auto-backup failed: ' . $e->getMessage());
+        // }
 
         $spreadsheet = IOFactory::load($file->getPathname());
         $worksheet = $spreadsheet->getActiveSheet();
