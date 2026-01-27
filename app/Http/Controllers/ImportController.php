@@ -593,11 +593,14 @@ class ImportController extends Controller
         $file = $request->file('file');
         
         // Auto-backup before processing
-        // try {
-        //     $this->backupService->create('Auto-backup before Import Uninvoiced: ' . $file->getClientOriginalName());
-        // } catch (\Exception $e) {
-        //     \Log::error('Auto-backup failed: ' . $e->getMessage());
-        // }
+        // Auto-backup before processing
+        try {
+            // Increase timeout for backup operation
+            set_time_limit(600); // 10 minutes
+            $this->backupService->create('Auto-backup before Import Uninvoiced: ' . $file->getClientOriginalName());
+        } catch (\Exception $e) {
+            \Log::error('Auto-backup failed: ' . $e->getMessage());
+        }
 
         $spreadsheet = IOFactory::load($file->getPathname());
         $worksheet = $spreadsheet->getActiveSheet();
@@ -639,6 +642,9 @@ class ImportController extends Controller
         // 4. Local Cache for Customer Lookups to avoid repeated DB hits
         $customerLookupCache = []; // name|plate => customer_id
 
+        // Mute dashboard broadcasts for bulk operation
+        Job::$muteBroadcast = true;
+        
         $imported = 0;
         $updated = 0;
         $failed = 0;
@@ -887,9 +893,16 @@ class ImportController extends Controller
             } // end loop
 
             \DB::commit(); // Commit all changes
+            
+            // Unmute and fire single broadcast
+            Job::$muteBroadcast = false;
+            try {
+                event(new \App\Events\DashboardUpdated());
+            } catch (\Exception $e) {}
 
         } catch (\Exception $e) {
             \DB::rollBack();
+            Job::$muteBroadcast = false; // Reset flag on error
             \Log::error("Import transaction failed: " . $e->getMessage());
             return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
         }
@@ -905,9 +918,9 @@ class ImportController extends Controller
             'customers_unlinked' => array_keys($customersUnlinked),
         ]);
 
-        // Background jobs
-        \Illuminate\Support\Facades\Artisan::queue('customers:find-duplicates');
-        \Illuminate\Support\Facades\Artisan::queue('customers:refresh-summaries');
+        // Background jobs - DISABLED for performance (they run sync and block the UI)
+        // \Illuminate\Support\Facades\Artisan::queue('customers:find-duplicates');
+        // \Illuminate\Support\Facades\Artisan::queue('customers:refresh-summaries');
 
         $unlinkedCount = count($customersUnlinked);
         $linkingMsg = $customersLinked > 0 || $unlinkedCount > 0 

@@ -411,6 +411,9 @@ class Job extends Model
         return self::WORK_STATUS_META[$status] ?? ['label' => $status, 'icon' => 'circle', 'color' => 'secondary'];
     }
 
+    // Flag to suppress dashboard broadcasts during bulk operations
+    public static $muteBroadcast = false;
+
     /**
      * Boot the model and register events.
      */
@@ -418,6 +421,10 @@ class Job extends Model
     {
         // Clear dashboard cache and broadcast update when jobs change
         $handleDashboardUpdate = function () {
+            if (self::$muteBroadcast) {
+                return;
+            }
+
             // Clear dashboard cache immediately for fresh data
             \App\Http\Controllers\DashboardController::clearCache();
             
@@ -434,12 +441,12 @@ class Job extends Model
             }
         };
 
-        // static::created($handleDashboardUpdate);
-        // static::updated(function ($job) use ($handleDashboardUpdate) {
-        //     // Clear cache and broadcast for any job update
-        //     $handleDashboardUpdate();
-        // });
-        // static::deleted($handleDashboardUpdate);
+        static::created($handleDashboardUpdate);
+        static::updated(function ($job) use ($handleDashboardUpdate) {
+            // Clear cache and broadcast for any job update
+            $handleDashboardUpdate();
+        });
+        static::deleted($handleDashboardUpdate);
     }
 
     public function vehicle(): BelongsTo
