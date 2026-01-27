@@ -15,6 +15,9 @@ class CustomerAlias extends Model
         'created_by',
     ];
 
+    protected static $allCustomersCache = null;
+    protected static $allAliasesCache = null;
+
     /**
      * The customer this alias belongs to
      */
@@ -47,7 +50,11 @@ class CustomerAlias extends Model
         }
         
         // 2. Try normalized match (e.g., "PT ABC" matches "ABC" with title="PT")
-        $allCustomers = Customer::whereNotNull('name')->get();
+        if (self::$allCustomersCache === null) {
+            self::$allCustomersCache = Customer::whereNotNull('name')->get();
+        }
+        $allCustomers = self::$allCustomersCache;
+
         foreach ($allCustomers as $c) {
             if (\App\Helpers\CustomerNameHelper::normalize($c->name) === $normalizedName) {
                 return $c;
@@ -68,7 +75,11 @@ class CustomerAlias extends Model
         }
         
         // Normalized alias match
-        $allAliases = self::with('customer')->get();
+        if (self::$allAliasesCache === null) {
+            self::$allAliasesCache = self::with('customer')->get();
+        }
+        $allAliases = self::$allAliasesCache;
+
         foreach ($allAliases as $a) {
             if (\App\Helpers\CustomerNameHelper::normalize($a->alias_name) === $normalizedName) {
                 return $a->customer;
