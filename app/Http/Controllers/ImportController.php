@@ -723,7 +723,8 @@ class ImportController extends Controller
                         'created', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'tgl job', 'check in date'
                     ])),
                     'check_in_time' => $this->parseTime($this->getColumnValue($row, $headerMap, [
-                        'jam', 'time', 'check in time', 'waktu'
+                        'jam', 'time', 'check in time', 'waktu',
+                        'created', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'check in date'
                     ])),
                      'payment_type' => $this->getColumnValue($row, $headerMap, [
                         'code', 'kode', 'payment type', 'tipe bayar'
