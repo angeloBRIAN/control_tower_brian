@@ -30,14 +30,39 @@ Route::get('/vehicles/lookup', function (Request $request) {
     // Normalize plate: remove spaces and search case-insensitive
     $normalizedPlate = strtoupper(preg_replace('/\s+/', '', $plate));
     
-    $vehicle = Vehicle::whereRaw('UPPER(REPLACE(plate_number, " ", "")) = ?', [$normalizedPlate])
+    $vehicle = Vehicle::with('customer')
+        ->whereRaw('UPPER(REPLACE(plate_number, " ", "")) = ?', [$normalizedPlate])
         ->first();
     
     if ($vehicle) {
+        $fullAddress = null;
+        if ($vehicle->customer) {
+            $customer = $vehicle->customer;
+            $addressParts = array_filter([
+                $customer->address,
+                $customer->address_1,
+                $customer->address_2,
+                $customer->address_3,
+                $customer->address_4,
+                $customer->address_5,
+            ]);
+            
+            // Remove duplicates (case-insensitive)
+            $uniqueParts = [];
+            foreach ($addressParts as $part) {
+                $normalized = strtolower(trim($part));
+                if (!isset($uniqueParts[$normalized])) {
+                    $uniqueParts[$normalized] = trim($part);
+                }
+            }
+            $fullAddress = !empty($uniqueParts) ? implode(', ', array_values($uniqueParts)) : null;
+        }
+
         return response()->json([
             'found' => true,
             'model' => $vehicle->model,
-            'customer_name' => $vehicle->customer_name,
+            'customer_name' => $vehicle->customer_name ?? ($vehicle->customer ? $vehicle->customer->name : null),
+            'customer_address' => $fullAddress,
             'vin' => $vehicle->vin,
         ]);
     }

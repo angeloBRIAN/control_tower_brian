@@ -177,6 +177,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         lookupStatus.innerHTML = '<i class="bi bi-check-circle text-success"></i>';
                         plateHint.innerHTML = '<span class="text-success">Vehicle found!</span>';
                         
+                        // Auto-fill Unit Type / Model
+                        if (data.model && unitTypeInput) {
+                            unitTypeInput.value = data.model;
+                        }
+
                         // Auto-fill customer name if empty
                         if (!customerNameInput.value && data.customer_name) {
                             customerNameInput.value = data.customer_name;

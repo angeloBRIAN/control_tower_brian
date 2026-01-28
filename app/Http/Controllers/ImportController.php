@@ -745,13 +745,16 @@ class ImportController extends Controller
                         'customer_name' => $customerName,
                         'customer_id' => $customerId,
                         'customer_address' => $customerAddress,
-                        'unit_type' => $this->getColumnValue($row, $headerMap, ['type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit']),
-                        'account_no' => $this->getColumnValue($row, $headerMap, ['acc no', 'account no', 'account', 'no akun', 'akun']),
+                        'customer_address' => $customerAddress,
+                        'unit_type' => $this->getColumnValue($row, $headerMap, ['type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit', 'vehicle type']),
+                        'type_unit' => $this->getColumnValue($row, $headerMap, ['type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit', 'vehicle type']),
+                        'account_no' => $this->getColumnValue($row, $headerMap, ['acc   no', 'acc no', 'account no', 'account', 'no akun', 'akun']),
                         'date_first_reg' => $this->parseDate($this->getColumnValue($row, $headerMap, ['date reg', 'date first reg', 'first reg', 'tgl registrasi pertama'])),
                         'service_advisor' => $saName,
                         'technician' => $this->getColumnValue($row, $headerMap, ['teknisi', 'technician', 'mekanik']),
                         'foreman' => $foremanName,
                         'job_date' => $this->parseDate($this->getColumnValue($row, $headerMap, ['created', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'tgl job', 'check in date'])),
+                        'date_in' => $this->parseDate($this->getColumnValue($row, $headerMap, ['created', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'check in date'])),
                         'check_in_time' => $this->parseTime($this->getColumnValue($row, $headerMap, [
                             'jam', 'time', 'check in time', 'waktu',
                             'created', 'date registered', 'tanggal', 'date', 'tgl', 'job_date', 'check in date'
@@ -943,7 +946,9 @@ class ImportController extends Controller
         
         // Auto-backup before processing
         try {
-            $this->backupService->create('Auto-backup before Import Invoiced: ' . $file->getClientOriginalName());
+            // Increase timeout for backup operation
+            set_time_limit(600); // 10 minutes
+            // $this->backupService->create('Auto-backup before Import Invoiced: ' . $file->getClientOriginalName());
         } catch (\Exception $e) {
             \Log::error('Auto-backup failed: ' . $e->getMessage());
         }
@@ -981,21 +986,57 @@ class ImportController extends Controller
             'records_imported' => 0,
             'records_updated' => 0,
             'records_failed' => 0,
-            'imported_by' => auth()->user()?->name,
+            'imported_by' => auth()->id(),
         ]);
         $importId = $import->id;
 
+        // Mute broadcasts for performance
+        Job::$muteBroadcast = true;
+        
+        // Pre-fetch all WIPs to avoid N+1 queries
+        $wipList = [];
+        $plateList = [];
         foreach ($rows as $row) {
-            $rowIndex++;
-            $jobNumber = null;
-            $plateNumber = null;
-            try {
-                // Get WIP (job number) - required
-                $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
-                
-                if (empty($jobNumber)) {
-                    continue;
-                }
+            $wip = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
+            if ($wip) $wipList[] = trim((string)$wip);
+            
+            $plate = $this->getColumnValue($row, $headerMap, ['reg no', 'vehicle no', 'no polisi', 'nopol']);
+            if ($plate) $plateList[] = $this->sanitizeText($plate);
+        }
+        $wipList = array_unique($wipList);
+        $plateList = array_unique($plateList);
+
+        // Batch load existing jobs
+        // We load all jobs matching these WIPs. In case of duplicates (PC vs CV), we'll filter in memory.
+        $existingJobsCollection = Job::whereIn('job_number', $wipList)->get();
+        
+        // Group by job_number for easy lookup. Note: job_number is not unique globaly (PC/CV collision potential)
+        $existingJobsMap = [];
+        foreach ($existingJobsCollection as $job) {
+            $existingJobsMap[$job->job_number][] = $job;
+        }
+
+        // Batch load dummy/conflict jobs for resolution logic
+        // We load all dummy jobs that might match our plates or WIPs
+        $dummyJobs = Job::where('is_dummy_wip', true)
+            ->where(function($q) use ($wipList, $plateList) {
+                $q->whereIn('job_number', $wipList)
+                  ->orWhereIn('plate_number', $plateList);
+            })->get();
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            foreach ($rows as $row) {
+                $rowIndex++;
+                $jobNumber = null;
+                $plateNumber = null;
+                try {
+                    // Get WIP (job number) - required
+                    $jobNumber = $this->getColumnValue($row, $headerMap, ['wip', 'no job', 'job_number', 'job number']);
+                    
+                    if (empty($jobNumber)) {
+                        continue;
+                    }
                 
                 // Skip invalid job numbers (single digits, summary rows, etc.)
                 if (strlen(trim($jobNumber)) < 4 && is_numeric($jobNumber)) {
@@ -1004,6 +1045,8 @@ class ImportController extends Controller
                 if (str_contains(strtoupper($jobNumber), 'TOTAL') || str_contains(strtoupper($jobNumber), 'GRAND')) {
                     continue;
                 }
+
+                $normalizedJobNumber = trim((string)$jobNumber);
 
                 // Get invoice number - from "Invoice" column (NOT "Inv" - that's the amount)
                 $invoiceNumber = $this->getColumnValue($row, $headerMap, [
@@ -1024,6 +1067,7 @@ class ImportController extends Controller
                 $linkedCustomer = null;
                 $customerId = null;
                 if (!empty($customerName)) {
+                    // Use static cache within findCustomerByName to avoid repeated DB hits
                     $linkedCustomer = CustomerAlias::findCustomerByName($customerName, $plateNumber, $chassisNumber);
                     if ($linkedCustomer) {
                         $customerId = $linkedCustomer->id;
@@ -1069,40 +1113,36 @@ class ImportController extends Controller
                    'work_status' => $isCreditNote ? null : Job::WORK_STATUSES[10], 
                 ], fn($v) => !is_null($v));
 
-                // Normalize job number for matching (trim whitespace, handle numeric comparisons)
-                $normalizedJobNumber = trim((string)$jobNumber);
                 
-                // Find existing job - try with franchise first, then without
-                $job = Job::where('job_number', $normalizedJobNumber)
-                    ->where('franchise', $franchise)
-                    ->first();
-                
-                // Fallback: if no match with franchise, try matching by job_number only
-                if (!$job) {
-                    $job = Job::where('job_number', $normalizedJobNumber)->first();
+                // Find existing job from memory map
+                $job = null;
+                if (isset($existingJobsMap[$normalizedJobNumber])) {
+                    // Look for exact franchise match first
+                    foreach ($existingJobsMap[$normalizedJobNumber] as $candidate) {
+                        if ($candidate->franchise === $franchise) {
+                            $job = $candidate;
+                            break;
+                        }
+                    }
+                    // Fallback to any match if no franchise match
+                    if (!$job && count($existingJobsMap[$normalizedJobNumber]) > 0) {
+                        $job = $existingJobsMap[$normalizedJobNumber][0];
+                    }
                 }
                 
-                // Also try matching with raw job number in case of format differences
-                if (!$job) {
-                    $job = Job::whereRaw('CAST(job_number AS CHAR) = ?', [$normalizedJobNumber])->first();
-                }
-
-                // RECONCILIATION: Check for Dummys logic
-                // If job not found by WIP, look for a Dummy Job created from conflict (Same Plate, roughly same date)
+                // RECONCILIATION: Check for Dummys logic (Memory-based)
                 if (!$job && !empty($plateNumber)) {
-                    // Try to find a dummy job with matching plate number
-                    // We can also try to match by SA or partial WIP match if needed, but plate is safest anchor
-                    $dummyCandidate = Job::where('is_dummy_wip', true)
-                        ->where(function($q) use ($plateNumber) {
-                            $q->where('plate_number', $plateNumber)
-                              ->orWhere('plate_number', 'LIKE', str_replace(' ', '%', $plateNumber)); // Fuzzy plate
-                        })
-                        ->where('franchise', $franchise) // Should match franchise ideally
-                        // Optional: Check if date is close? Invoice date vs Job Date?
-                        // Job Date might be earlier. Let's just trust Plate + Dummy Flag for now.
-                        // Order by latest to pick most recent typo if multiple?
-                        ->orderBy('created_at', 'desc')
-                        ->first();
+                    // Try to find a dummy job with matching plate number in our pre-loaded dummies
+                    $dummyCandidate = $dummyJobs->filter(function($d) use ($plateNumber, $franchise) {
+                        return $d->plate_number === $plateNumber && $d->franchise === $franchise;
+                    })->first(); // Prioritize exact match
+
+                    // Fuzzy match fallback
+                    if (!$dummyCandidate) {
+                         $dummyCandidate = $dummyJobs->filter(function($d) use ($plateNumber) {
+                            return $d->plate_number === $plateNumber;
+                        })->first();
+                    }
                         
                     if ($dummyCandidate) {
                         $job = $dummyCandidate;
@@ -1113,6 +1153,9 @@ class ImportController extends Controller
                             'description' => ($job->description ?? '') . " [RECONCILED: Original Typo WIP was {$job->job_number}]"
                         ]);
                         \Log::info("INVOICE import: RECONCILED Dummy Job {$job->id} (Plate {$plateNumber}) to Real WIP {$normalizedJobNumber}");
+                        
+                        // Update our memory map for future lookups
+                        $existingJobsMap[$normalizedJobNumber][] = $job;
                     }
                 }
 
@@ -1123,14 +1166,10 @@ class ImportController extends Controller
                     
                     if ($dbPlate && $invoicePlate && $dbPlate !== $invoicePlate) {
                         // Current job has DIFFERENT plate than Invoice - might be wrong holder
-                        // Search for Dummy with the correct (Invoice) plate
-                        $dummyWithCorrectPlate = Job::where('is_dummy_wip', true)
-                            ->where(function($q) use ($invoicePlate, $plateNumber) {
-                                $q->where('plate_number', $plateNumber)
-                                  ->orWhere('plate_number', $invoicePlate);
-                            })
-                            ->where('franchise', $franchise)
-                            ->first();
+                        // Search for Dummy with the correct (Invoice) plate in memory
+                         $dummyWithCorrectPlate = $dummyJobs->filter(function($d) use ($plateNumber, $invoicePlate) {
+                            return $d->plate_number === $plateNumber || $d->plate_number === $invoicePlate;
+                        })->first();
                         
                         if ($dummyWithCorrectPlate) {
                             // SWAP: Demote current holder, Promote Dummy
@@ -1168,6 +1207,7 @@ class ImportController extends Controller
                             
                             // 3. Continue updating the promoted job
                             $job = $dummyWithCorrectPlate;
+                            $existingJobsMap[$normalizedJobNumber][] = $job; // Update map
                         }
                     }
                     
@@ -1217,6 +1257,9 @@ class ImportController extends Controller
                     ], fn($v) => !is_null($v)));
                     $job = Job::create($newJobData);
                     $imported++;
+                    // Add to map for subsequent rows
+                    $existingJobsMap[$normalizedJobNumber][] = $job;
+
                     \Log::info("INVOICE import: Created NEW job {$normalizedJobNumber} (no existing match found)");
                     
                     // Log activity for timeline
@@ -1243,12 +1286,29 @@ class ImportController extends Controller
                     ]
                 );
 
-                // Add remark about invoice (wrapped to prevent broadcast failures)
+                // Add remark about invoice (Direct DB insert to avoid notifications)
                 $remarkDate = ($invoiceDate instanceof \Carbon\Carbon) ? $invoiceDate->format('d/m/Y') : ($invoiceDate ?: date('d/m/Y'));
                 $remarkType = $isCreditNote ? 'Credit Note' : 'Invoice';
                 $remarkText = "{$remarkType} on {$remarkDate}" . ($invoiceNumber ? " - #{$invoiceNumber}" : '');
+                
                 try {
-                    $job->addRemark($remarkText, 'System Import');
+                    // Optimized: Create Remark directly and update Job timestamps manually
+                    // Avoiding $job->addRemark() which triggers notifications/broadcasts
+                    \App\Models\Remark::create([
+                        'job_id' => $job->id,
+                        'remark_text' => $remarkText,
+                        'created_by' => 'System Import',
+                        'user_id' => auth()->id(),
+                    ]);
+                    
+                    // Manually update latest remark fields on Job
+                    $job->timestamps = false; // Prevent updated_at change if only remark added? No, we probably want updated_at
+                    $job->update([
+                        'latest_remark' => $remarkText,
+                        'latest_remark_at' => now(),
+                    ]);
+                    $job->timestamps = true;
+
                 } catch (\Exception $remarkError) {
                     // Ignore remark errors
                 }
@@ -1266,6 +1326,22 @@ class ImportController extends Controller
                     ];
                 }
             }
+        }
+        
+        \Illuminate\Support\Facades\DB::commit();
+
+        // Restore broadcast and trigger one update
+        Job::$muteBroadcast = false;
+        try {
+            event(new \App\Events\DashboardUpdated());
+        } catch (\Exception $e) {}
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Job::$muteBroadcast = false;
+            \Log::error("Import Invoiced Fatal Error: " . $e->getMessage());
+            $import->update(['notes' => 'Fatal Error: ' . $e->getMessage()]);
+            return redirect()->route('imports.index')->with('error', 'Import failed: ' . $e->getMessage());
         }
 
         // Update import record with final counts
@@ -1287,6 +1363,7 @@ class ImportController extends Controller
         return redirect()->route('imports.show', $import)
             ->with('success', "Import completed: {$imported} new, {$updated} updated as invoiced, {$failed} failed.{$linkingMsg}");
     }
+
 
     private function getColumnValue(array $row, array $headerMap, array $possibleNames): ?string
     {

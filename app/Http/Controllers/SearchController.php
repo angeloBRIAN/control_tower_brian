@@ -37,7 +37,7 @@ class SearchController extends Controller
             ->orWhere('plate_number', 'like', "%{$query}%")
             ->orWhere('invoice_number', 'like', "%{$query}%")
             ->orWhere('customer_name', 'like', "%{$query}%")
-            ->orWhere('vin', 'like', "%{$query}%")
+            ->orWhere('chassis_number', 'like', "%{$query}%")
             ->limit(5)
             ->get(['id', 'job_number', 'plate_number', 'customer_name', 'status']);
             
@@ -123,7 +123,7 @@ class SearchController extends Controller
         if (auth()->user()->canManageMasterData()) {
             $bookings = Booking::where('plate_number', 'like', "%{$query}%")
                 ->orWhere('customer_name', 'like', "%{$query}%")
-                ->orWhere('contact_number', 'like', "%{$query}%")
+                ->orWhere('customer_phone', 'like', "%{$query}%")
                 ->limit(5)
                 ->get();
                 
@@ -144,8 +144,8 @@ class SearchController extends Controller
         if (auth()->user()->canManageMasterData()) {
             $towingRecords = TowingRecord::where('plate_number', 'like', "%{$query}%")
                 ->orWhere('customer_name', 'like', "%{$query}%")
-                ->orWhere('contact_number', 'like', "%{$query}%")
-                ->orWhere('location_from', 'like', "%{$query}%")
+                ->orWhere('customer_phone', 'like', "%{$query}%")
+                ->orWhere('pickup_location', 'like', "%{$query}%")
                 ->limit(5)
                 ->get();
                 
@@ -154,7 +154,7 @@ class SearchController extends Controller
                     'type' => 'towing',
                     'icon' => 'bi-truck',
                     'title' => $record->plate_number ?: 'No Plate',
-                    'subtitle' => ($record->customer_name ?: 'No Name') . ' - ' . ($record->location_from ?: 'Unknown location'),
+                    'subtitle' => ($record->customer_name ?: 'No Name') . ' - ' . ($record->pickup_location ?: 'Unknown location'),
                     'badge' => 'Towing',
                     'badge_class' => 'bg-secondary',
                     'url' => route('towing-records.show', $record->id),
@@ -165,7 +165,6 @@ class SearchController extends Controller
         // Search PDI Records
         if (auth()->user()->canManageMasterData()) {
             $pdiRecords = PdiRecord::where('plate_number', 'like', "%{$query}%")
-                ->orWhere('customer_name', 'like', "%{$query}%")
                 ->orWhere('vin', 'like', "%{$query}%")
                 ->limit(5)
                 ->get();
@@ -175,7 +174,7 @@ class SearchController extends Controller
                     'type' => 'pdi',
                     'icon' => 'bi-clipboard-check',
                     'title' => $record->plate_number ?: 'No Plate',
-                    'subtitle' => ($record->customer_name ?: 'No Name') . ' - PDI Check',
+                    'subtitle' => 'PDI Check - ' . ($record->vin ?: 'No VIN'),
                     'badge' => 'PDI',
                     'badge_class' => 'bg-primary',
                     'url' => route('pdi-records.show', $record->id),

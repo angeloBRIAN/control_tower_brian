@@ -55,7 +55,7 @@
                 <div class="row text-center">
                     <div class="col-6">
                         <small class="text-muted d-block">Imported By</small>
-                        <strong>{{ $import->imported_by ?? 'System' }}</strong>
+                        <strong>{{ $import->user->name ?? $import->imported_by ?? 'System' }}</strong>
                     </div>
                     <div class="col-6">
                         <small class="text-muted d-block">Date</small>
