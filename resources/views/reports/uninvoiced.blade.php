@@ -405,12 +405,20 @@
                         <!-- Toggles injected via JS -->
                         <div id="columnToggles"></div>
                         <div class="dropdown-divider"></div>
-                        <li class="px-2 pb-2">
-                             <button type="button" class="btn btn-primary btn-sm w-100" id="saveColumnsBtn">Save Preferences</button>
+                        <li class="px-2 pb-2 d-flex gap-2">
+                             <button type="button" class="btn btn-primary btn-sm flex-grow-1" id="saveColumnsBtn">Save</button>
+                             <button type="button" class="btn btn-outline-danger btn-sm" id="resetColumnsBtn">Reset</button>
                         </li>
                     </ul>
                 </div>
             </div>
+            
+            <style>
+                #dataTable th, #dataTable td {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+            </style>
             
             <!-- Additional Filters Row -->
             <div class="col-md-2">
@@ -833,6 +841,33 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             });
+        });
+
+        // 8. Reset Preferences
+        const defaultOrder = Object.keys(allColumns);
+        const defaultWidths = {};
+        
+        document.getElementById('resetColumnsBtn').addEventListener('click', function() {
+             if(!confirm('Reset table columns to default?')) return;
+             
+             // Reset variables
+             userOrder = [...defaultOrder];
+             
+             // Reset UI
+             applyColumnOrder(userOrder);
+             buildToggles();
+             
+             // Reset Checks
+             document.querySelectorAll('.col-toggle').forEach(t => {
+                 t.checked = allColumns[t.value].default;
+             });
+             applyVisibility();
+             
+             // Reset Widths
+             table.querySelectorAll('th').forEach(th => th.style.width = '');
+             
+             // Save defaults
+             document.getElementById('saveColumnsBtn').click();
         });
     });
 
