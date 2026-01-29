@@ -29,6 +29,34 @@
     if (request('date_to')) {
         $allUninvoicedJobs->whereDate('job_date', '<=', request('date_to'));
     }
+    if (request('franchise')) {
+        $allUninvoicedJobs->where('franchise', request('franchise'));
+    }
+    if (request('department')) {
+        $allUninvoicedJobs->where('department', request('department'));
+    }
+    if (request('service_advisor')) {
+        $sa = request('service_advisor');
+        if (is_array($sa)) {
+            $allUninvoicedJobs->whereIn('service_advisor', $sa);
+        } else {
+            $allUninvoicedJobs->where('service_advisor', $sa);
+        }
+    }
+    if (request('foreman')) {
+        $fm = request('foreman');
+        if (is_array($fm)) {
+            $allUninvoicedJobs->whereIn('foreman', $fm);
+        } else {
+            $allUninvoicedJobs->where('foreman', $fm);
+        }
+    }
+    if (request('work_status')) {
+        $allUninvoicedJobs->where('work_status', request('work_status'));
+    }
+    if (request('need_part')) {
+        $allUninvoicedJobs->where('need_part', request('need_part') == '1');
+    }
     
     // Count totals
     $totalJobCount = (clone $allUninvoicedJobs)->count();
@@ -324,6 +352,7 @@
                             $allColumns = [
                                 'job_number' => ['label' => 'WIP', 'default' => true],
                                 'franchise' => ['label' => 'Franchise', 'default' => false],
+                                'department' => ['label' => 'Dept', 'default' => false],
                                 'plate_number' => ['label' => 'Plate No', 'default' => true],
                                 'customer_name' => ['label' => 'Customer', 'default' => false],
                                 'service_advisor' => ['label' => 'SA', 'default' => true],
@@ -359,20 +388,42 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <select name="service_advisor" class="form-select">
-                    <option value="">All SA</option>
-                    @foreach(\App\Models\Job::whereNotNull('service_advisor')->distinct()->pluck('service_advisor')->sort() as $sa)
-                        <option value="{{ $sa }}" {{ request('service_advisor') == $sa ? 'selected' : '' }}>{{ $sa }}</option>
+                <select name="department" class="form-select">
+                    <option value="">All Dept</option>
+                    @foreach(\App\Models\Job::uninvoiced()->whereNotNull('department')->distinct()->pluck('department')->sort() as $dept)
+                        <option value="{{ $dept }}" {{ request('department') == $dept ? 'selected' : '' }}>
+                            {{ $dept === 'W' ? 'Workshop' : ($dept === 'B' ? 'Body Paint' : $dept) }}
+                        </option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-2">
-                <select name="foreman" class="form-select">
-                    <option value="">All Foreman</option>
-                    @foreach(\App\Models\Job::whereNotNull('foreman')->distinct()->pluck('foreman')->sort() as $fm)
-                        <option value="{{ $fm }}" {{ request('foreman') == $fm ? 'selected' : '' }}>{{ $fm }}</option>
+                <select name="service_advisor[]" class="form-select" multiple size="3" aria-label="Service Advisor">
+                    <option value="" {{ empty(request('service_advisor')) ? 'selected' : '' }}>All SA</option>
+                    @foreach(\App\Models\Job::whereNotNull('service_advisor')->distinct()->pluck('service_advisor')->sort() as $sa)
+                        @php
+                            $selectedSAs = request('service_advisor');
+                            if (!is_array($selectedSAs)) $selectedSAs = $selectedSAs ? [$selectedSAs] : [];
+                            $isSelected = in_array($sa, $selectedSAs);
+                        @endphp
+                        <option value="{{ $sa }}" {{ $isSelected ? 'selected' : '' }}>{{ $sa }}</option>
                     @endforeach
                 </select>
+                <div class="form-text small mt-0 text-muted">Hold Ctrl to select multiple</div>
+            </div>
+            <div class="col-md-2">
+                <select name="foreman[]" class="form-select" multiple size="3" aria-label="Foreman">
+                    <option value="" {{ empty(request('foreman')) ? 'selected' : '' }}>All Foreman</option>
+                    @foreach(\App\Models\Job::whereNotNull('foreman')->distinct()->pluck('foreman')->sort() as $fm)
+                        @php
+                            $selectedFMs = request('foreman');
+                            if (!is_array($selectedFMs)) $selectedFMs = $selectedFMs ? [$selectedFMs] : [];
+                            $isSelected = in_array($fm, $selectedFMs);
+                        @endphp
+                        <option value="{{ $fm }}" {{ $isSelected ? 'selected' : '' }}>{{ $fm }}</option>
+                    @endforeach
+                </select>
+                <div class="form-text small mt-0 text-muted">Hold Ctrl to select multiple</div>
             </div>
             <div class="col-md-2">
                 <select name="work_status" class="form-select">
@@ -408,6 +459,8 @@
                         $currentDir = request('dir', 'desc');
                         $sortMap = [
                             'job_number' => 'job_number',
+                            'franchise' => 'franchise',
+                            'department' => 'department',
                             'plate_number' => 'plate_number',
                             'service_advisor' => 'service_advisor',
                             'foreman' => 'foreman',
@@ -423,6 +476,7 @@
                         @foreach([
                             'job_number' => 'WIP',
                             'franchise' => 'Franchise',
+                            'department' => 'Dept',
                             'plate_number' => 'Plate',
                             'customer_name' => 'Customer',
                             'service_advisor' => 'SA',
@@ -441,7 +495,7 @@
                                 $sortField = $sortMap[$col] ?? null;
                                 $isActive = $sortable && $currentSort === $sortField;
                                 $nextDir = $isActive && $currentDir === 'asc' ? 'desc' : 'asc';
-                                $isHidden = in_array($col, ['franchise', 'customer_name', 'foreman', 'labour_sales', 'part_sales', 'need_part', 'latest_remark_at']);
+                                $isHidden = in_array($col, ['franchise', 'department', 'customer_name', 'foreman', 'labour_sales', 'part_sales', 'need_part', 'latest_remark_at']);
                                 $isNumeric = in_array($col, ['total_sales', 'labour_sales', 'part_sales']);
                             @endphp
                             <th data-col="{{ $col }}" class="col-{{ $col }} {{ $isHidden ? 'd-none' : '' }} {{ $isNumeric ? 'text-end' : '' }}" @if($sortable) style="cursor: pointer;" @endif>
@@ -466,6 +520,7 @@
                     <tr>
                         <td class="col-job_number"><a href="{{ route('jobs.show', $job) }}" class="fw-bold">{{ $job->job_number }}</a></td>
                         <td class="col-franchise d-none">{{ $job->franchise ?? '-' }}</td>
+                        <td class="col-department d-none">{{ $job->department_label ?? '-' }}</td>
                         <td class="col-plate_number">{{ $job->plate_number }}</td>
                         <td class="col-customer_name d-none">{{ Str::limit($job->customer_name, 20) ?? '-' }}</td>
                         <td class="col-service_advisor">{{ $job->service_advisor ?? '-' }}</td>

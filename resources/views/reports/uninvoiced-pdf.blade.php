@@ -174,8 +174,9 @@
         @if($filters['date_from'] ?? null) From: {{ $filters['date_from'] }} @endif
         @if($filters['date_to'] ?? null) To: {{ $filters['date_to'] }} @endif
         @if($filters['franchise'] ?? null) Franchise: {{ $filters['franchise'] }} @endif
-        @if($filters['service_advisor'] ?? null) SA: {{ $filters['service_advisor'] }} @endif
-        @if($filters['foreman'] ?? null) Foreman: {{ $filters['foreman'] }} @endif
+        @if($filters['department'] ?? null) Dept: {{ $filters['department'] }} @endif
+        @if($filters['service_advisor'] ?? null) SA: {{ is_array($filters['service_advisor']) ? implode(', ', $filters['service_advisor']) : $filters['service_advisor'] }} @endif
+        @if($filters['foreman'] ?? null) Foreman: {{ is_array($filters['foreman']) ? implode(', ', $filters['foreman']) : $filters['foreman'] }} @endif
         @if($filters['work_status'] ?? null) Status: {{ $filters['work_status'] }} @endif
         @if(isset($filters['need_part'])) Parts: {{ $filters['need_part'] == '1' ? 'Needs Parts' : 'No Parts' }} @endif
         @if($filters['search'] ?? null) Search: "{{ $filters['search'] }}" @endif
@@ -202,6 +203,8 @@
                             {{ $job->job_date?->format('d/m/Y') }}
                         @elseif($col === 'latest_remark_at')
                             {{ $job->latest_remark_at?->format('d/m/Y') }}
+                        @elseif($col === 'department')
+                            {{ $job->department_label }}
                         @elseif(in_array($col, ['total_sales', 'labour_sales', 'part_sales']))
                             {{ $job->{$col} ? number_format($job->{$col}, 0, ',', '.') : '-' }}
                         @elseif($col === 'work_status')

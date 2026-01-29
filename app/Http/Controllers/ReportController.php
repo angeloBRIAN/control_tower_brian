@@ -39,11 +39,24 @@ class ReportController extends Controller
         if ($request->filled('franchise')) {
             $query->where('franchise', $request->franchise);
         }
+        if ($request->filled('department')) {
+            $query->where('department', $request->department);
+        }
         if ($request->filled('service_advisor')) {
-            $query->where('service_advisor', $request->service_advisor);
+            $sa = $request->service_advisor;
+            if (is_array($sa)) {
+                $query->whereIn('service_advisor', $sa);
+            } else {
+                $query->where('service_advisor', $sa);
+            }
         }
         if ($request->filled('foreman')) {
-            $query->where('foreman', $request->foreman);
+            $fm = $request->foreman;
+            if (is_array($fm)) {
+                $query->whereIn('foreman', $fm);
+            } else {
+                $query->where('foreman', $fm);
+            }
         }
         if ($request->filled('work_status')) {
             $query->where('work_status', $request->work_status);
@@ -683,8 +696,26 @@ class ReportController extends Controller
         if ($request->filled('date_from')) $query->whereDate('job_date', '>=', $request->date_from);
         if ($request->filled('date_to')) $query->whereDate('job_date', '<=', $request->date_to);
         if ($request->filled('franchise')) $query->where('franchise', $request->franchise);
-        if ($request->filled('service_advisor')) $query->where('service_advisor', $request->service_advisor);
-        if ($request->filled('foreman')) $query->where('foreman', $request->foreman);
+        if ($request->filled('department')) $query->where('department', $request->department);
+        
+        if ($request->filled('service_advisor')) {
+            $sa = $request->service_advisor;
+            if (is_array($sa)) {
+                $query->whereIn('service_advisor', $sa);
+            } else {
+                $query->where('service_advisor', $sa);
+            }
+        }
+        
+        if ($request->filled('foreman')) {
+            $fm = $request->foreman;
+            if (is_array($fm)) {
+                $query->whereIn('foreman', $fm);
+            } else {
+                $query->where('foreman', $fm);
+            }
+        }
+        
         if ($request->filled('work_status')) $query->where('work_status', $request->work_status);
         if ($request->filled('need_part')) $query->where('need_part', $request->need_part == '1');
         
@@ -694,6 +725,7 @@ class ReportController extends Controller
         $allColumns = [
             'job_number' => 'WIP',
             'franchise' => 'Franchise',
+            'department' => 'Dept',
             'plate_number' => 'Plate No',
             'customer_name' => 'Customer',
             'service_advisor' => 'SA',
@@ -730,7 +762,9 @@ class ReportController extends Controller
                 'totalSales' => $totalSales,
                 'totalLabour' => $totalLabour,
                 'totalParts' => $totalParts,
-                'filters' => $request->only(['search', 'date_from', 'date_to', 'franchise', 'service_advisor', 'foreman', 'work_status', 'need_part']),
+                'totalLabour' => $totalLabour,
+                'totalParts' => $totalParts,
+                'filters' => $request->only(['search', 'date_from', 'date_to', 'franchise', 'department', 'service_advisor', 'foreman', 'work_status', 'need_part']),
             ]);
         }
         
@@ -757,6 +791,7 @@ class ReportController extends Controller
                 $value = $job->{$col};
                 if ($col === 'job_date' && $value) $value = $value->format('d/m/Y');
                 if ($col === 'latest_remark_at' && $value) $value = $value->format('d/m/Y');
+                if ($col === 'department') $value = $job->department_label;
                 if (in_array($col, ['total_sales', 'labour_sales', 'part_sales']) && $value) $value = (float)$value;
                 if ($col === 'need_part') $value = $value ? 'Yes' : 'No';
                 $rowData[] = $value ?? '';
@@ -831,59 +866,87 @@ class ReportController extends Controller
 
     // ===== CUSTOM REPORT BUILDER =====
 
+    // ===== CUSTOM REPORT BUILDER =====
+    
     /**
-     * Available columns for job reports
+     * Get available columns dynamically from Schema
      */
     private function getJobColumns(): array
     {
-        return [
-            'job_number' => ['label' => 'WIP', 'group' => 'Core'],
-            'job_card' => ['label' => 'Job Card', 'group' => 'Core'],
-            'franchise' => ['label' => 'Franchise', 'group' => 'Core'],
-            'department' => ['label' => 'Department', 'group' => 'Core'],
-            'job_date' => ['label' => 'Job Date', 'group' => 'Dates', 'type' => 'date'],
-            'date_in' => ['label' => 'Date In', 'group' => 'Dates', 'type' => 'date'],
-            'date_out' => ['label' => 'Date Out', 'group' => 'Dates', 'type' => 'date'],
-            'check_in_time' => ['label' => 'Check-In Time', 'group' => 'Dates'],
-            'promise_date' => ['label' => 'Promise Date', 'group' => 'Dates', 'type' => 'date'],
-            'deadline' => ['label' => 'Deadline', 'group' => 'Dates', 'type' => 'date'],
-            'plate_number' => ['label' => 'Reg No', 'group' => 'Vehicle'],
-            'chassis_number' => ['label' => 'Chassis', 'group' => 'Vehicle'],
-            'unit_type' => ['label' => 'Unit Type', 'group' => 'Vehicle'],
-            'customer_name' => ['label' => 'Customer Name', 'group' => 'Customer'],
-            'customer_address' => ['label' => 'Customer Address', 'group' => 'Customer'],
-            'service_advisor' => ['label' => 'Service Advisor', 'group' => 'Personnel'],
-            'foreman' => ['label' => 'Foreman', 'group' => 'Personnel'],
-            'technician' => ['label' => 'Technician', 'group' => 'Personnel'],
-            'block' => ['label' => 'Block', 'group' => 'Personnel'],
-            'job_type' => ['label' => 'Job Type', 'group' => 'Job Info'],
-            'payment_type' => ['label' => 'Payment Type', 'group' => 'Job Info'],
-            'work_status' => ['label' => 'Work Status', 'group' => 'Job Info'],
-            'labour_sales' => ['label' => 'Labour Sales', 'group' => 'Sales', 'type' => 'number'],
-            'part_sales' => ['label' => 'Part Sales', 'group' => 'Sales', 'type' => 'number'],
-            'total_sales' => ['label' => 'Total Sales', 'group' => 'Sales', 'type' => 'number'],
-            'estimated_amount' => ['label' => 'Estimated', 'group' => 'Sales', 'type' => 'number'],
-            'rq' => ['label' => 'RQ', 'group' => 'Parts'],
-            'no_order_part_mbina' => ['label' => 'Order Part', 'group' => 'Parts'],
-            'need_part' => ['label' => 'Needs Parts', 'group' => 'Parts', 'type' => 'boolean'],
-            'status' => ['label' => 'Status', 'group' => 'Invoice'],
-            'invoice_number' => ['label' => 'Invoice No', 'group' => 'Invoice'],
-            'invoice_date' => ['label' => 'Inv Date', 'group' => 'Invoice', 'type' => 'date'],
-            'inv_amount' => ['label' => 'Inv Amount', 'group' => 'Invoice', 'type' => 'number'],
-            'latest_remark' => ['label' => 'Latest Remark', 'group' => 'Remarks'],
-            'latest_remark_at' => ['label' => 'Remark Updated', 'group' => 'Remarks', 'type' => 'datetime'],
-        ];
+        $columns = [];
+        
+        // JOB Columns
+        $jobCols = \Illuminate\Support\Facades\Schema::getColumnListing('jobs');
+        foreach ($jobCols as $col) {
+            // Skip internal/heavy columns
+            if (in_array($col, ['id', 'created_at', 'updated_at', 'deleted_at', 'search_data'])) continue;
+            
+            $type = \Illuminate\Support\Facades\Schema::getColumnType('jobs', $col);
+            $group = 'Job Info';
+            
+            if (str_contains($col, 'date') || str_contains($col, 'time') || str_contains($col, 'deadline')) {
+                $group = 'Dates';
+            } elseif (in_array($col, ['customer_name', 'customer_address', 'customer_phone', 'customer_email'])) {
+                $group = 'Customer';
+            } elseif (in_array($col, ['service_advisor', 'foreman', 'technician', 'block'])) {
+                $group = 'Personnel';
+            } elseif (str_contains($col, 'sales') || str_contains($col, 'amount') || str_contains($col, 'price')) {
+                $group = 'Sales';
+            } elseif (str_contains($col, 'invoice')) {
+                $group = 'Invoice';
+            } elseif (str_contains($col, 'plate') || str_contains($col, 'chassis') || str_contains($col, 'vin') || str_contains($col, 'model')) {
+                $group = 'Vehicle';
+            }
+
+            $label = ucwords(str_replace('_', ' ', $col));
+            
+            // Custom labels
+            $customLabels = [
+                'job_number' => 'WIP',
+                'plate_number' => 'Plate No',
+                'inv_ppn_meterai' => 'Total Amount',
+                'service_advisor' => 'SA',
+            ];
+
+            $columns[$col] = [
+                'label' => $customLabels[$col] ?? $label,
+                'group' => $group,
+                'type' => $type,
+                'source' => 'jobs'
+            ];
+        }
+
+        // VEHICLE Columns (prefixed with vehicle.)
+        $vehicleCols = \Illuminate\Support\Facades\Schema::getColumnListing('vehicles');
+        foreach ($vehicleCols as $col) {
+            if (in_array($col, ['id', 'created_at', 'updated_at', 'deleted_at', 'job_id', 'customer_id'])) continue;
+            // Skip duplicates that exist in jobs
+            if (isset($columns[$col])) continue;
+
+            $columns["vehicle.$col"] = [
+                'label' => "Vehicle " . ucwords(str_replace('_', ' ', $col)),
+                'group' => 'Vehicle Details',
+                'type' => \Illuminate\Support\Facades\Schema::getColumnType('vehicles', $col),
+                'source' => 'vehicles'
+            ];
+        }
+
+        return $columns;
     }
 
+    /**
+     * Get filter options for select fields
+     */
     private function getFilterOptions(): array
     {
+        // Cache these or fetch efficiently
         return [
             'franchise' => ['PC', 'CV'],
-            'status' => ['uninvoiced', 'invoiced'],
-            'service_advisor' => Job::whereNotNull('service_advisor')->distinct()->pluck('service_advisor')->sort()->values()->toArray(),
-            'foreman' => Job::whereNotNull('foreman')->distinct()->pluck('foreman')->sort()->values()->toArray(),
-            'department' => Job::whereNotNull('department')->distinct()->pluck('department')->sort()->values()->toArray(),
-            'work_status' => Job::whereNotNull('work_status')->distinct()->pluck('work_status')->sort()->values()->toArray(),
+            'status' => ['uninvoiced', 'invoiced', 'canceled'],
+            'work_status' => Job::distinct()->whereNotNull('work_status')->pluck('work_status')->sort()->values()->toArray(),
+            'service_advisor' => Job::distinct()->whereNotNull('service_advisor')->pluck('service_advisor')->sort()->values()->toArray(),
+            'foreman' => Job::distinct()->whereNotNull('foreman')->pluck('foreman')->sort()->values()->toArray(),
+            'department' => Job::distinct()->whereNotNull('department')->pluck('department')->sort()->values()->toArray(),
         ];
     }
 
@@ -899,7 +962,9 @@ class ReportController extends Controller
             $groupedColumns[$group][$key] = $col;
         }
         
-        return view('reports.builder', compact('groupedColumns', 'filterOptions', 'savedReports'));
+        ksort($groupedColumns);
+        
+        return view('reports.builder', compact('groupedColumns', 'filterOptions', 'savedReports', 'columns'));
     }
 
     public function preview(Request $request)
@@ -907,7 +972,13 @@ class ReportController extends Controller
         $data = $this->buildQuery($request);
         $columns = $request->input('columns', []);
         $allColumns = $this->getJobColumns();
-        $selectedColumns = array_intersect_key($allColumns, array_flip($columns));
+        
+        $selectedColumns = [];
+        foreach ($columns as $colKey) {
+            if (isset($allColumns[$colKey])) {
+                $selectedColumns[$colKey] = $allColumns[$colKey];
+            }
+        }
         
         return response()->json([
             'success' => true,
@@ -915,10 +986,10 @@ class ReportController extends Controller
             'data' => $data->take(50)->get()->map(function ($job) use ($selectedColumns) {
                 $row = [];
                 foreach ($selectedColumns as $key => $col) {
-                    $value = $job->{$key};
+                    $value = data_get($job, $key);
                     if (isset($col['type'])) {
-                        if ($col['type'] === 'date' && $value) $value = $value->format('d/m/Y');
-                        elseif ($col['type'] === 'datetime' && $value) $value = $value->format('d/m/Y H:i');
+                        if ($col['type'] === 'date' && $value) $value = \Carbon\Carbon::parse($value)->format('d/m/Y');
+                        elseif ($col['type'] === 'datetime' && $value) $value = \Carbon\Carbon::parse($value)->format('d/m/Y H:i');
                         elseif ($col['type'] === 'number' && $value) $value = number_format($value, 0, ',', '.');
                         elseif ($col['type'] === 'boolean') $value = $value ? 'Yes' : 'No';
                     }
@@ -935,7 +1006,14 @@ class ReportController extends Controller
         $format = $request->input('format', 'xlsx');
         $columns = $request->input('columns', []);
         $allColumns = $this->getJobColumns();
-        $selectedColumns = array_intersect_key($allColumns, array_flip($columns));
+        
+        $selectedColumns = [];
+        foreach ($columns as $colKey) {
+            if (isset($allColumns[$colKey])) {
+                $selectedColumns[$colKey] = $allColumns[$colKey];
+            }
+        }
+        
         $data = $this->buildQuery($request)->get();
         
         // Handle PDF/Print format
@@ -981,7 +1059,7 @@ class ReportController extends Controller
             ]);
         }
         
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         
         // Header
@@ -996,10 +1074,10 @@ class ReportController extends Controller
         foreach ($data as $job) {
             $col = 1;
             foreach ($selectedColumns as $key => $colDef) {
-                $value = $job->{$key};
+                $value = data_get($job, $key);
                 if (isset($colDef['type'])) {
-                    if ($colDef['type'] === 'date' && $value) $value = $value->format('Y-m-d');
-                    elseif ($colDef['type'] === 'datetime' && $value) $value = $value->format('Y-m-d H:i');
+                    if ($colDef['type'] === 'date' && $value) $value = \Carbon\Carbon::parse($value)->format('Y-m-d');
+                    elseif ($colDef['type'] === 'datetime' && $value) $value = \Carbon\Carbon::parse($value)->format('Y-m-d H:i');
                     elseif ($colDef['type'] === 'boolean') $value = $value ? 'Yes' : 'No';
                 }
                 $sheet->setCellValueByColumnAndRow($col++, $row, $value ?? '');
@@ -1014,11 +1092,11 @@ class ReportController extends Controller
         $filename = 'job_report_' . now()->format('Ymd_His');
         
         if ($format === 'csv') {
-            $writer = new Csv($spreadsheet);
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Csv($spreadsheet);
             $filename .= '.csv';
             $contentType = 'text/csv';
         } else {
-            $writer = new Xlsx($spreadsheet);
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $filename .= '.xlsx';
             $contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         }
@@ -1064,9 +1142,123 @@ class ReportController extends Controller
         return response()->json(['success' => true]);
     }
 
+    private function applyRule($query, $rule)
+    {
+        // Handle Groups (Nested Rules)
+        if (isset($rule['condition'])) {
+            $condition = strtoupper($rule['condition']); // AND / OR
+            $query->where(function($q) use ($rule, $condition) {
+                foreach ($rule['rules'] as $subRule) {
+                    if ($condition === 'OR') {
+                        $q->orWhere(function($subQ) use ($subRule) {
+                            $this->applyRule($subQ, $subRule);
+                        });
+                    } else {
+                        $this->applyRule($q, $subRule);
+                    }
+                }
+            });
+            return;
+        }
+
+        // Handle Single Rule
+        if (!isset($rule['field']) || !isset($rule['operator'])) return;
+
+        $field = $rule['field'];
+        $operator = $rule['operator'];
+        $value = $rule['value'] ?? null;
+        $type = $rule['type'] ?? 'string';
+
+        // Clean field name for relations
+        $dbField = $field;
+        $isRelation = false;
+        
+        if (str_starts_with($field, 'vehicle.')) {
+            $isRelation = true;
+            $dbField = str_replace('vehicle.', '', $field);
+        }
+
+        // Apply Where Clause
+        $apply = function($q) use ($dbField, $operator, $value, $type) {
+            switch ($operator) {
+                case 'equal':
+                    $q->where($dbField, $value);
+                    break;
+                case 'not_equal':
+                    $q->where($dbField, '!=', $value);
+                    break;
+                case 'contains':
+                    $q->where($dbField, 'like', "%{$value}%");
+                    break;
+                case 'not_contains':
+                    $q->where($dbField, 'not like', "%{$value}%");
+                    break;
+                case 'starts_with':
+                    $q->where($dbField, 'like', "{$value}%");
+                    break;
+                case 'ends_with':
+                    $q->where($dbField, 'like', "%{$value}");
+                    break;
+                case 'is_empty':
+                    $q->where(function($sq) use ($dbField) {
+                        $sq->whereNull($dbField)->orWhere($dbField, '');
+                    });
+                    break;
+                case 'is_not_empty':
+                    $q->where(function($sq) use ($dbField) {
+                        $sq->whereNotNull($dbField)->where($dbField, '!=', '');
+                    });
+                    break;
+                case 'less':
+                    $q->where($dbField, '<', $value);
+                    break;
+                case 'less_or_equal':
+                    $q->where($dbField, '<=', $value);
+                    break;
+                case 'greater':
+                    $q->where($dbField, '>', $value);
+                    break;
+                case 'greater_or_equal':
+                    $q->where($dbField, '>=', $value);
+                    break;
+                case 'between':
+                    if (is_array($value) && count($value) >= 2) {
+                        $q->whereBetween($dbField, [$value[0], $value[1]]);
+                    }
+                    break;
+                case 'in':
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', $value));
+                    $q->whereIn($dbField, $arr);
+                    break;
+            }
+        };
+
+        if ($isRelation) {
+            $query->whereHas('vehicle', function($q) use ($apply) {
+                $apply($q);
+            });
+        } else {
+            $apply($query);
+        }
+    }
+
     private function buildQuery(Request $request)
     {
-        $query = Job::query();
+        $query = Job::query()->with('vehicle');
+        
+        // New Query Builder Logic
+        if ($request->filled('query_rules')) {
+            $rules = $request->input('query_rules');
+            if (is_string($rules)) $rules = json_decode($rules, true);
+            
+            if (is_array($rules)) {
+                $this->applyRule($query, $rules);
+                return $query->latest('job_date');
+            }
+        }
+
+        // --- BACKWARD COMPATIBILITY for Old Reports ---
+        // If no "query_rules", fall back to simple filters
         
         if ($request->filled('date_from')) $query->whereDate('job_date', '>=', $request->date_from);
         if ($request->filled('date_to')) $query->whereDate('job_date', '<=', $request->date_to);
@@ -1079,7 +1271,7 @@ class ReportController extends Controller
             $query->where('need_part', $request->need_part === '1');
         }
         
-        return $query->orderBy('job_date', 'desc');
+        return $query->latest('job_date');
     }
 }
 
