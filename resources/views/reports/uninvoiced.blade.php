@@ -485,7 +485,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0" id="dataTable">
+            <table class="table table-hover table-sm mb-0" id="dataTable" style="table-layout: fixed; white-space: nowrap;">
                 <thead class="table-dark">
                     @php
                         $currentSort = request('sort', 'job_date');
