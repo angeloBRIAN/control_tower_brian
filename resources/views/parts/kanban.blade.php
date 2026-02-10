@@ -207,6 +207,11 @@
                     <div class="kanban-card kanban-order-card" 
                          data-order-id="{{ $order->id }}"
                          data-current-status="{{ $order->status }}"
+                         data-created-by="{{ $order->created_by }}"
+                         data-no-order-part="{{ $order->no_order_part }}"
+                         data-order-date="{{ $order->order_date?->format('Y-m-d') }}"
+                         data-expected-date="{{ $order->expected_date?->format('Y-m-d') }}"
+                         data-notes="{{ $order->notes }}"
                          draggable="true">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="mb-0 fw-semibold">
@@ -529,15 +534,19 @@ document.addEventListener('DOMContentLoaded', function() {
         canUpdateStatus: {{ $permissions['canUpdateStatus'] ? 'true' : 'false' }},
         canReceivePart: {{ in_array($permissions['userRole'], ['admin', 'sparepart', 'foreman', 'control_tower']) ? 'true' : 'false' }},
         userRole: '{{ $permissions['userRole'] }}',
-        userForeman: {!! json_encode($permissions['userForeman']) !!}
+        userForeman: {!! json_encode($permissions['userForeman']) !!},
+        userId: {{ auth()->id() }}
     };
     
     // Allowed transitions (1-step only, 5-status flow)
+    // Allowed transitions (1-step only, 5-status flow)
+    // Allowed transitions (1-step only, 5-status flow)
     const allowedTransitions = {
         'pending': ['rq_sent'],
-        'rq_sent': ['processing'],
-        'processing': ['ready'],
-        'ready': ['received']
+        'rq_sent': ['processing', 'pending'], // Forward + Undo (Delete)
+        'processing': ['ready', 'rq_sent'], // Forward + Undo
+        'ready': ['received', 'processing'], // Forward + Undo
+        'received': ['ready'] // Undo
     };
     
     // Status labels (5-status flow)
@@ -641,6 +650,54 @@ document.addEventListener('DOMContentLoaded', function() {
             } 
             // Permission check for Order status updates
             else if (draggedType === 'order') {
+                
+                // RQ Sent -> Pending (Undo Creation / Delete)
+                if (originalStatus === 'rq_sent' && targetStatus === 'pending') {
+                    // Check permission: Admin, Sparepart, or Creator
+                    const creatorId = parseInt(draggedCard.dataset.createdBy);
+                    const canDelete = 
+                        permissions.userRole === 'admin' || 
+                        permissions.userRole === 'sparepart' || 
+                        permissions.userId === creatorId;
+                        
+                    if (!canDelete) {
+                        alert('You do not have permission to delete this RQ. Only Admin, Sparepart, or the Creator can do this.');
+                        return;
+                    }
+                    
+                    if (confirm('Are you sure you want to DELETE this RQ? This action cannot be undone.')) {
+                        deletePartOrder(draggedCard.dataset.orderId);
+                    }
+                    return;
+                }
+
+                // Check if moving BACKWARD (Undo)
+                const isBackward = 
+                    (originalStatus === 'processing' && targetStatus === 'rq_sent') ||
+                    (originalStatus === 'ready' && targetStatus === 'processing') ||
+                    (originalStatus === 'received' && targetStatus === 'ready');
+
+                if (isBackward) {
+                     // Permission check for undo - sparepart/admin only
+                     if (!permissions.canUpdateStatus) {
+                        alert('You do not have permission to undo status.');
+                        return;
+                    }
+
+                    if (confirm(`Undo status back to ${statusLabels[targetStatus]}? Data associated with this status will be cleared and logged.`)) {
+                        // Submit directly without modal
+                        const orderId = draggedCard.dataset.orderId;
+                        const data = { 
+                            order_id: orderId, 
+                            status: targetStatus,
+                            remark: 'Undo status change'
+                        };
+                        // Use a dummy modal object that has a hide method
+                        submitStatusUpdate(orderId, data, { hide: () => {} });
+                    }
+                    return;
+                }
+
                 // Special case: Ready → Received can be done by foreman/control_tower too
                 if (originalStatus === 'ready' && targetStatus === 'received') {
                     if (!permissions.canReceivePart) {
@@ -657,7 +714,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     if (originalStatus === 'rq_sent' && targetStatus === 'processing') {
-                        // RQ Sent → Processing: Show order details modal (order number, dates, notes)
+                        // RQ Sent → Processing: Show order details modal
                         showOrderModal(draggedCard.dataset.orderId, draggedCard);
                     } else {
                         // Other transitions: Show remark modal
@@ -680,8 +737,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('od_order_id').value = orderId;
         const rqBadge = cardElement.querySelector('.badge.bg-info');
         document.getElementById('od_rq_display').textContent = rqBadge ? rqBadge.textContent : '-';
-        document.getElementById('od_no_order_part').value = '';
-        document.getElementById('od_notes').value = '';
+        
+        // Pre-fill data if available (Smart Pre-fill for Redo)
+        const savedNoOrder = cardElement.dataset.noOrderPart;
+        const savedOrderDate = cardElement.dataset.orderDate;
+        const savedExpDate = cardElement.dataset.expectedDate;
+        const savedNotes = cardElement.dataset.notes;
+
+        document.getElementById('od_no_order_part').value = savedNoOrder || '';
+        document.getElementById('od_order_date').value = savedOrderDate || "{{ date('Y-m-d') }}";
+        document.getElementById('od_expected_date').value = savedExpDate || '';
+        document.getElementById('od_notes').value = savedNotes || '';
+        
         orderDetailModal.show();
     }
 
@@ -795,6 +862,31 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(err => {
             console.error(err);
             alert('Error updating status');
+        });
+    }
+
+    function deletePartOrder(orderId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        
+        fetch(`/part-orders/${orderId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (res.message || 'Delete failed'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error deleting part order');
         });
     }
 

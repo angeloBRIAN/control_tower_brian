@@ -1,7 +1,7 @@
 // Service Worker for Control Tower PWA
-const CACHE_NAME = 'control-tower-v3';
-const STATIC_CACHE = 'control-tower-static-v3';
-const DYNAMIC_CACHE = 'control-tower-dynamic-v3';
+const CACHE_NAME = 'control-tower-v4';
+const STATIC_CACHE = 'control-tower-static-v4';
+const DYNAMIC_CACHE = 'control-tower-dynamic-v4';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [

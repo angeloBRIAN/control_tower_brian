@@ -356,6 +356,18 @@ class PartOrderController extends Controller
                     $desc,
                     $changes
                 );
+
+                // Log to AuditLog (System)
+                \App\Models\AuditLog::create([
+                    'auditable_type' => get_class($partOrder),
+                    'auditable_id' => $partOrder->id,
+                    'user_id' => auth()->id(),
+                    'action' => 'updated',
+                    'old_values' => array_map(fn($field) => $partOrder->getOriginal($field), array_keys($changes)),
+                    'new_values' => $changes,
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
             }
         }
 
@@ -387,15 +399,60 @@ class PartOrderController extends Controller
     /**
      * Delete part order
      */
+    /**
+     * Delete part order (Undo Creation)
+     */
     public function destroy(PartOrder $partOrder)
     {
+        $user = auth()->user();
+        
+        // Permission Check: Admin, Sparepart, or Creator
+        $canDelete = in_array($user->role, ['admin', 'sparepart']);
+        
+        if (!$canDelete && $user->id === $partOrder->created_by) {
+            $canDelete = true;
+        }
+        
+        if (!$canDelete) {
+            $message = 'You do not have permission to delete this part order.';
+            if (request()->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $message], 403);
+            }
+            return redirect()->back()->with('error', $message);
+        }
+
         $jobId = $partOrder->job_id;
+        $rqNumber = $partOrder->rq;
+        
+        // Log before delete
+        $job = $partOrder->job;
+        \App\Models\JobActivity::log(
+            $job, 
+            \App\Models\JobActivity::ACTION_PARTS_UPDATED, 
+            "RQ <strong>{$rqNumber}</strong> deleted (Undo Creation)",
+            ['rq' => $rqNumber, 'deleted_by' => $user->name]
+        );
+        
+        \App\Models\AuditLog::create([
+            'auditable_type' => get_class($partOrder),
+            'auditable_id' => $partOrder->id,
+            'user_id' => $user->id,
+            'action' => 'deleted',
+            'old_values' => $partOrder->toArray(),
+            'new_values' => null,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
         $partOrder->delete();
 
         // Check if job still has pending part orders
         $remainingParts = PartOrder::where('job_id', $jobId)->pending()->count();
         if ($remainingParts === 0) {
             Job::where('id', $jobId)->update(['need_part' => false]);
+            // Also revert work status if it was "5. Buka RQ" back to previous if needed, 
+            // but usually it stays at "Checkup" or similar. 
+            // For now, we leave work_status as is or maybe reverting is complex.
         }
 
         if (request()->wantsJson()) {
@@ -461,22 +518,41 @@ class PartOrderController extends Controller
             $newStatus = PartOrder::STATUS_PROCESSING;
         }
         
-        // Define allowed transitions (1-step only, 5-status flow)
+        // Define allowed transitions (including reverse for Undo)
         $allowedTransitions = [
+            // Forward
             PartOrder::STATUS_RQ_SENT => [PartOrder::STATUS_PROCESSING],
-            PartOrder::STATUS_PROCESSING => [PartOrder::STATUS_READY],
-            PartOrder::STATUS_READY => [PartOrder::STATUS_RECEIVED],
+            PartOrder::STATUS_PROCESSING => [PartOrder::STATUS_READY, PartOrder::STATUS_RQ_SENT], // Allow back to RQ Sent
+            PartOrder::STATUS_READY => [PartOrder::STATUS_RECEIVED, PartOrder::STATUS_PROCESSING], // Allow back to Processing
+            PartOrder::STATUS_RECEIVED => [PartOrder::STATUS_READY], // Allow back to Ready
         ];
         
-        // Validate 1-step movement
+        // Validate transition
         if (!isset($allowedTransitions[$oldStatus]) || !in_array($newStatus, $allowedTransitions[$oldStatus])) {
             return response()->json([
                 'success' => false,
-                'message' => "Invalid transition: {$oldStatus} → {$newStatus}. Only 1-step movement is allowed.",
+                'message' => "Invalid transition: {$oldStatus} → {$newStatus}.",
             ], 400);
         }
+
+        // Strict Undo Ownership Check
+        // If moving BACKWARD, only the user who moved it forward (updated_by) OR Admin can undo.
+        $isBackward = 
+            ($oldStatus === PartOrder::STATUS_PROCESSING && $newStatus === PartOrder::STATUS_RQ_SENT) ||
+            ($oldStatus === PartOrder::STATUS_READY && $newStatus === PartOrder::STATUS_PROCESSING) ||
+            ($oldStatus === PartOrder::STATUS_RECEIVED && $newStatus === PartOrder::STATUS_READY);
+
+        if ($isBackward) {
+            // Check if user is Admin or the one who last updated it
+            if ($user->role !== 'admin' && $partOrder->updated_by !== $user->id) {
+                 return response()->json([
+                    'success' => false,
+                    'message' => 'Only the user who moved this card or an Admin can undo this action.',
+                ], 403);
+            }
+        }
         
-        // Validate required fields when moving to "processing" (order details required)
+        // Validate required fields ONLY when moving forward to "processing" (skip if undoing from Ready)
         if ($newStatus === PartOrder::STATUS_PROCESSING && $oldStatus === PartOrder::STATUS_RQ_SENT) {
             if (empty($validated['no_order_part']) || empty($validated['order_date']) || empty($validated['expected_date'])) {
                 return response()->json([
@@ -493,12 +569,87 @@ class PartOrderController extends Controller
         }
 
         // Update Status with auto-dates
-        $partOrder->update([
+        // Update Status with auto-dates
+        // Logic for Data Clearing on Undo (Reverse Transition)
+        $fieldsToClear = [];
+        $clearedData = [];
+
+        // Processing -> RQ Sent (Undo Ordering)
+        if ($oldStatus === PartOrder::STATUS_PROCESSING && $newStatus === PartOrder::STATUS_RQ_SENT) {
+            $fieldsToClear = ['no_order_part', 'order_date', 'expected_date', 'notes'];
+        }
+        // Ready -> Processing (Undo Ready)
+        elseif ($oldStatus === PartOrder::STATUS_READY && $newStatus === PartOrder::STATUS_PROCESSING) {
+            $fieldsToClear = ['ready_date'];
+        }
+        // Received -> Ready (Undo Received)
+        elseif ($oldStatus === PartOrder::STATUS_RECEIVED && $newStatus === PartOrder::STATUS_READY) {
+            $fieldsToClear = ['received_date'];
+        }
+
+        // Capture data before clearing
+        if (!empty($fieldsToClear)) {
+            foreach ($fieldsToClear as $field) {
+                // For dates, we might want to ensure they are nullified in the update payload
+                if ($partOrder->$field) {
+                    $clearedData[$field] = $partOrder->$field;
+                    // Add to update payload (setting to null)
+                    $validated[$field] = null;
+                    
+                    // Also forcibly update the model instance for the immediate update call below if needed, 
+                    // but $partOrder->update() inside the 'if (!empty($fillable))' block above handles $fillable.
+                    // We need to ensure these nulls are applied. 
+                    // The block above filters $validated by keys not in ['status', 'remark'].
+                    // So adding them to $validated with null values will work if we re-run the fillable logic or just pass them to the final update.
+                }
+            }
+        }
+        
+        $updateData = [
             'status' => $newStatus,
             'updated_by' => auth()->id(),
-            'ready_date' => $newStatus === PartOrder::STATUS_READY ? now()->toDateString() : $partOrder->ready_date,
-            'received_date' => $newStatus === PartOrder::STATUS_RECEIVED ? now()->toDateString() : $partOrder->received_date,
-        ]);
+            'ready_date' => $newStatus === PartOrder::STATUS_READY ? now()->toDateString() : ($newStatus === PartOrder::STATUS_PROCESSING && $oldStatus === PartOrder::STATUS_READY ? null : $partOrder->ready_date),
+            'received_date' => $newStatus === PartOrder::STATUS_RECEIVED ? now()->toDateString() : ($newStatus === PartOrder::STATUS_READY && $oldStatus === PartOrder::STATUS_RECEIVED ? null : $partOrder->received_date),
+        ];
+
+        // Merge cleared fields into update data
+        foreach ($fieldsToClear as $field) {
+            if (!isset($updateData[$field])) { // Don't overwrite ready_date/received_date logic if already set
+                $updateData[$field] = null;
+            }
+        }
+
+        $partOrder->update($updateData);
+
+        // Log Data Clearing
+        if (!empty($clearedData)) {
+            // Log to JobActivity
+            $job = $partOrder->job;
+            $clearedDataStr = implode(', ', array_map(
+                fn($v, $k) => "$k: " . (is_object($v) ? $v->toDateString() : $v),
+                $clearedData,
+                array_keys($clearedData)
+            ));
+            
+            \App\Models\JobActivity::log(
+                $job, 
+                \App\Models\JobActivity::ACTION_PARTS_UPDATED, 
+                "RQ <a href='" . route('part-orders.edit', $partOrder->id) . "'>{$partOrder->rq}</a> reversed: <strong>{$oldStatus}</strong> → <strong>{$newStatus}</strong>. Data cleared: {$clearedDataStr}",
+                ['cleared_data' => $clearedData, 'from' => $oldStatus, 'to' => $newStatus]
+            );
+            
+            // Log to AuditLog
+            \App\Models\AuditLog::create([
+                'auditable_type' => get_class($partOrder),
+                'auditable_id' => $partOrder->id,
+                'user_id' => auth()->id(),
+                'action' => 'updated',
+                'old_values' => $clearedData,
+                'new_values' => array_fill_keys(array_keys($clearedData), null),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        }
 
         // Job Work Status Logic - Trigger on READY (part available for pickup)
         $job = $partOrder->job;
