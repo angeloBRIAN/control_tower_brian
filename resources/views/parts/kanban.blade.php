@@ -222,7 +222,10 @@
                         </div>
                         <div class="small mb-2">
                             <span class="badge bg-info text-dark">
-                                <i class="bi bi-receipt me-1"></i>RQ: {{ $order->rq ?: '-' }}
+                                <i class="bi bi-receipt me-1"></i>RQ: 
+                                <a href="{{ route('part-orders.edit', $order->id) }}" class="text-dark text-decoration-underline">
+                                    {{ $order->rq ?: '-' }}
+                                </a>
                             </span>
                         </div>
                         @if($order->no_order_part)

@@ -186,8 +186,9 @@ class PartOrderController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('part_name', 'like', "%{$search}%")
-                  ->orWhere('part_number', 'like', "%{$search}%")
+                $q->where('rq', 'like', "%{$search}%")
+                  ->orWhere('no_order_part', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
                   ->orWhereHas('job', function($jq) use ($search) {
                       $jq->where('job_number', 'like', "%{$search}%");
                   });
