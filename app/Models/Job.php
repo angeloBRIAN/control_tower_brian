@@ -148,6 +148,7 @@ class Job extends Model
         'invoiced_at',
         'import_id',
         'is_dummy_wip',
+        'is_stale',
     ];
 
     /**
@@ -177,6 +178,7 @@ class Job extends Model
             'invoiced_at' => 'datetime',
             'need_part' => 'boolean',
             'is_dummy_wip' => 'boolean',
+            'is_stale' => 'boolean',
         ];
     }
 

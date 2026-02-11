@@ -294,6 +294,9 @@
                         {{-- Core identifiers --}}
                         <td data-col="wip">
                             <span class="fw-bold text-primary">{{ $job->job_number }}</span>
+                            @if($job->is_stale)
+                            <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Job needs attention (Stale)"></i>
+                            @endif
                             <span class="badge {{ $job->franchise == 'CV' ? 'bg-info' : 'bg-secondary' }} ms-1">{{ $job->franchise }}</span>
                         </td>
                         <td data-col="job_card">{{ $job->job_card }}</td>

@@ -289,7 +289,12 @@
             <div class="kanban-card" data-job-id="{{ $job->id }}">
                 <div class="d-flex justify-content-between align-items-start">
                     <a href="{{ route('jobs.show', $job) }}" class="plate text-decoration-none">{{ $job->plate_number }}</a>
-                    <span class="wip">{{ $job->job_number }}</span>
+                    <span class="wip">
+                        {{ $job->job_number }}
+                        @if($job->is_stale)
+                        <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Job needs attention (Stale)"></i>
+                        @endif
+                    </span>
                 </div>
                 <div class="customer" title="{{ $job->customer_name }}">{{ Str::limit($job->customer_name, 30) }}</div>
                 <div class="meta">

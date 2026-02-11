@@ -9,7 +9,6 @@ class FlagStaleJobs extends Command
 {
     protected $signature = 'jobs:flag-stale 
                             {--days=14 : Jobs older than this many days will be flagged}
-                            {--status=needs_attention : Work status to set for stale jobs}
                             {--dry-run : Show what would be flagged without making changes}';
     
     protected $description = 'Flag stale uninvoiced jobs by updating their work status';
@@ -17,7 +16,6 @@ class FlagStaleJobs extends Command
     public function handle()
     {
         $days = (int) $this->option('days');
-        $newStatus = $this->option('status');
         $dryRun = $this->option('dry-run');
         
         $this->info("Checking for uninvoiced jobs older than {$days} days...");
@@ -27,10 +25,7 @@ class FlagStaleJobs extends Command
         // Get stale jobs that haven't already been flagged
         $staleJobs = Job::uninvoiced()
             ->where('job_date', '<=', $cutoffDate)
-            ->where(function($q) use ($newStatus) {
-                $q->where('work_status', '!=', $newStatus)
-                  ->orWhereNull('work_status');
-            })
+            ->where('is_stale', false)
             ->whereNotIn('work_status', ['selesai', 'completed', 'invoiced']) // Don't flag completed jobs
             ->get();
             
@@ -63,9 +58,9 @@ class FlagStaleJobs extends Command
         
         // Update all stale jobs
         $updated = Job::whereIn('id', $staleJobs->pluck('id'))
-            ->update(['work_status' => $newStatus]);
+            ->update(['is_stale' => true]);
         
-        $this->info("Flagged {$updated} jobs with status '{$newStatus}'.");
+        $this->info("Flagged {$updated} jobs as stale.");
         
         return 0;
     }
