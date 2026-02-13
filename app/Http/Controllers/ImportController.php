@@ -585,7 +585,7 @@ class ImportController extends Controller
     public function importUninvoiced(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv,txt',
             'franchise' => 'nullable|in:PC,CV',
         ]);
 
@@ -636,7 +636,9 @@ class ImportController extends Controller
         $plateList = array_unique($plateList);
 
         // 3. Batch Load Existing Data
-        $existingJobsMap = Job::whereIn('job_number', $wipList)->get()->keyBy('job_number');
+        $existingJobsCollection = Job::whereIn('job_number', $wipList)->get();
+        // Group by job_number to handle duplicates (PC vs CV)
+        $existingJobsMap = $existingJobsCollection->groupBy('job_number');
         $existingVehiclesMap = Vehicle::whereIn('plate_number', $plateList)->get()->keyBy('plate_number');
         
         // 4. Local Cache for Customer Lookups to avoid repeated DB hits
@@ -774,7 +776,21 @@ class ImportController extends Controller
                     ];
 
                     // Process Job Logic using Maps
-                    $existingJob = $existingJobsMap[$jobNumber] ?? null;
+                    $jobCandidates = $existingJobsMap[$jobNumber] ?? collect();
+                    $existingJob = null;
+                    
+                    // 1. Try exact franchise match
+                    $existingJob = $jobCandidates->firstWhere('franchise', $franchise);
+                    
+                    // 2. Fallback: If only 1 candidate and we don't know franchise, or just want to match loosely?
+                    // Strict mode: Only match if franchise matches.
+                    // But if DB job has no franchise (legacy)? 
+                    if (!$existingJob && $jobCandidates->count() === 1) {
+                         $candidate = $jobCandidates->first();
+                         if (empty($candidate->franchise)) {
+                             $existingJob = $candidate;
+                         }
+                    }
                     
                     // RECONCILIATION Checks (simplified for performance, but keeping core logic)
                     if (!$existingJob && !empty($plateNumber)) {
@@ -792,7 +808,7 @@ class ImportController extends Controller
                                 'description' => ($dummyCandidate->description ?? '') . " [RECONCILED: Original Typo WIP was {$dummyCandidate->job_number}]"
                             ]);
                             $existingJob = $dummyCandidate; // Treat as existing now
-                            $existingJobsMap[$jobNumber] = $existingJob; // Update map
+                            $existingJobsMap[$jobNumber] = ($existingJobsMap[$jobNumber] ?? collect())->push($existingJob); // Update map
                             \Log::info("UNINVOICED import: RECONCILED Dummy Job {$dummyCandidate->id}");
                         }
                     }
@@ -829,7 +845,7 @@ class ImportController extends Controller
                                 
                                 $conflictRows[] = ['row' => $rowIndex, 'type' => 'SWAP', 'action' => "Swapped {$oldWip} to {$plateNumber}"];
                                 $existingJob = $dummyWithCorrectPlate;
-                                $existingJobsMap[$jobNumber] = $existingJob;
+                                $existingJobsMap[$jobNumber] = ($existingJobsMap[$jobNumber] ?? collect())->push($existingJob);
                             } else {
                                 // Conflict - Create Dummy
                                 $dummyWip = $jobNumber . '-DUP-' . $rowIndex;
@@ -860,7 +876,7 @@ class ImportController extends Controller
                         // Create New
                         $job = Job::create(array_filter(array_merge($jobData, ['job_number' => $jobNumber, 'import_id' => $importId, 'work_status' => Job::WORK_STATUSES[0]]), fn($v) => !is_null($v)));
                         $imported++;
-                        $existingJobsMap[$jobNumber] = $job; // Add to map for subsequent rows
+                        $existingJobsMap[$jobNumber] = ($existingJobsMap[$jobNumber] ?? collect())->push($job); // Add to map for subsequent rows
                     }
 
                     // Vehicle Update (using Map)
@@ -936,7 +952,7 @@ class ImportController extends Controller
     public function importInvoiced(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,ods,csv',
+            'file' => 'required|file|mimes:xlsx,xls,ods,csv,txt',
             'franchise' => 'required|in:PC,CV',
         ]);
 
