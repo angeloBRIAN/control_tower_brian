@@ -53,7 +53,13 @@ class UpdateJobRequest extends FormRequest
         $jobId = $this->route('job')?->id ?? $this->route('job');
         
         return [
-            'job_number' => 'required|string|unique:jobs,job_number,' . $jobId,
+            'job_number' => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rule::unique('jobs')->ignore($jobId)->where(function ($query) {
+                    return $query->where('franchise', $this->franchise);
+                }),
+            ],
             'job_card' => 'nullable|string',
             'franchise' => 'required|in:PC,CV',
             'department' => 'nullable|string',

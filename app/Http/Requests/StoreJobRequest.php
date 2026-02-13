@@ -22,7 +22,13 @@ class StoreJobRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'job_number' => 'required|string|unique:jobs,job_number',
+            'job_number' => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rule::unique('jobs')->where(function ($query) {
+                    return $query->where('franchise', $this->franchise);
+                }),
+            ],
             'franchise' => 'required|in:PC,CV',
             'plate_number' => 'required|string',
             'unit_type' => 'nullable|string',
