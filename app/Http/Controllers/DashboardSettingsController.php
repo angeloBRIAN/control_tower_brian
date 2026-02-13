@@ -46,13 +46,20 @@ class DashboardSettingsController extends Controller
             }
         }
         
+        // Get role defaults to check if a new widget should be enabled by default
+        $roleDefaults = collect(UserDashboardPreference::getDefaultForRole($user->role))->keyBy('id');
+
         // Add any available widgets not in current config
         foreach ($availableWidgets as $id => $meta) {
             $exists = collect($widgetsWithMeta)->contains('id', $id);
             if (!$exists) {
+                // Check if this widget is enabled in role defaults
+                $defaultConfig = $roleDefaults->get($id);
+                $isDefaultEnabled = $defaultConfig['enabled'] ?? false;
+                
                 $widgetsWithMeta[] = array_merge($meta, [
                     'id' => $id,
-                    'enabled' => false,
+                    'enabled' => $isDefaultEnabled, // Use role default instead of hardcoded false
                     'position' => count($widgetsWithMeta),
                 ]);
             }
@@ -142,10 +149,10 @@ class DashboardSettingsController extends Controller
     {
         $user = auth()->user();
         
+        \Illuminate\Support\Facades\Log::info("Dashboard Widget Fetch: User {$user->id} ({$user->role}) requested {$widgetId}");
+        
         return match ($widgetId) {
             'my_jobs' => $this->getMyJobsData($user),
-            'bookings_today' => $this->getBookingsTodayData(),
-            'pending_invoices' => $this->getPendingInvoicesData(),
             'bookings_today' => $this->getBookingsTodayData(),
             'pending_invoices' => $this->getPendingInvoicesData(),
             'saved_filters' => $this->getSavedFiltersData($user),
@@ -229,7 +236,8 @@ class DashboardSettingsController extends Controller
         ];
         
         // Query jobs for the selected month/year
-        $query = Job::whereYear('job_date', $year)
+        $query = Job::withoutGlobalScopes()
+            ->whereYear('job_date', $year)
             ->whereMonth('job_date', $month);
             
         // Clone query for counts
@@ -270,7 +278,8 @@ class DashboardSettingsController extends Controller
         ];
 
         // Fetch jobs for the month
-        $jobs = Job::whereYear('job_date', $year)
+        $jobs = Job::withoutGlobalScopes()
+            ->whereYear('job_date', $year)
             ->whereMonth('job_date', $month)
             ->get(['job_date', 'job_type']);
 

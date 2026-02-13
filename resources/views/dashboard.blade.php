@@ -264,7 +264,7 @@
                 </div>
                 <!-- Canvas for Stacked Bar Chart -->
                 <div style="height: 300px; position: relative; width: 100%;">
-                    <canvas id="jobTypeChart"></canvas>
+                    <canvas id="jobTypeChart_v2"></canvas>
                 </div>
             </div>
         </div>
@@ -296,7 +296,7 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center justify-content-center" style="height: 300px; position: relative; width: 100%;">
-                    <canvas id="monthlyCompletionChart"></canvas>
+                    <canvas id="monthlyCompletionChart_v2"></canvas>
                 </div>
                 <!-- Text Overlay for Percentage -->
                 <div id="mc-overlay" class="position-absolute top-50 start-50 translate-middle text-center" style="pointer-events: none;">
@@ -441,7 +441,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Job Trend Chart
@@ -503,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // SA Revenue Bar Chart
     const saData = @json($saRevenue);
-    if (saData.length > 0) {
+    if (saData.length > 0 && document.getElementById('saRevenueChart')) {
         new Chart(document.getElementById('saRevenueChart'), {
             type: 'bar',
             data: {
@@ -540,34 +540,36 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Job Aging Doughnut Chart
     const agingData = @json($agingData);
-    new Chart(document.getElementById('agingChart'), {
-        type: 'doughnut',
-        data: {
-            labels: agingData.map(a => a.label),
-            datasets: [{
-                data: agingData.map(a => a.count),
-                backgroundColor: agingData.map(a => a.color),
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'right' }
+    if (document.getElementById('agingChart')) {
+        new Chart(document.getElementById('agingChart'), {
+            type: 'doughnut',
+            data: {
+                labels: agingData.map(a => a.label),
+                datasets: [{
+                    data: agingData.map(a => a.count),
+                    backgroundColor: agingData.map(a => a.color),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'right' }
+                }
             }
-        }
-    });
+        });
+    }
     
     // Job Type Doughnut Chart
     // Job Type Distribution Widget (Stacked Bar Chart)
-    if (document.getElementById('jobTypeChart')) {
+    if (document.getElementById('jobTypeChart_v2')) {
         let jtdChart = null;
         
         function loadJobTypeDistributionData() {
             const month = document.getElementById('jtd-month').value;
             const year = document.getElementById('jtd-year').value;
             const loader = document.getElementById('jtd-loader');
-            const canvas = document.getElementById('jobTypeChart');
+            const canvas = document.getElementById('jobTypeChart_v2');
             
             loader.style.display = 'block';
             canvas.style.opacity = '0.3';
@@ -584,8 +586,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         jtdChart.data.labels = stats.labels;
                         jtdChart.data.datasets = stats.datasets;
                         jtdChart.update();
+                    if (jtdChart) {
+                        jtdChart.data.labels = stats.labels;
+                        jtdChart.data.datasets = stats.datasets;
+                        jtdChart.update();
                     } else {
-                        jtdChart = new Chart(document.getElementById('jobTypeChart'), {
+                        const ctx = document.getElementById('jobTypeChart_v2').getContext('2d');
+                        jtdChart = new Chart(ctx, {
                             type: 'bar',
                             data: {
                                 labels: stats.labels,
@@ -622,7 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // Monthly Completion Rate Widget
-    if (document.getElementById('monthlyCompletionChart')) {
+    if (document.getElementById('monthlyCompletionChart_v2')) {
         let mcChart = null;
         
         function loadMonthlyCompletionData() {
@@ -630,7 +637,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const year = document.getElementById('mc-year').value;
             const loader = document.getElementById('mc-loader');
             const overlay = document.getElementById('mc-overlay');
-            const canvas = document.getElementById('monthlyCompletionChart');
+            const canvas = document.getElementById('monthlyCompletionChart_v2');
             
             loader.style.display = 'block';
             canvas.style.opacity = '0.3';
@@ -659,7 +666,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         mcChart.data.datasets[0].backgroundColor = chartData.colors;
                         mcChart.update();
                     } else {
-                        mcChart = new Chart(document.getElementById('monthlyCompletionChart'), {
+                        const ctx = document.getElementById('monthlyCompletionChart_v2').getContext('2d');
+                        mcChart = new Chart(ctx, {
                             type: 'doughnut',
                             data: {
                                 labels: chartData.labels,
