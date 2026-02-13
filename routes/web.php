@@ -39,6 +39,7 @@ Route::middleware('auth')->group(function () {
         Route::post('customize', [\App\Http\Controllers\DashboardSettingsController::class, 'update'])->name('customize.save');
         Route::post('customize/reset', [\App\Http\Controllers\DashboardSettingsController::class, 'reset'])->name('customize.reset');
         Route::post('widgets/reorder', [\App\Http\Controllers\DashboardSettingsController::class, 'reorder'])->name('widgets.reorder');
+        Route::get('widget-data/{widget}', [\App\Http\Controllers\DashboardSettingsController::class, 'getWidgetData'])->name('widgets.data');
     });
     
     // Global Search

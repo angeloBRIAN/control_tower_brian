@@ -228,6 +228,7 @@ class DashboardController extends Controller
      *
      * @param Collection $workStatusOptions Available work status dropdown options
      * @param Collection $workStatusCounts Current count per work status
+     * @param Collection $workStatusCounts Current count per work status
      * @return array Chart data arrays for JavaScript rendering
      */
     protected function getChartData($workStatusOptions, $workStatusCounts): array
@@ -283,11 +284,43 @@ class DashboardController extends Controller
             ['label' => '> 30 days', 'count' => Job::uninvoiced()->where('job_date', '<', $today->copy()->subDays(30))->count(), 'color' => '#dc3545'],
         ];
 
+        // Job Type Distribution
+        $jobTypeRaw = Job::uninvoiced()
+            ->selectRaw('COALESCE(NULLIF(job_type, ""), "Unspecified") as type, COUNT(*) as count')
+            ->groupBy('type')
+            ->orderBy('count', 'desc')
+            ->get();
+
+        // Color palette for job types
+        $colors = [
+            'quick_service' => '#0d6efd', // Blue
+            'warranty' => '#ffc107',      // Yellow
+            'isp' => '#0dcaf0',           // Cyan
+            'campaign' => '#6f42c1',      // Purple
+            'cash' => '#198754',          // Green
+            'booking_service' => '#fd7e14', // Orange
+            'pdi' => '#20c997',           // Teal
+            'internal' => '#6c757d',      // Gray
+            'Unspecified' => '#adb5bd',   // Light Gray
+        ];
+
+        $jobTypeData = $jobTypeRaw->map(function($item) use ($colors) {
+            // Format label: capitalize words/replace underscores
+            $label = ucwords(str_replace('_', ' ', $item->type));
+            
+            return [
+                'label' => $label,
+                'count' => $item->count,
+                'color' => $colors[$item->type] ?? '#' . substr(md5($item->type), 0, 6) // Fallback color
+            ];
+        });
+
         return [
             'last7Days' => $last7Days,
             'statusCounts' => $statusCounts,
             'saRevenue' => $saRevenue,
             'agingData' => $agingData,
+            'jobTypeData' => $jobTypeData,
         ];
     }
 }

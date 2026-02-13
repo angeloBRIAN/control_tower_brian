@@ -146,7 +146,11 @@ class DashboardSettingsController extends Controller
             'my_jobs' => $this->getMyJobsData($user),
             'bookings_today' => $this->getBookingsTodayData(),
             'pending_invoices' => $this->getPendingInvoicesData(),
+            'bookings_today' => $this->getBookingsTodayData(),
+            'pending_invoices' => $this->getPendingInvoicesData(),
             'saved_filters' => $this->getSavedFiltersData($user),
+            'monthly_completion' => $this->getMonthlyCompletionData($request),
+            'job_type_distribution' => $this->getJobTypeDistributionData($request),
             default => response()->json(['error' => 'Unknown widget'], 404),
         };
     }
@@ -206,5 +210,153 @@ class DashboardSettingsController extends Controller
             ->get();
             
         return ['savedFilters' => $filters];
+    }
+
+    /**
+     * Get monthly completion data (Completed vs Open).
+     */
+    protected function getMonthlyCompletionData(Request $request): array
+    {
+        $month = $request->input('month', now()->month);
+        $year = $request->input('year', now()->year);
+        
+        // Define completed statuses (11. Invoice, 12. Tunggu Bayar, 13. Lunas)
+        // Using strict string matching based on Job::WORK_STATUSES
+        $completedStatuses = [
+            '11. Proses Invoice',
+            '12. Menunggu Pembayaran',
+            '13. Sudah Dibayar'
+        ];
+        
+        // Query jobs for the selected month/year
+        $query = Job::whereYear('job_date', $year)
+            ->whereMonth('job_date', $month);
+            
+        // Clone query for counts
+        $total = (clone $query)->count();
+        $completed = (clone $query)->whereIn('work_status', $completedStatuses)->count();
+        $open = $total - $completed;
+        
+        return [
+            'monthlyCompletion' => [
+                'total' => $total,
+                'completed' => $completed,
+                'open' => $open,
+                'month_name' => \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y'),
+                'chart_data' => [
+                    'labels' => ['Completed (Invoiced)', 'Open (In Progress)'],
+                    'data' => [$completed, $open],
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Get Job Type Distribution data (Stacked Bar Chart by Date).
+     */
+    protected function getJobTypeDistributionData(Request $request): array
+    {
+        $month = $request->input('month', now()->month);
+        $year = $request->input('year', now()->year);
+        
+        // Groups definition
+        $groups = [
+            'Asuransi' => ['insurance', 'asuransi'],
+            'Cash' => ['cash'],
+            'Internal' => ['internal'], 
+            'ISP & Warranty' => ['isp', 'warranty', 'campaign'],
+            'PDI' => ['pdi'],
+            // 'Other' will capture anything else
+        ];
+
+        // Fetch jobs for the month
+        $jobs = Job::whereYear('job_date', $year)
+            ->whereMonth('job_date', $month)
+            ->get(['job_date', 'job_type']);
+
+        // Initialize daily data structure
+        $daysInMonth = \Carbon\Carbon::createFromDate($year, $month, 1)->daysInMonth;
+        $dailyData = [];
+        
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $date = \Carbon\Carbon::createFromDate($year, $month, $day)->format('Y-m-d');
+            $dailyData[$date] = [
+                'Asuransi' => 0,
+                'Cash' => 0,
+                'Internal' => 0,
+                'ISP & Warranty' => 0,
+                'PDI' => 0,
+                'Other' => 0,
+            ];
+        }
+
+        // Populate counts
+        foreach ($jobs as $job) {
+            $date = $job->job_date ? $job->job_date->format('Y-m-d') : null;
+            if (!$date || !isset($dailyData[$date])) continue;
+
+            $type = strtolower($job->job_type ?? '');
+            $foundGroup = false;
+
+            foreach ($groups as $groupName => $types) {
+                if (in_array($type, $types)) {
+                    $dailyData[$date][$groupName]++;
+                    $foundGroup = true;
+                    break;
+                }
+            }
+
+            if (!$foundGroup) {
+                $dailyData[$date]['Other']++;
+            }
+        }
+
+        // Format for Chart.js
+        $labels = array_keys($dailyData);
+        // Format labels to be dd/mm/yyyy
+        $formattedLabels = array_map(function($date) {
+            return \Carbon\Carbon::parse($date)->format('d/m/Y');
+        }, $labels);
+
+        $datasets = [];
+        $colors = [
+            'Asuransi' => '#0d6efd', // Blue
+            'Cash' => '#fd7e14', // Orange
+            'Internal' => '#6c757d', // Gray
+            'ISP & Warranty' => '#ffc107', // Yellow
+            'PDI' => '#198754', // Green
+            'Other' => '#6610f2' // Purple
+        ];
+
+        foreach (array_keys($groups) as $groupName) {
+            $data = [];
+            foreach ($dailyData as $dayStats) {
+                $data[] = $dayStats[$groupName];
+            }
+            $datasets[] = [
+                'label' => $groupName,
+                'data' => $data,
+                'backgroundColor' => $colors[$groupName],
+            ];
+        }
+        
+        // Add 'Other' dataset
+        $otherData = [];
+        foreach ($dailyData as $dayStats) {
+            $otherData[] = $dayStats['Other'];
+        }
+        $datasets[] = [
+            'label' => 'Other',
+            'data' => $otherData,
+            'backgroundColor' => $colors['Other'],
+        ];
+
+        return [
+            'jobTypeDistribution' => [
+                'labels' => $formattedLabels,
+                'datasets' => $datasets,
+                'month_name' => \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y'),
+            ]
+        ];
     }
 }

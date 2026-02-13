@@ -203,6 +203,7 @@
     $statusCounts = $chartData['statusCounts'];
     $saRevenue = $chartData['saRevenue'];
     $agingData = $chartData['agingData'];
+    $jobTypeData = $chartData['jobTypeData'] ?? [];
 @endphp
 
 <div class="row g-4 mb-4">
@@ -224,27 +225,100 @@
     </div>
 </div>
 
-<!-- Analytics Row 2: SA Revenue & Aging -->
+<!-- Analytics Row: SA Revenue, Job Type, Monthly, Aging -->
 <div class="row g-4 mb-4">
-    <div class="col-md-6">
+    @if(in_array('sa_revenue', $enabledWidgets))
+    <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header bg-light"><i class="bi bi-currency-dollar me-2"></i>Top 5 SA Revenue (Uninvoiced)</div>
+            <div class="card-header bg-light"><i class="bi bi-currency-dollar me-2"></i>Top 5 SA Revenue</div>
             <div class="card-body">
                 <canvas id="saRevenueChart" height="200"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    @endif
+
+    @if(in_array('job_type_distribution', $enabledWidgets))
+    <div class="col-md-8">
         <div class="card h-100">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-hourglass-split me-2"></i>Job Aging (Uninvoiced)</span>
+                <span><i class="bi bi-bar-chart-fill me-2"></i>Job Type Distribution</span>
+                <div class="d-flex gap-1">
+                    <select id="jtd-month" class="form-select form-select-sm py-0" style="width: auto;">
+                        @foreach(range(1, 12) as $m)
+                        <option value="{{ $m }}" {{ $m == now()->month ? 'selected' : '' }}>{{ date('M', mktime(0, 0, 0, $m, 1)) }}</option>
+                        @endforeach
+                    </select>
+                    <select id="jtd-year" class="form-select form-select-sm py-0" style="width: auto;">
+                        @foreach(range(now()->year - 2, now()->year + 1) as $y)
+                        <option value="{{ $y }}" {{ $y == now()->year ? 'selected' : '' }}>{{ $y }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="card-body position-relative">
+                <div id="jtd-loader" class="position-absolute top-50 start-50 translate-middle" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <!-- Canvas for Stacked Bar Chart -->
+                <canvas id="jobTypeChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if(in_array('monthly_completion', $enabledWidgets))
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-pie-chart me-2"></i>Monthly Completion</span>
+                <div class="d-flex gap-1">
+                    <select id="mc-month" class="form-select form-select-sm py-0" style="width: auto;">
+                        @foreach(range(1, 12) as $m)
+                        <option value="{{ $m }}" {{ $m == now()->month ? 'selected' : '' }}>{{ date('M', mktime(0, 0, 0, $m, 1)) }}</option>
+                        @endforeach
+                    </select>
+                    <select id="mc-year" class="form-select form-select-sm py-0" style="width: auto;">
+                        @foreach(range(now()->year - 2, now()->year + 1) as $y)
+                        <option value="{{ $y }}" {{ $y == now()->year ? 'selected' : '' }}>{{ $y }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="card-body position-relative">
+                <div id="mc-loader" class="position-absolute top-50 start-50 translate-middle" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-center h-100">
+                    <canvas id="monthlyCompletionChart" height="200"></canvas>
+                </div>
+                <!-- Text Overlay for Percentage -->
+                <div id="mc-overlay" class="position-absolute top-50 start-50 translate-middle text-center" style="pointer-events: none;">
+                    <h3 class="mb-0 fw-bold" id="mc-percentage">--%</h3>
+                    <small class="text-muted">Completed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if(in_array('aging_breakdown', $enabledWidgets))
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-hourglass-split me-2"></i>Job Aging</span>
                 <a href="{{ route('reports.aging') }}" class="btn btn-sm btn-outline-primary">Full Report</a>
             </div>
-            <div class="card-body">
+            <div class="card-body d-flex align-items-center justify-content-center h-100">
                 <canvas id="agingChart" height="200"></canvas>
             </div>
         </div>
     </div>
+    @endif
 </div>
 
 <!-- Main Content Area -->
@@ -481,6 +555,155 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // Job Type Doughnut Chart
+    // Job Type Distribution Widget (Stacked Bar Chart)
+    if (document.getElementById('jobTypeChart')) {
+        let jtdChart = null;
+        
+        function loadJobTypeDistributionData() {
+            const month = document.getElementById('jtd-month').value;
+            const year = document.getElementById('jtd-year').value;
+            const loader = document.getElementById('jtd-loader');
+            const canvas = document.getElementById('jobTypeChart');
+            
+            loader.style.display = 'block';
+            canvas.style.opacity = '0.3';
+            
+            fetch(`/dashboard/widget-data/job_type_distribution?month=${month}&year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    const stats = data.jobTypeDistribution;
+                    
+                    loader.style.display = 'none';
+                    canvas.style.opacity = '1';
+                    
+                    if (jtdChart) {
+                        jtdChart.data.labels = stats.labels;
+                        jtdChart.data.datasets = stats.datasets;
+                        jtdChart.update();
+                    } else {
+                        jtdChart = new Chart(document.getElementById('jobTypeChart'), {
+                            type: 'bar',
+                            data: {
+                                labels: stats.labels,
+                                datasets: stats.datasets
+                            },
+                            options: {
+                                responsive: true,
+                                // maintainAspectRatio: false, // Removed to match Job Trend behavior
+                                scales: {
+                                    x: { stacked: true },
+                                    y: { stacked: true, beginAtZero: true }
+                                },
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { boxWidth: 12 } }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching job type data:', error);
+                    loader.style.display = 'none';
+                });
+        }
+
+        // Initial load
+        loadJobTypeDistributionData();
+        
+        // Event listeners
+        document.getElementById('jtd-month').addEventListener('change', loadJobTypeDistributionData);
+        document.getElementById('jtd-year').addEventListener('change', loadJobTypeDistributionData);
+    }
+    
+
+
+    // Monthly Completion Rate Widget
+    if (document.getElementById('monthlyCompletionChart')) {
+        let mcChart = null;
+        
+        function loadMonthlyCompletionData() {
+            const month = document.getElementById('mc-month').value;
+            const year = document.getElementById('mc-year').value;
+            const loader = document.getElementById('mc-loader');
+            const overlay = document.getElementById('mc-overlay');
+            const canvas = document.getElementById('monthlyCompletionChart');
+            
+            loader.style.display = 'block';
+            canvas.style.opacity = '0.3';
+            overlay.style.opacity = '0.3';
+            
+            fetch(`/dashboard/widget-data/monthly_completion?month=${month}&year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    const stats = data.monthlyCompletion;
+                    const chartData = stats.chart_data;
+                    
+                    loader.style.display = 'none';
+                    canvas.style.opacity = '1';
+                    overlay.style.opacity = '1';
+                    
+                    // Update Percentage
+                    const total = stats.total;
+                    const completed = stats.completed;
+                    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    document.getElementById('mc-percentage').textContent = percentage + '%';
+                    
+                    // Render/Update Chart
+                    if (mcChart) {
+                        mcChart.data.labels = chartData.labels;
+                        mcChart.data.datasets[0].data = chartData.data;
+                        mcChart.data.datasets[0].backgroundColor = chartData.colors;
+                        mcChart.update();
+                    } else {
+                        mcChart = new Chart(document.getElementById('monthlyCompletionChart'), {
+                            type: 'doughnut',
+                            data: {
+                                labels: chartData.labels,
+                                datasets: [{
+                                    data: chartData.data,
+                                    backgroundColor: chartData.colors,
+                                    borderWidth: 0,
+                                    cutout: '70%'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: { position: 'bottom' },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.label || '';
+                                                if (label) {
+                                                    label += ': ';
+                                                }
+                                                let value = context.raw;
+                                                let total = context.chart._metasets[context.datasetIndex].total;
+                                                let percentage = Math.round((value * 100) / total) + '%';
+                                                return label + value + ' (' + percentage + ')';
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching monthly completion data:', error);
+                    loader.style.display = 'none';
+                });
+        }
+        
+        // Initial load
+        loadMonthlyCompletionData();
+        
+        // Event listeners
+        document.getElementById('mc-month').addEventListener('change', loadMonthlyCompletionData);
+        document.getElementById('mc-year').addEventListener('change', loadMonthlyCompletionData);
+    }
     
     // Real-time dashboard updates via WebSocket
     if (window.Echo) {
