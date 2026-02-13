@@ -263,7 +263,9 @@
                     </div>
                 </div>
                 <!-- Canvas for Stacked Bar Chart -->
-                <canvas id="jobTypeChart" height="120"></canvas>
+                <div style="height: 300px; position: relative; width: 100%;">
+                    <canvas id="jobTypeChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -293,8 +295,8 @@
                         <span class="visually-hidden">Loading...</span>
                     </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-center h-100">
-                    <canvas id="monthlyCompletionChart" height="200"></canvas>
+                <div class="d-flex align-items-center justify-content-center" style="height: 300px; position: relative; width: 100%;">
+                    <canvas id="monthlyCompletionChart"></canvas>
                 </div>
                 <!-- Text Overlay for Percentage -->
                 <div id="mc-overlay" class="position-absolute top-50 start-50 translate-middle text-center" style="pointer-events: none;">
@@ -591,7 +593,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             },
                             options: {
                                 responsive: true,
-                                // maintainAspectRatio: false, // Removed to match Job Trend behavior
+                                maintainAspectRatio: false,
                                 scales: {
                                     x: { stacked: true },
                                     y: { stacked: true, beginAtZero: true }
@@ -670,6 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             },
                             options: {
                                 responsive: true,
+                                maintainAspectRatio: false,
                                 plugins: {
                                     legend: { position: 'bottom' },
                                     tooltip: {
