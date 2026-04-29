@@ -359,6 +359,7 @@
                                 'chassis_number' => ['label' => 'Chassis', 'default' => false],
                                 'unit_type' => ['label' => 'Unit Type', 'default' => false],
                                 'customer_name' => ['label' => 'Customer', 'default' => false],
+                                'customer_address' => ['label' => 'Address', 'default' => false],
                                 'account_no' => ['label' => 'Account No', 'default' => false],
                                 'service_advisor' => ['label' => 'SA', 'default' => true],
                                 'technician' => ['label' => 'Technician', 'default' => false],
@@ -545,6 +546,7 @@
                             'chassis_number' => 'Chassis',
                             'unit_type' => 'Unit Type',
                             'customer_name' => 'Customer',
+                            'customer_address' => 'Address',
                             'account_no' => 'Account No',
                             'service_advisor' => 'SA',
                             'technician' => 'Technician',
@@ -608,6 +610,7 @@
                         <td class="col-chassis_number d-none">{{ $job->chassis_number ?? '-' }}</td>
                         <td class="col-unit_type d-none">{{ $job->unit_type ?? '-' }}</td>
                         <td class="col-customer_name d-none">{{ Str::limit($job->customer_name, 20) ?? '-' }}</td>
+                        <td class="col-customer_address d-none">{{ Str::limit($job->customer_address, 30) ?? '-' }}</td>
                         <td class="col-account_no d-none">{{ $job->account_no ?? '-' }}</td>
                         <td class="col-service_advisor">{{ $job->service_advisor ?? '-' }}</td>
                         <td class="col-technician d-none">{{ $job->technician ?? '-' }}</td>

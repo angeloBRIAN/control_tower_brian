@@ -747,6 +747,7 @@ class ReportController extends Controller
             'chassis_number' => 'Chassis',
             'unit_type' => 'Unit Type',
             'customer_name' => 'Customer',
+            'customer_address' => 'Address',
             'account_no' => 'Account No',
             'service_advisor' => 'SA',
             'technician' => 'Technician',

@@ -188,6 +188,7 @@
                             <th>Plate</th>
                             <th>SA</th>
                             <th>Date</th>
+                            <th>Address</th>
                             <th>Status</th>
                             <th class="amount">Amount</th>
                         </tr>
@@ -199,6 +200,7 @@
                             <td>{{ $job->plate_number }}</td>
                             <td>{{ $job->service_advisor ?? '-' }}</td>
                             <td>{{ $job->job_date?->format('d/m/Y') }}</td>
+                            <td>{{ Str::limit($job->customer_address, 20) ?? '-' }}</td>
                             <td>{{ $job->work_status ?? 'Pending' }}</td>
                             <td class="amount">{{ $job->total_sales ? number_format($job->total_sales, 0, ',', '.') : '-' }}</td>
                         </tr>

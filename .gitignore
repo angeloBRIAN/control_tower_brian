@@ -36,3 +36,14 @@ Thumbs.db
 # Testing
 .phpunit.result.cache
 public/storage
+*.sql
+package-lock.json
+query
+storage/remarks/4033/6961d24c9a797_1768018508.jpg
+storage/remarks/4039/6961d0c505e4b_1768018117.jpg
+storage/remarks/4039/6961d1bce3d52_1768018364.jpg
+storage/remarks/4039/6961d22933e61_1768018473.jpg
+storage/remarks/4169/69de086d4b258_1776158829.jpg
+storage/remarks/4169/69de086d4ff65_1776158829.jpg
+storage/remarks/4317/69688febca0f6_1768460267.jpg
+storage/remarks/5226/69e581b9073c4_1776648633.jpg
