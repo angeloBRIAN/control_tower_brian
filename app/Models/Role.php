@@ -119,6 +119,7 @@ class Role extends Model
             'sparepart' => 'sparepart',
             'viewer' => 'viewer',
             'manager' => 'manager',
+            'billing' => 'billing',
         ];
     }
 

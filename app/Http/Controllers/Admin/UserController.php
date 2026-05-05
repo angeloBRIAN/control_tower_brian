@@ -21,6 +21,7 @@ class UserController extends Controller
         'control_tower' => 'Control Tower',
         'audit' => 'Audit',
         'manager' => 'Workshop Manager',
+        'billing' => 'Billing',
         'admin' => 'Administrator',
     ];
 

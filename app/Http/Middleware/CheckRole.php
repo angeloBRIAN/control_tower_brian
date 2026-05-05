@@ -12,12 +12,13 @@ class CheckRole
      * Role hierarchy - higher roles include lower permissions
      */
     protected array $roleHierarchy = [
-        'admin' => ['admin', 'manager', 'control_tower', 'sparepart', 'sa', 'foreman', 'audit', 'user'],
-        'manager' => ['manager', 'control_tower', 'sparepart', 'sa', 'foreman', 'audit', 'user'],
-        'control_tower' => ['control_tower', 'sparepart', 'sa', 'foreman', 'user'],
+        'admin' => ['admin', 'manager', 'control_tower', 'sparepart', 'sa', 'foreman', 'audit', 'billing', 'user'],
+        'manager' => ['manager', 'control_tower', 'sparepart', 'sa', 'foreman', 'audit', 'billing', 'user'],
+        'control_tower' => ['control_tower', 'sparepart', 'sa', 'foreman', 'billing', 'user'],
         'sparepart' => ['sparepart', 'user'],
         'sa' => ['sa', 'user'],
         'foreman' => ['foreman', 'user'],
+        'billing' => ['billing', 'user'],
         'audit' => ['audit', 'user'],
         'user' => ['user'],
     ];

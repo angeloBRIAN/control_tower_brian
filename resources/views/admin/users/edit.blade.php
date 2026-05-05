@@ -92,6 +92,7 @@ const permissions = {
     'sa': ['View Jobs', 'Reports', 'Remarks'],
     'foreman': ['View Jobs', 'Reports', 'Remarks'],
     'audit': ['View All', 'Reports', 'Audit Logs'],
+    'billing': ['View All Jobs', 'Kanban View', 'Reports', 'Remarks'],
     'user': ['None'],
 };
 

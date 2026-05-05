@@ -199,7 +199,7 @@ class User extends Authenticatable
      */
     public function canAddRemarks(): bool
     {
-        return $this->hasAnyRole(['admin', 'manager', 'control_tower', 'sparepart', 'sa', 'foreman']);
+        return $this->hasAnyRole(['admin', 'manager', 'control_tower', 'sparepart', 'sa', 'foreman', 'billing']);
     }
 
     /**
@@ -255,8 +255,17 @@ class User extends Authenticatable
             'foreman' => 'Foreman',
             'audit' => 'Audit',
             'finance' => 'Finance',
+            'billing' => 'Billing',
             default => 'User',
         };
+    }
+
+    /**
+     * Check if user is Billing role
+     */
+    public function isBilling(): bool
+    {
+        return $this->role === 'billing';
     }
 
     /**
@@ -346,8 +355,8 @@ class User extends Authenticatable
      */
     public function canAddRemarkToJob(Job $job): bool
     {
-        // Admin, Manager, and Control Tower can add remarks to any job
-        if ($this->hasAnyRole(['admin', 'manager', 'control_tower'])) {
+        // Admin, Manager, Control Tower, and Billing can add remarks to any job
+        if ($this->hasAnyRole(['admin', 'manager', 'control_tower', 'billing'])) {
             return true;
         }
 
