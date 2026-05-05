@@ -22,6 +22,7 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Service Advisor', 'slug' => 'sa', 'description' => 'View jobs and add remarks', 'is_system' => true],
             ['name' => 'Foreman', 'slug' => 'foreman', 'description' => 'View jobs and add remarks', 'is_system' => true],
             ['name' => 'Sparepart', 'slug' => 'sparepart', 'description' => 'Manage spare parts fields only', 'is_system' => true],
+            ['name' => 'Billing', 'slug' => 'billing', 'description' => 'Can see all jobs, progress and kanban, can only comment', 'is_system' => true],
             ['name' => 'Viewer', 'slug' => 'viewer', 'description' => 'Read-only access', 'is_system' => true],
         ];
 
@@ -37,6 +38,7 @@ class RolePermissionSeeder extends Seeder
         $this->setupSAPermissions($doctypes);
         $this->setupForemanPermissions($doctypes);
         $this->setupSparepartPermissions();
+        $this->setupBillingPermissions($doctypes);
         $this->setupViewerPermissions($doctypes);
     }
 
@@ -155,6 +157,22 @@ class RolePermissionSeeder extends Seeder
             FieldPermission::updateOrCreate(
                 ['role_id' => $role->id, 'doctype' => 'Job', 'field' => $field],
                 ['can_read' => true, 'can_write' => in_array($field, $writableFields)]
+            );
+        }
+    }
+
+    private function setupBillingPermissions(array $doctypes): void
+    {
+        $role = Role::where('slug', 'billing')->first();
+        $allowRead = ['Job', 'Vehicle', 'Booking', 'Customer', 'Remark', 'Report'];
+        $allowWrite = ['Remark']; // For commenting
+
+        foreach ($doctypes as $doctype) {
+            $canRead = in_array($doctype, $allowRead);
+            $canWrite = in_array($doctype, $allowWrite);
+            Permission::updateOrCreate(
+                ['role_id' => $role->id, 'doctype' => $doctype],
+                ['can_read' => $canRead, 'can_write' => $canWrite, 'can_create' => $canWrite, 'can_delete' => false, 'can_export' => $canRead]
             );
         }
     }

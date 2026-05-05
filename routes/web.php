@@ -129,8 +129,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('orphan-vehicles', [\App\Http\Controllers\OrphanVehicleReportController::class, 'bulkDestroy'])->name('orphan-vehicles.bulk-destroy');
     });
 
-    // Add Remarks - SA, Foreman, Sparepart, Control Tower, Manager, Admin
-    Route::middleware('role:sa,foreman,sparepart,control_tower,manager,admin')->group(function () {
+    // Add Remarks - SA, Foreman, Sparepart, Control Tower, Manager, Admin, Billing
+    Route::middleware('role:sa,foreman,sparepart,control_tower,manager,admin,billing')->group(function () {
         Route::post('jobs/{job}/remark', [JobController::class, 'addRemark'])->name('jobs.add-remark');
         Route::delete('remarks/{remark}', [JobController::class, 'deleteRemark'])->name('remarks.destroy');
         Route::post('jobs/bulk-update', [JobController::class, 'bulkUpdate'])->name('jobs.bulk-update');

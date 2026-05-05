@@ -468,6 +468,13 @@ class ImportController extends Controller
                     // Set default work_status for new jobs so they appear in Kanban
                     // 'work_status' => 'belum_diproses', // REMOVED: Don't overwrite status for existing jobs
                 ];
+                
+                $firstReg = $this->parseDate($this->getColumnValue($row, $headerMap, [
+                    'date reg', 'date first reg', 'first reg', 'tgl registrasi pertama'
+                ]));
+                if ($firstReg) {
+                    $jobData['date_first_reg'] = $firstReg;
+                }
 
                 // Match by Job Number AND Franchise if possible? 
                 // Problem: If franchise is null (new SA), we might match wrong job if duplicates exist.
@@ -751,7 +758,6 @@ class ImportController extends Controller
                         'unit_type' => $this->getColumnValue($row, $headerMap, ['type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit', 'vehicle type']),
                         'type_unit' => $this->getColumnValue($row, $headerMap, ['type unit', 'unit', 'model', 'type', 'kendaraan', 'tipe unit', 'vehicle type']),
                         'account_no' => $this->getColumnValue($row, $headerMap, ['acc   no', 'acc no', 'account no', 'account', 'no akun', 'akun']),
-                        'date_first_reg' => $this->parseDate($this->getColumnValue($row, $headerMap, ['date reg', 'date first reg', 'first reg', 'tgl registrasi pertama'])),
                         'service_advisor' => $saName,
                         'technician' => $this->getColumnValue($row, $headerMap, ['teknisi', 'technician', 'mekanik']),
                         'foreman' => $foremanName,
@@ -774,6 +780,11 @@ class ImportController extends Controller
                         'update_remarks' => $this->getColumnValue($row, $headerMap, ['update remarks', 'update remark', 'update keterangan']),
                         'status' => 'uninvoiced',
                     ];
+                    
+                    $firstReg = $this->parseDate($this->getColumnValue($row, $headerMap, ['date reg', 'date first reg', 'first reg', 'tgl registrasi pertama']));
+                    if ($firstReg) {
+                        $jobData['date_first_reg'] = $firstReg;
+                    }
 
                     // Process Job Logic using Maps
                     $jobCandidates = $existingJobsMap[$jobNumber] ?? collect();

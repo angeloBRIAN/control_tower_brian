@@ -428,7 +428,7 @@
                         $commentBlockReason = '';
                         $commentUser = auth()->user();
                         
-                        if ($commentUser->hasAnyRole(['admin', 'manager', 'control_tower'])) {
+                        if ($commentUser->hasAnyRole(['admin', 'manager', 'control_tower']) || $commentUser->isBilling()) {
                             $canComment = true;
                         } elseif ($commentUser->hasRole('sa')) {
                             if ($commentUser->serviceAdvisor?->name === $job->service_advisor) {

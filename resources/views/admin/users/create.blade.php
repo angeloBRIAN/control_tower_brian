@@ -97,6 +97,7 @@
                     <li><strong>Sparepart</strong>: Manages parts ordering</li>
                     <li><strong>Service Advisor</strong>: Creates jobs, views assigned work</li>
                     <li><strong>Foreman</strong>: Views and updates job progress</li>
+                    <li><strong>Billing</strong>: Views all jobs and Kanban, can only add comments</li>
                 </ul>
             </div>
         </div>
