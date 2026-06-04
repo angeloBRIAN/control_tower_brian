@@ -276,7 +276,7 @@ class FixDummyWips extends Command
 
     private function deleteDummy(Job $dummy, string $reason): void
     {
-        JobActivity::log($dummy, JobActivity::ACTION_DELETED, "Deleted via wip:fix-dummies. Reason: {$reason}");
+        \Log::info("FIX_DUMMY_WIPS: Deleted dummy job {$dummy->id} ({$dummy->job_number}). Reason: {$reason}");
         $dummy->delete();
     }
 
