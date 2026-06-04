@@ -490,6 +490,30 @@ class ImportController extends Controller
                 
                 // Manual check for existing job + conflict handling
                 $existingJob = Job::where($searchCriteria)->first();
+                
+                // PREVENT CROSS-FRANCHISE DUPLICATES:
+                // If not found in current franchise, check if same WIP+Plate exists in DIFFERENT franchise.
+                // This happens when user imports CV data into PC menu (or vice versa).
+                if (!$existingJob && $franchise && $plateNumber) {
+                    $crossFranchiseJob = Job::where('job_number', $jobNumber)
+                        ->where('franchise', '!=', $franchise)
+                        ->where('plate_number', $plateNumber)
+                        ->where('is_dummy_wip', false)
+                        ->first();
+                    
+                    if ($crossFranchiseJob) {
+                        // Auto-correct franchise — user imported wrong franchise
+                        $oldFranchise = $crossFranchiseJob->franchise;
+                        $crossFranchiseJob->update([
+                            'franchise' => $franchise,
+                            'import_id' => $importId,
+                        ]);
+                        $existingJob = $crossFranchiseJob;
+                        \Log::warning("CROSS-FRANCHISE FIX: WIP {$jobNumber} (Plate {$plateNumber}) was in {$oldFranchise}, corrected to {$franchise} (Import #{$importId})");
+                        // Note: $updated not incremented here — the plate-match logic below will handle it.
+                    }
+                }
+                
                 $job = null;
                 $isDummy = false;
 
@@ -806,6 +830,27 @@ class ImportController extends Controller
                          if (empty($candidate->franchise)) {
                              $existingJob = $candidate;
                          }
+                    }
+                    
+                    // PREVENT CROSS-FRANCHISE DUPLICATES (Uninvoiced import):
+                    // If not found in current franchise, check if same WIP+Plate exists in different franchise.
+                    if (!$existingJob && $franchise && !empty($plateNumber)) {
+                        $crossFranchiseCandidate = Job::where('job_number', $jobNumber)
+                            ->where('franchise', '!=', $franchise)
+                            ->where('plate_number', $plateNumber)
+                            ->where('is_dummy_wip', false)
+                            ->first();
+                        
+                        if ($crossFranchiseCandidate) {
+                            $oldFranchise = $crossFranchiseCandidate->franchise;
+                            $crossFranchiseCandidate->update([
+                                'franchise' => $franchise,
+                                'import_id' => $importId,
+                            ]);
+                            $existingJob = $crossFranchiseCandidate;
+                            $existingJobsMap[$jobNumber] = ($existingJobsMap[$jobNumber] ?? collect())->push($existingJob);
+                            \Log::warning("CROSS-FRANCHISE FIX (Uninvoiced): WIP {$jobNumber} (Plate {$plateNumber}) was in {$oldFranchise}, corrected to {$franchise} (Import #{$importId})");
+                        }
                     }
                     
                     // RECONCILIATION Checks (simplified for performance, but keeping core logic)
@@ -1161,6 +1206,25 @@ class ImportController extends Controller
                             break;
                         }
                     }
+                    
+                    // PREVENT CROSS-FRANCHISE DUPLICATES (Invoice import):
+                    // If not found in current franchise, check if same WIP+Plate exists in different franchise.
+                    if (!$job && $franchise && !empty($plateNumber) && !empty($existingJobsMap[$normalizedJobNumber])) {
+                        foreach ($existingJobsMap[$normalizedJobNumber] as $candidate) {
+                            if ($candidate->franchise !== $franchise && $candidate->plate_number === $plateNumber && !$candidate->is_dummy_wip) {
+                                // Found cross-franchise match with same plate — auto-correct franchise
+                                $oldFranchise = $candidate->franchise;
+                                $candidate->update([
+                                    'franchise' => $franchise,
+                                    'import_id' => $importId,
+                                ]);
+                                $job = $candidate;
+                                \Log::warning("CROSS-FRANCHISE FIX (Invoice): WIP {$normalizedJobNumber} (Plate {$plateNumber}) was in {$oldFranchise}, corrected to {$franchise} (Import #{$importId})");
+                                break;
+                            }
+                        }
+                    }
+                    
                     // Fallback to any match if no franchise match
                     if (!$job && count($existingJobsMap[$normalizedJobNumber]) > 0) {
                         $job = $existingJobsMap[$normalizedJobNumber][0];
